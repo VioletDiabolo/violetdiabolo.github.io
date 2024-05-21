@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "https://violetdiabolo.github.io/static/css/main.f855e6bc.css",
+    "main.js": "https://violetdiabolo.github.io/static/js/main.e49cc343.js",
+    "static/js/453.e99e6e13.chunk.js": "https://violetdiabolo.github.io/static/js/453.e99e6e13.chunk.js",
+    "static/media/logo.svg": "https://violetdiabolo.github.io/static/media/logo.6ce24c58023cc2f8fd88fe9d219db6c6.svg",
+    "index.html": "https://violetdiabolo.github.io/index.html",
+    "main.f855e6bc.css.map": "https://violetdiabolo.github.io/static/css/main.f855e6bc.css.map",
+    "main.e49cc343.js.map": "https://violetdiabolo.github.io/static/js/main.e49cc343.js.map",
+    "453.e99e6e13.chunk.js.map": "https://violetdiabolo.github.io/static/js/453.e99e6e13.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.f855e6bc.css",
+    "static/js/main.e49cc343.js"
+  ]
+}
