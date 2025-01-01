@@ -5,8 +5,8 @@ import "../styles/Home.css";
 
 function Home() {
   return (
-    <div className='home'>
-      <div className='headerContainer' style={{ backgroundImage: `url(${BannerImage})` }}>
+    <div className='home' style={{ backgroundImage: `url(${BannerImage})` }}>
+      <div className='headerContainer'>
         <h1> VIOLET DIABOLO </h1>
         <p> PREMIER DIABOLO TEAM AT NYU </p>
         <Link to="/about">
