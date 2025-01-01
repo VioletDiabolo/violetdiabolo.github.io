@@ -4,6 +4,7 @@
     background-color: #121619;
     display: flex;
     flex-direction: row;
+    font-family: "Trebuchet MS", "Gill Sans", "Gill Sans MT", Calibri, sans-serif;
   }
   
   .navbar .leftSide {
