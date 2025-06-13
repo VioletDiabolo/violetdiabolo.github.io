@@ -44,6 +44,10 @@
     line-height: 1.2;
     flex-shrink: 0;
   }
+
+  body {
+    overflow-x: hidden;
+  }
   
   @media only screen and (max-width: 900px) {
     .home {
@@ -74,16 +78,5 @@
       font-size: 30px;
       margin: 0;
       text-align: center;
-    }
-  
-    .headerContainer button {
-      background-color: white;
-      color: #121619;
-      margin-bottom: 30px;
-    }
-  
-    .headerContainer button:hover {
-      background-color: rgb(225, 225, 225);
-      color: #121619;
     }
   }
