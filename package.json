@@ -1,7 +1,7 @@
 {
   "name": "violetdiabolo.github.io",
   "version": "0.1.0",
-  "homepage": "https://violetdiabolo.github.io",
+  "homepage": ".",
   "private": true,
   "dependencies": {
     "@emotion/react": "^11.13.5",
