@@ -5,7 +5,8 @@ import "../styles/Media.css";
 
 function Media() {
   return (
-    <div className='Media'>
+    <div className='media'>
+      <div className='mediaContent'>
         <h1 className='mediaTitle'>Media</h1>
         <div className='mediaList'>
             {MediaList.map((mediaItem, key) => {
@@ -18,6 +19,7 @@ function Media() {
             );
             })}
         </div>
+      </div>
     </div>
   )
 }

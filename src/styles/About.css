@@ -18,24 +18,59 @@
   .aboutBottom {
     display: flex;
     flex-direction: column;
-    height: 40%;
     text-align: center;
     justify-content: center;
     align-items: center;
-    margin-top: 50px;
+    padding: 20px 10px;
+    min-height: 30vh;
+  }
+
+  .aboutContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 1200px;
+    padding: 0 10px;
   }
   
-  .aboutBottom p {
+  .aboutContent p {
     color: white;
-    width: 1200px;
+    width: 90%;
+    max-width: 1200px;
+    margin-top: 0;
+    padding: 0 10px;
+    line-height: 1.5;
+    box-sizing: border-box;
+    text-align: center;
   }
   
-  .about .aboutBottom h1 {
+  .aboutContent h1 {
     font-weight: 400;
-    font-size: 70px;
+    font-size: clamp(2rem, 6vw, 70px);
     color: white;
-    height: 30px;
+    height: auto;
+    margin: 0 0 10px 0;
+    padding: 0 10px;
     display: flex;
     justify-content: center;
-    transform: translateY(-40px);
   }
+
+@media (max-height: 600px) {
+  .about {
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .aboutTop {
+    display: none;
+  }
+
+  .aboutBottom {
+    height: 100vh;
+    justify-content: center;
+    align-items: center;
+    padding: 0 20px;
+  }
+}

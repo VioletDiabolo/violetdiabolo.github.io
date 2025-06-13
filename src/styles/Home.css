@@ -25,9 +25,11 @@
     justify-content: center;
     align-items: center;
     font-size: 90px;
-    height: 60px;
+    margin-bottom: 10px;
     font-weight: 750;
     color: #8900e1;
+    line-height: 1.2;
+    flex-shrink: 0;
   }
   
   .headerContainer p {
@@ -38,31 +40,11 @@
     font-size: 40px;
     font-weight: 500;
     color: #8900e1;
+    line-height: 1.2;
+    flex-shrink: 0;
   }
   
-  .headerContainer button {
-    margin-right: 50px;
-    float: right;
-    color: #8900e1;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    justify-content: center;
-    background-color: #8900e1;
-    height: 50px;
-    width: 180px;
-    color: white;
-    text-decoration: none;
-    font-size: 20px;
-  }
-  
-  .headerContainer button:hover {
-    background-color: #57068c;
-    cursor: pointer;
-    transition: 0.3s ease-in;
-  }
-  
-  @media only screen and (max-width: 650px) {
+  @media only screen and (max-width: 900px) {
     .home {
       justify-content: center;
       align-items: center;
@@ -77,19 +59,18 @@
       justify-content: center;
       align-items: center;
       flex-direction: column;
-      background-color: #121619;
       color: white;
     }
   
     .headerContainer h1 {
       font-size: 40px;
-      height: 30px;
-      color: white;
+      margin-bottom: 8px;
+      text-align: center;
     }
   
     .headerContainer p {
       font-size: 30px;
-      color: white;
+      text-align: center;
     }
   
     .headerContainer button {

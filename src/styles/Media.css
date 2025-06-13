@@ -1,8 +1,17 @@
-.Media {
+.media {
     background-color: #57068c;
+    min-height: 90vh;
     padding: 20px;
     text-align: center;
     font-family: "Trebuchet MS", "Gill Sans", "Gill Sans MT", Calibri, sans-serif;
+    box-sizing: border-box;
+  }
+
+  .mediaContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
   
   .mediaTitle {
@@ -16,9 +25,20 @@
     gap: 20px;
     padding: 0;
     list-style-type: none;
+    align-items: stretch;
+    grid-auto-rows: 1fr;
+  }
+
+  .mediaTitleWrapper {
+    height: 5rem;
+    overflow: hidden;
+    margin-bottom: 16px;
   }
   
   .mediaItem {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
     background-color: #8900e1;
     padding: 15px;
     border-radius: 8px;
@@ -29,22 +49,37 @@
     color:white;
     font-size: 1.5rem;
     margin-bottom: 10px;
+    line-height: 1.2;
+    display: -webkit-box;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+    box-orient: vertical;
   }
   
   .mediaImage {
+    margin-top: auto;
     position: relative;
     overflow: hidden;
     background-color: #e0e0e0;
     border-radius: 8px;
   }
   
+  .videoEmbed {
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    position: relative;
+  }
+
   .videoEmbed iframe {
+    display: block;
     width: 100%;
     height: 100%;
+    border: none;
     border-radius: 8px;
   }
   
-  /* Responsive Grid Layout */
   @media (min-width: 320px) {
     .mediaList {
       grid-template-columns: repeat(1, 1fr); /* 1 item per row on small screens */
