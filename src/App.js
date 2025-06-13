@@ -6,7 +6,7 @@ import Board from './pages/Board'
 import Media from './pages/Media';
 import About from './pages/About';
 import Contact from './pages/Contact';
-import {BrowserRouter as Router, Route, Routes} from "react-router-dom";
+import {HashRouter as Router, Route, Routes} from "react-router-dom";
 
 function App() {
   return (
