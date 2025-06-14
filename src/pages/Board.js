@@ -5,7 +5,7 @@ import "../styles/Board.css"
 
 function Board() {
   return (
-    <div className='media'>
+    <div className='board'>
       <div className='boardContent'>
         <h1 className='boardTitle'>Board</h1>
         <div className='boardList'>

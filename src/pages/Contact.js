@@ -4,7 +4,12 @@ import "../styles/Contact.css"
 function Contact() {
   return (
     <div className='contact'>
-        <div>Contact</div>
+        <div className='contactContent'>
+          <h1 className='contactTitle'>Contact Us</h1>
+          <p className='contactInfo'>
+              violetdiabolo@gmail.com
+          </p>
+        </div>
     </div>
   )
 }
