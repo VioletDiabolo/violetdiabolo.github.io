@@ -12,6 +12,22 @@ function Home() {
             <p className='description'>PREMIER DIABOLO TEAM AT NYU</p>
           </div>
         </div>
+        <div className='homeAbout'>
+          <div className='homeAboutContent'>
+            <h1>ABOUT US</h1>
+            <p>
+                Founded in the Spring of 2019, Violet Diabolo is NYU’s award-winning Chinese Yo-Yo team. Adopting this traditional recreational pastime and blending it with energetic contemporary music, Violet Diabolo aims to promote AAPI culture through showcasing their unique performing art. The club has been invited to perform on Gordon Ramsey’s Hell’s Kitchen and has dazzled major crowds at hundreds of other teaching engagements and performances at major galas, festivals, non-profit events, schools, and fundraisers throughout the tri-state area.
+            </p>
+          </div>
+        </div>
+        <div className='homeEvents'>
+          <div className='homeEventsContent'>
+            <h1>EVENTS</h1>
+            <p>
+                We are currently not running practice in the summer. However, some diabolo players in New York City do host monthly meetups; contact us if you want more information!
+            </p>
+          </div>
+        </div>
         <div className='homeFormsContent'>
           <h1>FORMS</h1>
           <div className='homeForms'>

@@ -30,6 +30,7 @@
     min-height: 40vh;
     position: relative;
     z-index: 2;
+    box-sizing: border-box;
   }
 
   .homeContent {
@@ -61,6 +62,107 @@
     padding: 0 10px;
     display: flex;
     justify-content: center;
+  }
+
+  .homeAbout {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    padding: 20px 10px;
+    position: relative;
+    z-index: 2;
+    background-color: #8900e1;
+    padding-top: 20px;
+    box-sizing: border-box;
+  }
+
+  .homeAboutContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 30vh;
+    position: relative;
+    z-index: 2;
+    background-color: #8900e1;
+    box-sizing: border-box;
+  }
+
+  .homeAboutContent h1 {
+    background-color: #8900e1;
+    font-weight: 400;
+    font-size: clamp(1.5rem, 4vw, 40px);
+    color: white;
+    height: auto;
+    margin: 20px 0 10px 0;
+    text-align: center;
+    z-index: 2;
+    box-sizing: border-box;
+  }
+
+  .homeAboutContent p {
+    background-color: #8900e1;
+    color: white;
+    width: 90%;
+    max-width: 1200px;
+    margin-top: 0;
+    line-height: 1.5;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .homeEvents {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    padding: 20px 10px;
+    position: relative;
+    z-index: 2;
+    background-color: #57068c;
+    padding-top: 20px;
+    box-sizing: border-box;
+  }
+
+  .homeEventsContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height:30vh;
+    position: relative;
+    z-index: 2;
+    background-color: #57068c;
+    padding-top: 20px;
+    box-sizing: border-box;
+  }
+
+  .homeEventsContent h1 {
+    background-color: #57068c;
+    font-weight: 400;
+    font-size: clamp(1.5rem, 4vw, 40px);
+    color: white;
+    height: auto;
+    margin: 20px 0 10px 0;
+    text-align: center;
+    z-index: 2;
+    box-sizing: border-box;
+  }
+
+  .homeEventsContent p {
+    background-color: #57068c;
+    color: white;
+    width: 90%;
+    max-width: 1200px;
+    margin-top: 0;
+    line-height: 1.5;
+    text-align: center;
+    box-sizing: border-box;
   }
 
   .homeFormsContent {
