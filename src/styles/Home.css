@@ -129,8 +129,7 @@
 
   @media (max-width: 900px) {
     .homeTop {
-      position: static;
-      height: auto;
+      position: relative;
     }
 
     .homeForms {
