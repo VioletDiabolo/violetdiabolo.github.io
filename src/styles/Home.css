@@ -76,6 +76,7 @@
   }
   
   .homeFormsContent h1 {
+    background-color: #8900e1;
     font-weight: 400;
     font-size: clamp(1.5rem, 4vw, 40px);
     color: white;
