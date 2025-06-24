@@ -13,6 +13,7 @@ function Home() {
             <p className='description'>PREMIER DIABOLO TEAM AT NYU</p>
           </div>
         </div>
+        <div className="homeWipe"></div>
         <div className='homeFormsContent'>
           <h1>FORMS</h1>
           <div className='homeForms'>
