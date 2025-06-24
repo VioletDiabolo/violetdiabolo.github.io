@@ -56,14 +56,12 @@ function Navbar() {
                 <Link to="/" onClick={() => setIsDropdownOpen(false)}> Home </Link>
                 <Link to="/board" onClick={() => setIsDropdownOpen(false)}> Board </Link>
                 <Link to="/media" onClick={() => setIsDropdownOpen(false)}> Media </Link>
-                <Link to="/about" onClick={() => setIsDropdownOpen(false)}> About </Link>
                 <Link to="/contact" onClick={() => setIsDropdownOpen(false)}> Contact </Link>
             </div>
             <div className="fullLinks">
                 <Link to="/">Home</Link>
                 <Link to="/board">Board</Link>
                 <Link to="/media">Media</Link>
-                <Link to="/about">About</Link>
                 <Link to="/contact">Contact</Link>
                 </div>
         </div>
