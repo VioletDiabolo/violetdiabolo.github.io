@@ -6,7 +6,7 @@ export const BoardList = [
         description: "Heyo, I'm Aaron and I'm the current president of Violet Diabolo! I am a vertax one-trick (which means that you should be very careful near me when I'm yoyoing), but I'm currently working on 3D and trying to learn more integrals! In my free time I like to play Tetris (modern, not NES) and spin other non yoyo props like poi, whip, staff, or ropedart. Sometimes you'll catch me playing with fire :)"
     },
     {
-        image: 'https://violetdiabolo.github.io/jon_boardphoto.jpg',
+        image: 'https://violetdiabolo.github.io/jon_boardphoto.jpeg',
         name: 'Jonathan Sun',
         position: 'Artistic Director',
         description: "Yo. I'm JonaSun. Resident transplant from UMich Revolution. I’m all about carefully crafting combos for creative, yet chaotic, choreography. Proud proponent of plasma torch for cutting yo-yo string. I'm currently working on getting DNA into flare (a.k.a. cancer) consistently. When I'm not spinning, I am mad scientist. It is so cool!"
