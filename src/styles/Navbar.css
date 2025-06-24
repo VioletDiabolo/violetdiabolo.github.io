@@ -54,7 +54,11 @@
     opacity: 0;
     transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out;
     text-align: center;
-    
+    transition: transform 0.2s;
+  }
+  
+  .navbar .dropdownLinks :hover {
+    transform: scale(1.1);
   }
 
   .navbar .dropdownLinks.open {
@@ -83,6 +87,11 @@
 
   .navbar .rightSide .fullLinks {
     display: flex;
+    transition: transform 0.2s;
+  }
+  
+  .navbar .rightSide .fullLinks :hover {
+    transform: scale(1.1);
   }
 
   .navbar .rightSide .fullLinks a {

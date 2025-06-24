@@ -1,16 +1,18 @@
 .board {
     background-color: #57068c;
-    padding: 20px;
     text-align: center;
     font-family: "Trebuchet MS", "Gill Sans", "Gill Sans MT", Calibri, sans-serif;
     box-sizing: border-box;
   }
 
   .boardContent {
+    padding: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    min-height: 90vh;
+    box-sizing: border-box;
   }
   
   .boardTitle {
