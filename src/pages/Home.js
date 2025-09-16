@@ -24,7 +24,7 @@ function Home() {
           <div className='homeEventsContent'>
             <h1>EVENTS</h1>
             <p>
-                We are currently not running practice in the summer. However, some diabolo players in New York City do host monthly meetups; contact us if you want more information!
+                Practices are on Saturdays from 1-3PM at Kimmel 606! Our first practice will be on September 20. All equipment will be provided, and anyone is welcome, regardless of experience!
             </p>
           </div>
         </div>
