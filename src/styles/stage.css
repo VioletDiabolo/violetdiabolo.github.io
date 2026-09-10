@@ -1,0 +1,64 @@
+/*
+ * The 3D stage: the sticky WebGL canvas, and the two fallback states that stand in
+ * for it. #stage and #content are SIBLINGS (see index.html) -- that is what lets the
+ * sticky stage stay pinned behind #content for the entire height of the document
+ * instead of unsticking after one viewport's worth of scroll.
+ */
+
+#stage {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  width: 100%;
+  z-index: 0;
+  overflow: hidden;
+  /* Purely decorative (aria-hidden in the markup) -- never let it steal a click,
+     hover, or scroll gesture meant for the content column stacked on top of it. */
+  pointer-events: none;
+}
+
+#stage > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * data-stage lives on <html>, set once by main.js: "live" (WebGL + motion), "static"
+ * (WebGL present, prefers-reduced-motion: reduce -- one frozen frame, no choreography),
+ * or "unsupported" (no WebGL at all).
+ */
+
+/* Static: the renderer already drew a single frame and stopped. Nothing to add here --
+   there was never a scroll-cue to begin with, so there is nothing that would now read
+   as broken. The frame is simply still, on purpose. */
+
+/* Unsupported: swap the canvas for a hand-built SVG of the same object. */
+html[data-stage='unsupported'] #renderer {
+  display: none;
+}
+
+.stage-fallback {
+  display: none;
+}
+
+html[data-stage='unsupported'] .stage-fallback {
+  display: block;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  height: min(72dvh, 640px);
+  width: auto;
+}
+
+/* ---------------------------------------------------------------------------
+ * Narrow screens: the content column becomes the only column (see sections.css),
+ * so the diabolo no longer has a dedicated empty half to occupy. Dim it instead of
+ * hiding it outright -- it stays present as atmosphere behind the text, at an
+ * opacity low enough that body copy keeps full contrast on top of it.
+ * ------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  #stage {
+    opacity: 0.3;
+  }
+}

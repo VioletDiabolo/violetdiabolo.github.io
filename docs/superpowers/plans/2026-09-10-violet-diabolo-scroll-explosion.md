@@ -88,6 +88,18 @@ Every task's requirements implicitly include this section.
 
 `base: './'` is required — GitHub Pages serves this from a subpath in some configurations and absolute asset URLs would 404.
 
+**jsdom routing:** Vitest 5 removed `environmentMatchGlobs` (it is silently ignored, not an error —
+verified against the installed `vitest@5.0.0`: the string appears nowhere in the package, and a
+`.dom.test.js` file run without a docblock gets `document === undefined`). Per-file environment is
+now declared with a docblock on the **first line** of the test file:
+
+```js
+// @vitest-environment jsdom
+```
+
+Every `tests/*.dom.test.js` in this plan carries that line. Omitting it produces
+`ReferenceError: document is not defined` with nothing pointing at the cause.
+
 ```js
 import { defineConfig } from 'vite';
 
@@ -96,7 +108,6 @@ export default defineConfig({
   build: { outDir: 'dist', assetsInlineLimit: 0 },
   test: {
     environment: 'node',
-    environmentMatchGlobs: [['tests/**/*.dom.test.js', 'jsdom']],
     include: ['tests/**/*.test.js'],
   },
 });
@@ -257,7 +268,16 @@ Expected: FAIL — cannot resolve `../src/content/index.js`.
 
 - [ ] **Step 3: Create `src/content/index.js`**
 
-Copy the `body` strings **character for character** from the source repo, including the curly apostrophes in `NYU’s` and `Hell’s`.
+Copy the `body` strings **character for character** from the source repo. The apostrophes are a
+deliberate mix and are load-bearing. Verified byte-level against the legacy source:
+
+| Form | Occurrences |
+|---|---|
+| U+2019 curly `’` | `NYU’s award-winning`, `Ramsey’s Hell’s Kitchen`, `I’m all about carefully crafting` |
+| U+0027 ASCII `'` | `Heyo, I'm Aaron`, `I'm the current president`, `I'm currently working on 3D`, `Sometimes you'll catch me`, `can't really write`, `I'm currently working on getting DNA`, `I'm not spinning` |
+
+Note `I’m all about` is curly but `I'm currently working on getting DNA` is ASCII — both inside
+Jonathan's single bio. Do not normalise either way; the regression test pins every entry above.
 
 ```js
 export const SITE = {
@@ -304,7 +324,7 @@ const AARON = {
     "Heyo, I'm Aaron and I'm the current president of Violet Diabolo! I am a vertax one-trick (which " +
     "means that you should be very careful near me when I'm yoyoing), but I'm currently working on 3D " +
     'and trying to learn more integrals! In my free time I like to play Tetris (modern, not NES) and ' +
-    'spin other non yoyo props like poi, whip, staff, or ropedart. Sometimes you’ll catch me playing ' +
+    "spin other non yoyo props like poi, whip, staff, or ropedart. Sometimes you'll catch me playing " +
     'with fire :)',
 };
 
@@ -399,7 +419,7 @@ Measured on the real masters: `vdgroupphotousadc.png` is **11.3 MB**; at 1600 px
 - [ ] **Step 1: Copy the masters into the repo**
 
 ```bash
-mkdir -p assets-src
+mkdir -p assets-src public
 git clone --depth 1 https://github.com/violetdiabolo/violetdiabolo.github.io.git /tmp/vd-src
 cp /tmp/vd-src/src/assets/vdgroupphotousadc.png assets-src/group-usadc.png
 cp /tmp/vd-src/src/assets/usadcphoto.png        assets-src/usadc-wide.png
@@ -422,6 +442,17 @@ describe('image pipeline', () => {
   it('declares every master that content references', () => {
     const names = TARGETS.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['group-usadc', 'usadc-wide', 'aaron', 'jon']));
+  });
+
+  it('caps widths at 2000, since 2400 cannot meet the size budget at usable quality', () => {
+    for (const t of TARGETS) expect(Math.max(...t.widths)).toBeLessThanOrEqual(2000);
+  });
+
+  it('emits no last-resort JPEG at the largest width', () => {
+    for (const t of TARGETS) {
+      if (t.jpgWidths.length === 0) continue;
+      expect(Math.max(...t.jpgWidths)).toBeLessThan(Math.max(...t.widths));
+    }
   });
 
   it('emits an 800px derivative for each board portrait', () => {
@@ -460,11 +491,21 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(ROOT, 'assets-src');
 const OUT = path.join(ROOT, 'public', 'images');
 
+/**
+ * Widths cap at 2000, not 2400. Measured on the 4032x3024 master: at 2400 the brief's
+ * intended quality yields WebP 406 KB and JPEG 531 KB, both over the 400 KB budget, while
+ * 2000 yields AVIF 240 / WebP 307 / JPEG 387. Capping the width preserves image quality;
+ * dropping quality to fit 2400 would not.
+ *
+ * `jpgWidths` stops the last-resort JPEG at 1600 — it exists only for browsers supporting
+ * neither AVIF nor WebP, which no longer meaningfully exist, and it is the least efficient
+ * format at exactly the size where the budget is tightest.
+ */
 export const TARGETS = [
-  { name: 'group-usadc', file: 'group-usadc.png', widths: [900, 1600, 2400], jpg: true },
-  { name: 'usadc-wide',  file: 'usadc-wide.png',  widths: [900, 1600, 2400], jpg: true },
-  { name: 'aaron',       file: 'aaron.jpg',       widths: [400, 800],        jpg: false },
-  { name: 'jon',         file: 'jon.jpg',         widths: [400, 800],        jpg: false },
+  { name: 'group-usadc', file: 'group-usadc.png', widths: [900, 1600, 2000], jpgWidths: [900, 1600] },
+  { name: 'usadc-wide',  file: 'usadc-wide.png',  widths: [900, 1600, 2000], jpgWidths: [900, 1600] },
+  { name: 'aaron',       file: 'aaron.jpg',       widths: [400, 800],        jpgWidths: [] },
+  { name: 'jon',         file: 'jon.jpg',         widths: [400, 800],        jpgWidths: [] },
 ];
 
 export async function buildAssets() {
@@ -477,7 +518,7 @@ export async function buildAssets() {
         base.clone().avif({ quality: 55 }).toFile(path.join(OUT, `${t.name}-${w}.avif`)),
         base.clone().webp({ quality: 72 }).toFile(path.join(OUT, `${t.name}-${w}.webp`)),
       ];
-      if (t.jpg) jobs.push(base.clone().jpeg({ quality: 78, mozjpeg: true }).toFile(path.join(OUT, `${t.name}-${w}.jpg`)));
+      if (t.jpgWidths.includes(w)) jobs.push(base.clone().jpeg({ quality: 78, mozjpeg: true }).toFile(path.join(OUT, `${t.name}-${w}.jpg`)));
       const results = await Promise.all(jobs);
       results.forEach((r, i) => written.push({ file: `${t.name}-${w}`, kb: Math.round(r.size / 1024), i }));
     }
@@ -741,7 +782,7 @@ Flat lights make moulded plastic read as clay. `RoomEnvironment` + `PMREMGenerat
 - Produces:
   - `GRADIENT_STOPS: Array<{ offset: number, color: string }>`
   - `createGradientTexture(): CanvasTexture` — violet at the neck fading to milky white at the rim
-  - `createEnvironment(renderer): Texture` — PMREM-prefiltered `RoomEnvironment`
+  - `createEnvironment(renderer): WebGLRenderTarget` — PMREM-prefiltered `RoomEnvironment`. Returns the **target**, not the texture, so its framebuffer can be freed; read `.texture` off it.
   - `createMaterials({ renderer, tier }): { cup, gasket, hub, bearing }`
   - `disposeMaterials(materials): void`
 - Note: `createMaterials` needs a real WebGL context, so it is **not** unit-tested here — it is covered by the browser verification in Task 12. Only the pure gradient data is unit-tested, in jsdom.
@@ -750,6 +791,7 @@ Flat lights make moulded plastic read as clay. `RoomEnvironment` + `PMREMGenerat
 
 ```js
 // tests/materials.dom.test.js
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { GRADIENT_STOPS } from '../src/diabolo/materials.js';
 
@@ -816,11 +858,25 @@ export function createGradientTexture() {
   return tex;
 }
 
+/**
+ * Returns the PMREM **render target**, not just its texture.
+ *
+ * `fromScene()` allocates a WebGLRenderTarget with a real framebuffer and depth
+ * renderbuffer. Only `WebGLRenderTarget.dispose()` frees those; disposing the bare
+ * texture calls `gl.deleteTexture` and leaks the rest. `renderer.dispose()` does not
+ * rescue it either — `WebGLProperties.dispose()` swaps in a fresh WeakMap without
+ * walking the old one. On a page that tears down and re-inits, that leak is unbounded.
+ *
+ * The RoomEnvironment scene owns a BoxGeometry and 8 materials and is only needed
+ * synchronously, so it is disposed as soon as `fromScene` returns.
+ */
 export function createEnvironment(renderer) {
   const pmrem = new PMREMGenerator(renderer);
-  const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const room = new RoomEnvironment();
+  const target = pmrem.fromScene(room, 0.04);
+  room.dispose();
   pmrem.dispose();
-  return env;
+  return target;
 }
 
 /**
@@ -829,7 +885,8 @@ export function createEnvironment(renderer) {
  */
 export function createMaterials({ renderer, tier }) {
   const map = createGradientTexture();
-  const env = createEnvironment(renderer);
+  const envTarget = createEnvironment(renderer);
+  const env = envTarget.texture;
   const high = tier === 'high';
 
   const cup = new MeshPhysicalMaterial({
@@ -860,7 +917,8 @@ export function createMaterials({ renderer, tier }) {
     color: new Color('#cfd2d8'), envMap: env, roughness: 0.18, metalness: 1.0,
   });
 
-  return { cup, gasket, hub, bearing, _map: map, _env: env };
+  // _envTarget, not _env: disposing the target frees its framebuffer AND its texture.
+  return { cup, gasket, hub, bearing, _map: map, _envTarget: envTarget };
 }
 
 export function disposeMaterials(materials) {
@@ -1191,7 +1249,7 @@ export function createStage({ canvas, tier }) {
   const materials = createMaterials({ renderer, tier });
   const { root, parts } = buildDiabolo({ materials, segments: settings.segments });
   scene.add(root);
-  scene.environment = materials._env;
+  scene.environment = materials._envTarget.texture;
 
   /** anime.js writes this scalar; the render loop reads it. Never the reverse. */
   const state = { spinRate: 1 };
@@ -1683,6 +1741,7 @@ git commit -m "feat: add scroll-scrubbed explosion choreography"
 
 ```js
 // tests/ui.dom.test.js
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderSections } from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
@@ -2069,6 +2128,7 @@ Two things land together because the design director's pass needs the fallback s
 
 ```js
 // tests/detect.dom.test.js
+// @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { supportsWebGL, prefersReducedMotion } from '../src/fallback/detect.js';
 
