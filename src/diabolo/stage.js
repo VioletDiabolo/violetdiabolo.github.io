@@ -96,6 +96,10 @@ export function createStage({ canvas, tier }) {
     renderer.setSize(view.width, view.height, false);
     camera.aspect = view.aspect;
     camera.updateProjectionMatrix();
+
+    // Repaint immediately. setSize() clears the drawing buffer, and on the
+    // reduced-motion path no loop exists to redraw — the canvas would stay blank.
+    renderer.render(scene, camera);
   }
 
   function dispose() {

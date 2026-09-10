@@ -23,6 +23,10 @@ export function mountForms(el) {
       frame.width = '100%';
       frame.height = '1000';
       button.replaceWith(frame);
+      // replaceWith removes the focused element, which resets focus to <body>.
+      // Move focus onto the embed so keyboard users stay where they were.
+      frame.tabIndex = -1;
+      frame.focus();
     });
 
     card.append(heading, button);

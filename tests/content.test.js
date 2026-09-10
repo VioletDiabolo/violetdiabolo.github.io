@@ -1,6 +1,6 @@
 // tests/content.test.js
 import { describe, it, expect } from 'vitest';
-import { SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS } from '../src/content/index.js';
+import { SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, SECTION_HEADINGS } from '../src/content/index.js';
 
 describe('content', () => {
   it('carries the site identity verbatim', () => {
@@ -70,5 +70,13 @@ describe('content', () => {
     expect(aaronSecretary.description).toContain("can't really write");
     expect(jon.description).toContain("I'm currently working on getting DNA");
     expect(jon.description).toContain("I'm not spinning");
+  });
+
+  it('supplies a heading for every section that has no natural heading field', () => {
+    expect(Object.keys(SECTION_HEADINGS).sort()).toEqual(['board', 'contact', 'media']);
+    for (const heading of Object.values(SECTION_HEADINGS)) {
+      expect(typeof heading).toBe('string');
+      expect(heading.length).toBeGreaterThan(0);
+    }
   });
 });
