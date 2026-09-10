@@ -268,7 +268,16 @@ Expected: FAIL — cannot resolve `../src/content/index.js`.
 
 - [ ] **Step 3: Create `src/content/index.js`**
 
-Copy the `body` strings **character for character** from the source repo, including the curly apostrophes in `NYU’s` and `Hell’s`.
+Copy the `body` strings **character for character** from the source repo. The apostrophes are a
+deliberate mix and are load-bearing. Verified byte-level against the legacy source:
+
+| Form | Occurrences |
+|---|---|
+| U+2019 curly `’` | `NYU’s award-winning`, `Ramsey’s Hell’s Kitchen`, `I’m all about carefully crafting` |
+| U+0027 ASCII `'` | `Heyo, I'm Aaron`, `I'm the current president`, `I'm currently working on 3D`, `Sometimes you'll catch me`, `can't really write`, `I'm currently working on getting DNA`, `I'm not spinning` |
+
+Note `I’m all about` is curly but `I'm currently working on getting DNA` is ASCII — both inside
+Jonathan's single bio. Do not normalise either way; the regression test pins every entry above.
 
 ```js
 export const SITE = {
