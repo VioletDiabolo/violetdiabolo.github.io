@@ -1,6 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { createLifecycle } from '../src/diabolo/lifecycle.js';
+
+function listJsFiles(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...listJsFiles(full));
+    else if (entry.endsWith('.js')) out.push(full);
+  }
+  return out;
+}
 
 function harness({ hidden = false } = {}) {
   let ioCallback;
@@ -159,9 +171,36 @@ describe('lifecycle', () => {
 });
 
 describe('engine independence', () => {
-  it('never imports anime.js, whose global engine other visible animations share', () => {
-    const source = readFileSync(new URL('../src/diabolo/lifecycle.js', import.meta.url), 'utf8');
-    expect(source).not.toMatch(/from\s+['"]animejs/);
-    expect(source).not.toMatch(/require\(\s*['"]animejs/);
+  // Built from a plain path, not `new URL(..., import.meta.url)`: some sibling test
+  // files run under `@vitest-environment jsdom`, whose global URL shim resolves relative
+  // file: URLs against http://localhost:3000 instead of the filesystem. This file does
+  // not opt into that environment, but resolving by plain path costs nothing and stays
+  // safe regardless.
+  const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src');
+  // The only module the spec's own boundary table (§10) lists as depending on anime.js.
+  const ANIME_OWNER = path.join(SRC, 'scroll', 'choreography.js');
+
+  it('keeps anime.js confined to the one module that owns the scrubbed timeline', () => {
+    for (const file of listJsFiles(SRC)) {
+      if (file === ANIME_OWNER) continue;
+      const source = readFileSync(file, 'utf8');
+      const rel = path.relative(SRC, file);
+      expect(source, `src/${rel} imports animejs; only scroll/choreography.js should`).not.toMatch(/from\s+['"]animejs['"]/);
+      expect(source, `src/${rel} requires animejs; only scroll/choreography.js should`).not.toMatch(/require\(\s*['"]animejs['"]\s*\)/);
+    }
+  });
+
+  it("never imports or calls animejs's global engine anywhere, not even in choreography.js", () => {
+    // Pausing/resuming the shared engine would freeze every other visible anime.js
+    // animation riding the same ticker (spec §6.2). createTimeline/onScroll are the
+    // legitimate import; reaching for `engine` itself is not, in any file, including the
+    // one file allowed to import animejs at all.
+    for (const file of listJsFiles(SRC)) {
+      const source = readFileSync(file, 'utf8');
+      const rel = path.relative(SRC, file);
+      expect(source, `src/${rel} imports animejs's global engine`).not.toMatch(/\{[^}]*\bengine\b[^}]*\}\s*from\s*['"]animejs['"]/);
+      expect(source, `src/${rel} calls engine.pause()`).not.toMatch(/\bengine\.pause\(/);
+      expect(source, `src/${rel} calls engine.resume()`).not.toMatch(/\bengine\.resume\(/);
+    }
   });
 });

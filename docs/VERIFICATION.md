@@ -9,7 +9,7 @@ environment could not produce a condition, that is stated rather than papered ov
 | Claim | Status |
 |---|---|
 | Render loop stops when the document is hidden | **Verified, real condition** |
-| Render loop stops when the stage is scrolled offscreen | **Not verified** — environment cannot deliver scroll/rAF |
+| Render loop stops when the stage is scrolled offscreen | **Unreachable by design** — `#stage` is sticky and full-height, so it is always onscreen; see §2 |
 | anime.js global engine is never paused by us | **Verified** by construction + test guard |
 | Explosion timeline drives all 7 parts and is reversible | **Verified** by direct timeline seek |
 | Scroll position drives the timeline | **Verified structurally**; live tick delivery **not verified** |
@@ -40,15 +40,32 @@ bare requestAnimationFrame loop : 0 ticks in 900 ms
 Both zero. So the absence of frames is attributable to the host, and the lifecycle's own
 `isRunning() === false` is what demonstrates our behaviour.
 
-## 2. Scrolled offscreen — NOT VERIFIED, and why
+## 2. Scrolled offscreen — unreachable by design, not merely unverified
 
-Not verified. This environment fires no `scroll` events at all (measured above: 0 events
-across a real 3000 px scroll). An IntersectionObserver-driven pause cannot be exercised
-where the host never reports scroll. **No claim is made that this path works in a browser.**
-It is covered by 13 unit tests against an injected observer, which is not the real condition.
+This branch is not just unverified in this environment; it is **unreachable by design in
+any browser**. `#stage` is `position: sticky; top: 0; height: 100dvh` and is a sibling of
+`#content` inside `body` (index.html), so it stays pinned to the viewport for the entire
+document height. There is no scroll position at which it leaves the viewport, so its
+`IntersectionObserver` reports `isIntersecting: true` from first paint and **can never flip
+to `false`**. §5's own measurements prove this directly: `#stage` top/bottom sits at
+`0 / 768` at scrollY 0, 3760, **and** 6752 — the last of those is the end of the document,
+and the box has not moved at all.
 
-Anyone re-running this should open the built site in an ordinary focused tab, scroll the
-stage fully out of view, wait 3 s, and confirm `__vd.lifecycle.frameCount()` is unchanged.
+This environment also happens to fire no `scroll` events (measured above: 0 events across a
+real 3000 px scroll), but that is incidental — even a host that delivered perfect scroll
+events could not exercise this branch, because this layout never presents the observer with
+anything to react to.
+
+Practically, this means `document.hidden` (§1) is the only pause gate that ever actually
+fires for this page as built. The IntersectionObserver wiring in `src/diabolo/lifecycle.js`
+is defensive depth — correct, and worth keeping for a future layout that does let the stage
+scroll offscreen — rather than a path this particular layout can trigger. No amount of
+re-running this probe against a real browser would change that answer, so there is nothing
+to gain from a human scrolling the built site to check it.
+
+The pause/resume logic itself — independent of whether this layout ever drives it — is
+covered by the 13 tests in `tests/lifecycle.test.js`, which exercise the branch through an
+injected `observerFactory` standing in for `IntersectionObserver` rather than a real one.
 
 ## 3. anime.js global engine
 
@@ -152,7 +169,9 @@ largest image     307 kB  (from an 11.3 MB master; 240 kB AVIF is what actually 
 
 ## Outstanding for a human on a real machine
 
-1. Scroll the stage fully offscreen and confirm the render loop stops (§2).
-2. Watch the explosion scrub live end to end (§5).
-3. Toggle OS reduced-motion and confirm `data-stage="static"` looks deliberate.
-4. Disable WebGL and confirm `data-stage="unsupported"` shows the static SVG diabolo.
+1. Watch the explosion scrub live end to end (§5).
+2. Toggle OS reduced-motion and confirm `data-stage="static"` looks deliberate.
+3. Disable WebGL and confirm `data-stage="unsupported"` shows the static SVG diabolo.
+
+(Scrolling the stage offscreen is deliberately not listed here — §2 explains why this
+layout makes that impossible to observe, so there would be nothing to see.)

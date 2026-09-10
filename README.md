@@ -9,7 +9,7 @@ npm install
 npm run dev          # Start dev server on localhost:5173
 npm run build        # Build production (runs `npm run assets` first)
 npm run preview      # Preview built dist/ locally
-npm test             # Run 119 tests across 13 test files
+npm test             # Run 127 tests across 13 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -33,22 +33,22 @@ To deploy:
 | `src/fallback/` | Feature detection (WebGL support, reduced-motion preference). |
 | `src/styles/` | Base typography/layout, section styles, stage canvas styles. |
 | `scripts/build-assets.mjs` | Image optimization pipeline (resize, AVIF/WebP/JPEG conversion). |
-| `tests/` | 119 unit tests. 13 test files verify content, geometry, lifecycle, scroll binding, DOM structure, feature detection. |
+| `tests/` | 127 unit tests. 13 test files verify content, geometry, lifecycle, scroll binding, DOM structure, feature detection. |
 | `public/images/` | Generated derivative images (run `npm run assets` to refresh). |
 | `docs/VERIFICATION.md` | Real-condition verification record from Chromium; see it for what is/isn't verified. |
 
-**Boundaries enforced by tests:**
+**Module boundaries (conventions, not mechanically checked):**
 - `src/content/*` holds no markup (literals only).
 - `src/ui/*` holds no 3D geometry or anime.js imports.
 - `src/diabolo/*` holds no copy or DOM rendering.
 
-The test suite fails if club copy is hardcoded into a `ui/` module, ensuring content edits don't require code changes.
+**One boundary actually enforced by a test:** `src/ui/*` never hardcodes club copy (site name/tagline, contact email, About/Events body text, media titles). `tests/ui.dom.test.js` greps every file in `src/ui/` for those literal strings and fails if one is baked in rather than imported from `src/content/`. This is what actually guarantees content edits don't require code changes; the three boundaries above are followed but not currently checked by any test.
 
 ## How the 3D works
 
 Seven parts (two cups, two gaskets, two hub cones, one bearing) are built procedurally using Three.js `LatheGeometry`, revolved from 2D half-profiles defined in `src/diabolo/profiles.js`. No downloaded 3D model files.
 
-The explosion is driven by an anime.js timeline (508 ms duration) that animates each part's position and rotation. Page scroll (0 to 1) is mapped onto timeline progress (0 to 508) by a ScrollObserver in `src/scroll/choreography.js`, which calls `timeline.seek()` on every scroll tick. Three.js's render loop ticks every frame independent of scroll, reading part positions written by anime and rendering them.
+The explosion is driven by an anime.js timeline (666 ms duration: a 90 ms hero hold, then a staggered explode cascade, then a reassembly beat that returns every part home) that animates each part's position and rotation. Page scroll (0 to 1) is mapped onto timeline progress (0 to 666) by a ScrollObserver in `src/scroll/choreography.js`, which calls `timeline.seek()` on every scroll tick. Three.js's render loop ticks every frame independent of scroll, reading part positions written by anime and rendering them.
 
 ## The one rule: one owner per transform
 
@@ -82,18 +82,18 @@ Widths are capped at 2000 px (not 2400) to stay under budget while preserving qu
 npm test
 ```
 
-Runs 119 tests across 13 test files:
+Runs 127 tests across 13 test files:
 - `content.test.js` — apostrophe preservation, board structure, media list, contact details
 - `lifecycle.test.js` — render loop pause/resume on visibility changes; guards against anime.js global engine import
 - `choreography.test.js`, `choreography.dom.test.js` — timeline seek, scroll→timeline binding, sticky target rejection
 - `profiles.test.js`, `build.test.js` — geometry dimensions and LatheGeometry construction
-- `stage.test.js`, `materials.test.js`, `detect.dom.test.js`, `ui.dom.test.js`, `reveal.dom.test.js`, `assets.test.js`, `smoke.test.js` — rendering, materials, feature detection, DOM structure, image budget
+- `stage.test.js`, `materials.dom.test.js`, `detect.dom.test.js`, `ui.dom.test.js`, `reveal.dom.test.js`, `assets.test.js`, `smoke.test.js` — rendering, materials, feature detection, DOM structure, image budget
 
 ## Known limitations
 
 See **Outstanding for a human on a real machine** in [`docs/VERIFICATION.md`](docs/VERIFICATION.md):
 
-1. **Scroll pause not verified.** Environment cannot deliver scroll events or `requestAnimationFrame` ticks. An IntersectionObserver watches for the stage scrolling offscreen to pause rendering. This is covered by unit tests but not verified in a real browser. To test on your machine: open the built site in a focused tab, scroll the stage fully out of view, wait 3 s, and confirm `__vd.lifecycle.frameCount()` stops changing.
+1. **Scroll-offscreen pause is unreachable by design, not just unverified.** `#stage` is `position: sticky; top: 0; height: 100dvh`, pinned to the viewport for the entire document height — its `IntersectionObserver` reports `isIntersecting: true` from first paint and can never flip to `false` in any browser, so this branch never fires for this page as built (there is nothing to scroll to that would trigger it — see `docs/VERIFICATION.md` §2). `document.hidden` is the only pause gate that actually runs live. The IntersectionObserver wiring is defensive depth, exercised by the 13 `tests/lifecycle.test.js` unit tests through an injected observer rather than a real one.
 
 2. **Live scroll scrub not verified.** The ScrollObserver's scroll→timeline binding is structurally correct but was not exercised end-to-end with live scroll events.
 

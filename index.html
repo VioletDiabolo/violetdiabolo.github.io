@@ -26,7 +26,13 @@
       exact same GRADIENT_STOPS colours as src/diabolo/materials.js so this reads as
       the same object, not a placeholder for it.
     -->
-    <svg class="stage-fallback" viewBox="0 0 320 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a diabolo, exploded into its parts">
+    <!--
+      No role/aria-label here: this SVG lives inside #stage, which is aria-hidden="true"
+      above, so any label on it would be unreachable to assistive tech regardless. It is
+      purely decorative -- the page's text content already conveys everything -- so it
+      carries its own aria-hidden too rather than a label nothing can ever read.
+    -->
+    <svg class="stage-fallback" viewBox="0 0 320 600" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>
         <linearGradient id="vd-bowl-top" x1="0" y1="1" x2="0" y2="0">
           <stop offset="0" stop-color="#4c1d95" />
