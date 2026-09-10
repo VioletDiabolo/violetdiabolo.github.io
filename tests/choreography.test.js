@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { SCROLL_BEATS } from '../src/scroll/choreography.js';
+import { SCROLL_BEATS, beatTarget, BEAT_DURATION, BEAT_STAGGER } from '../src/scroll/choreography.js';
 import { PART_IDS } from '../src/diabolo/profiles.js';
+import { HOME } from '../src/diabolo/build.js';
 
 describe('SCROLL_BEATS', () => {
   it('assigns every part exactly one beat', () => {
@@ -43,5 +44,58 @@ describe('SCROLL_BEATS', () => {
   it('separates parts laterally so labels do not collide', () => {
     const xs = SCROLL_BEATS.map((b) => b.offset[0]);
     expect(new Set(xs).size).toBeGreaterThan(1);
+  });
+});
+
+describe('beatTarget', () => {
+  it('adds each offset to its part HOME position rather than replacing or subtracting it', () => {
+    for (const beat of SCROLL_BEATS) {
+      expect(beatTarget(beat).position.y).toBeCloseTo(HOME[beat.part].y + beat.offset[1], 10);
+    }
+  });
+
+  it('lifts the top half above its rest height and drops the bottom half below', () => {
+    const targetFor = (id) => beatTarget(SCROLL_BEATS.find((b) => b.part === id));
+    for (const id of ['cupTop', 'gasketTop', 'hubConeTop']) {
+      expect(targetFor(id).position.y).toBeGreaterThan(HOME[id].y);
+    }
+    for (const id of ['cupBottom', 'gasketBottom', 'hubConeBottom']) {
+      expect(targetFor(id).position.y).toBeLessThan(HOME[id].y);
+    }
+  });
+
+  it('never lands two parts on the same exploded position', () => {
+    const keys = SCROLL_BEATS.map((b) => {
+      const p = beatTarget(b).position;
+      return `${p.x},${p.y},${p.z}`;
+    });
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('gives a part with no lateral offset no lateral tilt', () => {
+    const flat = { part: 'axleBearing', offset: [0, 0, 0], spinRate: 1 };
+    expect(beatTarget(flat).rotation.z).toBe(0);
+    expect(beatTarget(flat).rotation.x).toBe(0);
+  });
+});
+
+describe('timeline shape', () => {
+  it('overlaps beats so parts cascade instead of moving one at a time', () => {
+    expect(BEAT_STAGGER).toBeLessThan(BEAT_DURATION);
+  });
+
+  it('ends the bearing spin-down before the timeline runs out', () => {
+    const bearingIndex = SCROLL_BEATS.findIndex((b) => b.spinRate !== 1);
+    const spinDownEnds = bearingIndex * BEAT_STAGGER + 2 * BEAT_DURATION;
+    const timelineEnds = (SCROLL_BEATS.length - 1) * BEAT_STAGGER + BEAT_DURATION;
+    expect(spinDownEnds).toBeLessThanOrEqual(timelineEnds);
+  });
+});
+
+describe('SCROLL_BEATS immutability', () => {
+  it('cannot be mutated in place by a consumer', () => {
+    const before = SCROLL_BEATS[0].offset[1];
+    try { SCROLL_BEATS[0].offset[1] = 999; } catch { /* frozen throws in strict mode */ }
+    expect(SCROLL_BEATS[0].offset[1]).toBe(before);
   });
 });
