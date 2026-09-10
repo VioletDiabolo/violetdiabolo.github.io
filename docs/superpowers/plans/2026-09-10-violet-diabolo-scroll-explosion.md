@@ -399,7 +399,7 @@ Measured on the real masters: `vdgroupphotousadc.png` is **11.3 MB**; at 1600 px
 - [ ] **Step 1: Copy the masters into the repo**
 
 ```bash
-mkdir -p assets-src
+mkdir -p assets-src public
 git clone --depth 1 https://github.com/violetdiabolo/violetdiabolo.github.io.git /tmp/vd-src
 cp /tmp/vd-src/src/assets/vdgroupphotousadc.png assets-src/group-usadc.png
 cp /tmp/vd-src/src/assets/usadcphoto.png        assets-src/usadc-wide.png
