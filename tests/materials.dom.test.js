@@ -45,8 +45,8 @@ describe('gradient texture', () => {
 
     // Bottom (y = height) to top (y = 0). Reversing this inverts the cup.
     expect(calls.axis).toEqual([0, 256, 0, 0]);
-    expect(calls.stops[0]).toEqual([0, '#7b3fd4']);
-    expect(calls.stops.at(-1)).toEqual([1, '#f6f1fb']);
+    expect(calls.stops[0]).toEqual([0, '#4c1d95']);
+    expect(calls.stops.at(-1)).toEqual([1, '#d9bdf7']);
     expect(texture.colorSpace).toBe(SRGBColorSpace);
   });
 });

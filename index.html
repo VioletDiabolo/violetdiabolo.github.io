@@ -6,10 +6,74 @@
   <title>Violet Diabolo</title>
   <meta name="description" content="Premier Diabolo Team at NYU" />
   <link rel="icon" href="./favicon.ico" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
   <link rel="stylesheet" href="./src/styles/base.css" />
+  <link rel="stylesheet" href="./src/styles/stage.css" />
+  <link rel="stylesheet" href="./src/styles/sections.css" />
 </head>
 <body>
-  <div id="stage" aria-hidden="true"><canvas id="renderer"></canvas></div>
+  <div id="stage" aria-hidden="true">
+    <canvas id="renderer"></canvas>
+
+    <!--
+      Shown only when html[data-stage="unsupported"] (src/fallback/detect.js found no
+      WebGL context). Built from the same two-mirrored-bowl / cyan-gasket-pair /
+      black-cone / chrome-axle assembly the 3D scene renders, and the bowls use the
+      exact same GRADIENT_STOPS colours as src/diabolo/materials.js so this reads as
+      the same object, not a placeholder for it.
+    -->
+    <svg class="stage-fallback" viewBox="0 0 320 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a diabolo, exploded into its parts">
+      <defs>
+        <linearGradient id="vd-bowl-top" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#4c1d95" />
+          <stop offset="0.5" stop-color="#7c3aed" />
+          <stop offset="0.85" stop-color="#9d6ff0" />
+          <stop offset="1" stop-color="#d9bdf7" />
+        </linearGradient>
+        <linearGradient id="vd-bowl-bottom" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4c1d95" />
+          <stop offset="0.5" stop-color="#7c3aed" />
+          <stop offset="0.85" stop-color="#9d6ff0" />
+          <stop offset="1" stop-color="#d9bdf7" />
+        </linearGradient>
+        <linearGradient id="vd-chrome" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#7d8087" />
+          <stop offset="0.5" stop-color="#f4f5f7" />
+          <stop offset="1" stop-color="#7d8087" />
+        </linearGradient>
+      </defs>
+
+      <!-- construction centreline, drawn first so everything else paints over it -->
+      <line x1="160" y1="4" x2="160" y2="596" stroke="rgba(168,110,240,0.28)" stroke-width="1" stroke-dasharray="2 8" />
+
+      <!-- top bowl (cupTop): neck at the waist, rim flaring out at the top -->
+      <path d="M142,230 C136,165 100,90 32,32 Q160,8 288,32 C220,90 184,165 178,230 Z"
+            fill="url(#vd-bowl-top)" stroke="rgba(8,6,13,0.4)" stroke-width="1.5" />
+
+      <!-- top gasket (cyan ring) -->
+      <rect x="136" y="228" width="48" height="16" rx="6" fill="#5fd7e8" />
+
+      <!-- top hub cone (black), narrowing into the bearing -->
+      <path d="M136,244 L184,244 L176,286 L144,286 Z" fill="#131017" />
+
+      <!-- chrome axle bearing, centred -->
+      <rect x="144" y="286" width="32" height="28" rx="4" fill="url(#vd-chrome)" />
+
+      <!-- bottom hub cone (black), mirrored -->
+      <path d="M144,314 L176,314 L184,356 L136,356 Z" fill="#131017" />
+
+      <!-- bottom gasket (cyan ring) -->
+      <rect x="136" y="356" width="48" height="16" rx="6" fill="#5fd7e8" />
+
+      <!-- bottom bowl (cupBottom): mirror of the top bowl -->
+      <path d="M142,372 C136,437 100,512 32,568 Q160,592 288,568 C220,512 184,437 178,372 Z"
+            fill="url(#vd-bowl-bottom)" stroke="rgba(8,6,13,0.4)" stroke-width="1.5" />
+    </svg>
+  </div>
   <main id="content"></main>
   <script type="module" src="./src/main.js"></script>
 </body>

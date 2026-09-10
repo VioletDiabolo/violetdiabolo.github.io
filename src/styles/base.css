@@ -1,4 +1,141 @@
+/*
+ * Foundation layer: design tokens, reset, atmosphere, and global typography/links.
+ * Layout (the sticky stage, section grids, component treatment) lives in stage.css
+ * and sections.css -- this file only holds things that are true everywhere.
+ */
+
+:root {
+  /* ---- Palette. One dominant field, violet dominant, cyan used sparingly. ---- */
+  --stage:        #08060d; /* near-black ground */
+  --stage-raised: #0f0b18;
+  --violet-deep:  #57068c; /* NYU violet, the anchor */
+  --violet:       #8b45d6;
+  --violet-lift:  #a86ef0; /* glow / hover */
+  --cyan:         #5fd7e8; /* the gasket. THE only other accent. used sparingly */
+  --ink:          #f4f0f8;
+  --ink-dim:      #a79fb5;
+  --rule:         rgba(168, 110, 240, 0.22); /* hairline diagram rules */
+
+  /* ---- Derived atmosphere colours (same hues, baked-in low alpha). ---- */
+  --grid-line: rgba(168, 110, 240, 0.05);
+  --bloom:     rgba(87, 6, 140, 0.16);
+
+  /* ---- Type. Two families, shared lineage, real fallback stacks. ---- */
+  --font-display: 'Space Grotesk', ui-sans-serif, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-body:    'Space Grotesk', ui-sans-serif, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono:    'Space Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+
+  /* ---- Shared geometry. ---- */
+  --radius: 2px; /* technical, not pill-round */
+  --gutter: clamp(1.5rem, 5vw, 4rem);
+  --content-max: 1400px;
+
+  color-scheme: dark;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; background: #0a0710; color: #f4f0f8; }
-#stage { position: sticky; top: 0; height: 100dvh; width: 100%; }
-#stage > canvas { display: block; width: 100%; height: 100%; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background-color: var(--stage);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.65;
+
+  /*
+   * Atmosphere, back to front: film grain (SVG feTurbulence noise, alpha baked into
+   * the filter itself), a soft violet bloom behind the stage centre, then a graph-paper
+   * grid on both axes. `background-attachment: fixed` pins all three to the viewport --
+   * matching the sticky stage, which never scrolls either -- so the bloom stays behind
+   * the diabolo instead of drifting off with page content. (iOS Safari treats `fixed`
+   * backgrounds as `scroll`; the atmosphere still renders there, it just travels with
+   * the page, which is a harmless degradation.)
+   * These are background-image layers on body itself, not separate overlay elements,
+   * so there is nothing extra in the paint order that could ever intercept a click.
+   */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix in='noise' type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05' intercept='0'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 900px 620px at 50% 46%, var(--bloom), transparent 68%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-repeat: repeat, no-repeat, repeat, repeat;
+  background-position: 0 0, center, 0 0, 0 0;
+  background-size: 180px 180px, auto, 48px 48px, 48px 48px;
+  background-attachment: fixed, fixed, fixed, fixed;
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography
+ * ------------------------------------------------------------------------- */
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0;
+  color: var(--ink);
+}
+
+p {
+  margin: 0;
+  max-width: 62ch;
+}
+
+/* The diagram voice: part numbers, section indices, small labels. */
+.mono, .annotation {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  color: var(--ink-dim);
+}
+
+/* ---------------------------------------------------------------------------
+ * Links
+ * ------------------------------------------------------------------------- */
+
+a {
+  color: var(--violet);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--rule);
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+a:hover {
+  color: var(--violet-lift);
+  text-decoration-color: var(--violet-lift);
+}
+
+/* ---------------------------------------------------------------------------
+ * Accessibility: a keyboard user must always be able to see where they are.
+ * ------------------------------------------------------------------------- */
+
+:focus-visible {
+  outline: 2px solid var(--violet-lift);
+  outline-offset: 3px;
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------------------
+ * Scroll reveal (see src/ui/reveal.js). The hidden state exists ONLY inside this
+ * media query, so a browser that never runs the JS -- or a user who has asked for
+ * no motion -- gets every section fully visible from the first paint, no exceptions.
+ * ------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-pending {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  .reveal-pending.reveal-visible {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+}

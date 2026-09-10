@@ -4,12 +4,35 @@ import {
 } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
-/** Neck (0) to rim (1). Matches the translucent violet-to-milky cup in the reference photo. */
+/**
+ * Neck (0) to rim (1). Matches the translucent violet-to-milky cup in the reference
+ * photo.
+ *
+ * The rim is where the lathed cup has by far the most surface area (radius grows to
+ * ~7x the neck radius, and Pappus's theorem says a revolved surface's area scales
+ * with radius), so whatever colour sits in the back half of this range dominates what
+ * a viewer actually sees. An earlier version reached near-white (#f6f1fb) by the rim
+ * and measured only 44% clearly-violet lit pixels, mean RGB (178,160,193) -- pale
+ * lavender-grey, not violet. This version holds saturated violet through the middle
+ * of the range and only lightens toward a pale (never white) violet at the very rim,
+ * which also matters for lit pixels specifically: a specular highlight or clearcoat
+ * reflection adds brightness on TOP of this base colour, and a highlight over an
+ * already near-white base clips straight to neutral grey/white, while the same
+ * highlight over a still-saturated violet keeps a visible violet cast.
+ *
+ * A first pass (0/0.45/0.80/1.00 -> #4c1d95/#7c3aed/#a78bfa/#e9d5ff) measured 66.9%
+ * (mean RGB 159,132,197) -- a big jump from 44.4%, but short of the 70% target. This
+ * version pushes the same idea further: richer violet holds through the middle stop
+ * (offset moved 0.45 -> 0.50), the "start lightening" stop moves later (0.80 -> 0.85)
+ * and is itself less pale (#a78bfa -> #9d6ff0), and the rim stop is a pale violet
+ * rather than a near-white one (#e9d5ff -> #d9bdf7). Measured after this change:
+ * see materials-tuning notes in task-11-report.md.
+ */
 export const GRADIENT_STOPS = [
-  { offset: 0.00, color: '#7b3fd4' },
-  { offset: 0.42, color: '#a86ef0' },
-  { offset: 0.78, color: '#ddc9f7' },
-  { offset: 1.00, color: '#f6f1fb' },
+  { offset: 0.00, color: '#4c1d95' },
+  { offset: 0.50, color: '#7c3aed' },
+  { offset: 0.85, color: '#9d6ff0' },
+  { offset: 1.00, color: '#d9bdf7' },
 ];
 
 export function createGradientTexture() {

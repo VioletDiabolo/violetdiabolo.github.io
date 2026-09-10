@@ -1,0 +1,452 @@
+/*
+ * Section layout and component treatment.
+ *
+ * The core idea: each [data-section] is a two-column grid. The text block occupies
+ * ONE column; the other column is left empty on purpose, so the sticky 3D stage
+ * (painted behind #content, see the z-index note below) shows through it -- that
+ * empty column is where the diabolo's part flies to for that beat. Which side the
+ * text sits on is chosen to sit opposite SCROLL_BEATS' offset[0] for that section
+ * (see src/scroll/choreography.js): about/media/contact fly their part left, so text
+ * sits right; events/board fly right, so text sits left. That is the "callout sits
+ * opposite its subject" grammar the whole page is built on.
+ */
+
+#content {
+  position: relative;
+  /* #stage is `position: sticky` with z-index: 0 (stage.css). A sticky element is
+     "positioned", so per CSS stacking rules it paints ABOVE plain static in-flow
+     content regardless of DOM order -- content would end up UNDER the canvas without
+     this. Promoting #content to its own positioned stacking context at z-index: 1
+     fixes that for every section inside it in one place, rather than per-section. */
+  z-index: 1;
+  /* #stage and #content are SIBLINGS, not parent/child (see index.html). A sticky
+     element still reserves its own box in normal flow -- without this, #content
+     would start one full viewport height BELOW #stage instead of overlapping it,
+     so the hero (and everything else) would render a whole screen lower than
+     intended and nothing would appear over the diabolo until the first scroll.
+     Pulling #content up by exactly #stage's height (100dvh, stage.css) is the
+     standard fix for a sticky background meant to sit behind content from y=0. */
+  margin-top: -100dvh;
+  overflow-x: hidden;
+}
+
+.section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: clamp(2rem, 6vw, 6rem);
+  row-gap: 1.25rem;
+  align-content: center;
+  min-height: 100vh;
+  padding-block: clamp(3rem, 8vh, 6rem);
+  padding-inline: var(--gutter);
+  max-width: var(--content-max);
+  margin-inline: auto;
+}
+
+.section > * {
+  grid-column: 2; /* default: text right */
+  min-width: 0; /* grid items default to min-width:auto, which can force overflow */
+}
+
+[data-section='events'] > *,
+[data-section='board'] > * {
+  grid-column: 1; /* text left -- these two sections fly their part right */
+}
+
+/* ---------------------------------------------------------------------------
+ * Hero: full vertical presence, no grid -- there is no part to sit opposite yet.
+ * ------------------------------------------------------------------------- */
+
+[data-section='hero'] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+[data-section='hero'] h1 {
+  font-size: clamp(3rem, 10vw, 8rem);
+  text-transform: uppercase;
+  max-width: 18ch;
+}
+
+[data-section='hero'] p {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: clamp(0.8rem, 1.4vw, 1rem);
+  letter-spacing: 0.2em;
+  color: var(--ink-dim);
+  max-width: 42ch;
+}
+
+/* Large type sitting directly over the diabolo's rest position gets a soft dark
+   glow so it stays legible regardless of exactly what is behind it at any moment. */
+[data-section='hero'] h1,
+[data-section='hero'] p,
+.section:not([data-section='hero']) h2 {
+  text-shadow: 0 2px 28px rgba(8, 6, 13, 0.75);
+}
+
+/* ---------------------------------------------------------------------------
+ * Section headings: auto-numbered mono index + a hairline callout rule pointing
+ * from the heading toward the diabolo's side, ending in a filled dot. Both are
+ * pure ::before/::after -- SITE copy in src/content/index.js is never touched.
+ * ------------------------------------------------------------------------- */
+
+#content {
+  counter-reset: section-index;
+}
+
+.section:not([data-section='hero']) h2 {
+  position: relative;
+  font-size: clamp(1.75rem, 3.4vw, 2.75rem);
+  text-transform: uppercase;
+}
+
+.section:not([data-section='hero']) h2::before {
+  counter-increment: section-index;
+  content: counter(section-index, decimal-leading-zero) ' / ';
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  color: var(--ink-dim);
+  margin-bottom: 0.85em;
+}
+
+.section:not([data-section='hero']) h2::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: clamp(2.5rem, 6vw, 7rem);
+  height: 8px;
+  transform: translateY(-50%);
+  background-repeat: no-repeat;
+  background-size: 100% 1px, 7px 7px;
+  background-image:
+    linear-gradient(var(--rule), var(--rule)),
+    radial-gradient(circle, var(--violet-lift) 0 2.5px, transparent 3px);
+  pointer-events: none;
+}
+
+/* text-right sections: rule points left, into the empty (diabolo) column */
+[data-section='about'] h2::after,
+[data-section='media'] h2::after,
+[data-section='contact'] h2::after {
+  right: 100%;
+  margin-right: 1rem;
+  background-position: center, left center;
+}
+
+/* text-left sections: rule points right, into the empty (diabolo) column */
+[data-section='events'] h2::after,
+[data-section='board'] h2::after {
+  left: 100%;
+  margin-left: 1rem;
+  background-position: center, right center;
+}
+
+/* ---------------------------------------------------------------------------
+ * Contact: the sign-off line + socials nav.
+ * ------------------------------------------------------------------------- */
+
+.socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.75rem;
+}
+
+.socials a {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Board cards
+ * ------------------------------------------------------------------------- */
+
+.board-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 1.5rem;
+}
+
+.board-card {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1rem;
+  background: rgba(15, 11, 24, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.board-card img {
+  display: block;
+  width: 100%;
+  /* board.js sets width/height="800" HTML attributes (to hint the browser's own
+     preload aspect-ratio and avoid layout shift). Those attributes count as a
+     definite `height`, and CSS aspect-ratio only fills in an axis left `auto` --
+     it does not override two already-definite, conflicting dimensions. Without this,
+     images render at the HTML attributes' raw 800px height regardless of column
+     width (measured: 147.6 x 800, ratio 0.18, not square). `height: auto` clears
+     that so aspect-ratio can compute height from the rendered width instead. */
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.board-card h3 {
+  font-size: 1.05rem;
+}
+
+.board-position {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim);
+  max-width: none;
+}
+
+.board-card p:not(.board-position) {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  max-width: none;
+}
+
+/* The open slot: no image, so it reads as a deliberate gap in the roster rather
+   than a card that failed to load one. */
+.board-card[data-placeholder='true'] {
+  border-style: dashed;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding-block: 2.5rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Semester select
+ * ------------------------------------------------------------------------- */
+
+.semester-select {
+  appearance: none;
+  -webkit-appearance: none;
+  justify-self: start;
+  background-color: var(--stage-raised);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.7rem 2.4rem 0.7rem 1rem;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  /* CSS-only chevron: two triangular gradients meeting in a V, no image asset. */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-dim) 50%),
+    linear-gradient(135deg, var(--ink-dim) 50%, transparent 50%);
+  background-position: calc(100% - 22px) center, calc(100% - 17px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.semester-select:hover {
+  border-color: var(--violet-lift);
+}
+
+.semester-select option {
+  background-color: var(--stage-raised);
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------------
+ * Media facades
+ * ------------------------------------------------------------------------- */
+
+.media-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1.75rem;
+}
+
+.media-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.media-facade {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background-color: var(--stage-raised);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
+/* Play affordance: a triangle in a circle, built entirely from CSS. */
+.media-facade::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 3px);
+  transform: translate(-50%, -50%);
+  border-style: solid;
+  border-width: 10px 0 10px 16px;
+  border-color: transparent transparent transparent var(--cyan);
+  transition: border-color 0.25s ease;
+}
+
+.media-facade::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1.5px solid var(--cyan);
+  background: rgba(8, 6, 13, 0.35);
+  transition: border-color 0.25s ease;
+}
+
+.media-facade:hover,
+.media-facade:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--violet-lift);
+}
+
+.media-facade:hover::after,
+.media-facade:focus-visible::after {
+  border-color: var(--violet-lift);
+}
+
+.media-facade:hover::before,
+.media-facade:focus-visible::before {
+  border-color: transparent transparent transparent var(--violet-lift);
+}
+
+.media-facade:focus-visible {
+  outline-offset: 4px;
+}
+
+.media-card h3 {
+  font-family: var(--font-body);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.media-card iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------------------
+ * Form facades
+ * ------------------------------------------------------------------------- */
+
+.form-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-top: 0.25rem;
+}
+
+.form-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.form-card h3 {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  max-width: none;
+}
+
+/* The one place --cyan is allowed to fill a shape. */
+.form-card button {
+  background: var(--cyan);
+  color: var(--stage);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.75rem 1.25rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.form-card button:hover {
+  background: var(--violet-lift);
+  color: var(--ink);
+}
+
+.form-card iframe {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------------------
+ * Narrow screens: single column. The empty-column trick needs two columns to
+ * work, so below tablet width every section collapses to one, and the callout
+ * rule (which points "toward" a column that no longer exists) is dropped. The
+ * dimmed #stage (stage.css) plus a tight scrim behind text keeps copy legible
+ * over whatever the canvas is doing behind it.
+ * ------------------------------------------------------------------------- */
+
+@media (max-width: 767px) {
+  .section:not([data-section='hero']) {
+    grid-template-columns: 1fr;
+  }
+
+  .section:not([data-section='hero']) > * {
+    grid-column: 1;
+  }
+
+  .section:not([data-section='hero']) h2::after {
+    display: none;
+  }
+
+  [data-section] h1,
+  [data-section] h2,
+  [data-section] h3,
+  [data-section] p {
+    width: fit-content;
+    max-width: 100%;
+    background: rgba(8, 6, 13, 0.55);
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius);
+  }
+}
