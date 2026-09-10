@@ -21,6 +21,15 @@ export const EVENTS = {
     'All equipment will be provided, and anyone is welcome, regardless of experience!',
 };
 
+// Headings for the sections that don't otherwise carry a `heading` field (MEDIA is an
+// array, BOARD is a semester map, CONTACT is just an email/linktree pair) - kept here so
+// ui/sections.js never hardcodes club-facing copy, matching ABOUT.heading/EVENTS.heading.
+export const SECTION_HEADINGS = {
+  media: 'MEDIA',
+  board: 'BOARD',
+  contact: 'CONTACT US',
+};
+
 export const MEDIA = [
   { name: 'VSA Holiday Night Market - 2024', youtubeId: 'OF6nfdBX9OQ' },
   { name: 'Violet Diabolo @ USADA National Diabolo Competition - 2024', youtubeId: 'Om9etqgYLRk' },
