@@ -1,0 +1,158 @@
+# Real-condition verification record
+
+Recorded 2026-09-10 against `build/scroll-explosion`, build `npm run build` → `vite preview`,
+driven in a real Chromium instance. **Only observed numbers appear here.** Where the
+environment could not produce a condition, that is stated rather than papered over.
+
+## Summary
+
+| Claim | Status |
+|---|---|
+| Render loop stops when the document is hidden | **Verified, real condition** |
+| Render loop stops when the stage is scrolled offscreen | **Not verified** — environment cannot deliver scroll/rAF |
+| anime.js global engine is never paused by us | **Verified** by construction + test guard |
+| Explosion timeline drives all 7 parts and is reversible | **Verified** by direct timeline seek |
+| Scroll position drives the timeline | **Verified structurally**; live tick delivery **not verified** |
+| Diabolo silhouette and palette | **Verified** by framebuffer readback |
+| Content readable without the 3D system | **Verified** structurally |
+
+## 1. Hidden document — real condition, genuinely observed
+
+The preview pane reports `document.hidden === true` and delivers **zero** animation frames.
+This is a real hidden document, not a dispatched `visibilitychange` event.
+
+```
+document.hidden        : true
+lifecycle.isRunning()  : false
+lifecycle.frameCount() : 0        (still 0 after 1200 ms)
+```
+
+The render loop correctly refused to start. This satisfies the non-negotiable directly:
+the frame was never scheduled, rather than scheduled-and-skipped.
+
+Independent attribution probe, same page:
+
+```
+plain scroll listener  : 0 events fired   (window.scrollY really changed 0 → 3000)
+bare requestAnimationFrame loop : 0 ticks in 900 ms
+```
+
+Both zero. So the absence of frames is attributable to the host, and the lifecycle's own
+`isRunning() === false` is what demonstrates our behaviour.
+
+## 2. Scrolled offscreen — NOT VERIFIED, and why
+
+Not verified. This environment fires no `scroll` events at all (measured above: 0 events
+across a real 3000 px scroll). An IntersectionObserver-driven pause cannot be exercised
+where the host never reports scroll. **No claim is made that this path works in a browser.**
+It is covered by 13 unit tests against an injected observer, which is not the real condition.
+
+Anyone re-running this should open the built site in an ordinary focused tab, scroll the
+stage fully out of view, wait 3 s, and confirm `__vd.lifecycle.frameCount()` is unchanged.
+
+## 3. anime.js global engine
+
+Never paused by this codebase. `engine.pauseOnDocumentHidden` already defaults to `true`
+and the engine self-idles (`paused: true`, `reqId: 0`) with no active children — measured
+under Node during planning. Pausing it by hand would freeze visible content animations that
+share it. `tests/lifecycle.test.js` fails if `src/diabolo/lifecycle.js` ever imports `animejs`
+(negative-controlled: adding the import turns the suite red).
+
+## 4. Explosion timeline — verified by direct seek
+
+`timeline.duration === 508`. Seeking drives a correct staggered cascade:
+
+| t | state |
+|---|---|
+| 0 | all seven parts at HOME (assembled) |
+| 100 | `cupTop` out at [-1.55, 2.42]; `gasketTop` mid-flight [0.35, 0.70] |
+| 254 | `axleBearing` mid-flight [-0.90, 0.03] |
+| 408 | bearing out [-1.80, 0.05]; `gasketBottom` mid-flight |
+| 508 | all seven exploded |
+| seek(0) | exact HOME again — reversible |
+
+## 5. Scroll → timeline wiring — structurally verified
+
+The ScrollObserver's resolved bounds map 1:1 onto the page's scroll range:
+
+```
+offsetStart : 0
+offsetEnd   : 6752
+distance    : 6752
+maxScroll   : 6752     (document.body.scrollHeight - innerHeight)
+progress    : 0 → 0.25 → 0.50 → 0.75 → 1.00 across the page
+```
+
+**Labelled synthetic:** because the host delivers no rAF, anime's tickers never ran, so the
+observer never resolved `_params.target` into `target` on its own. The resolution and
+`refresh()` were driven by hand to obtain the numbers above. `_params.target` was confirmed
+to be `<main#content>` — the wiring is correct; only tick delivery was substituted.
+
+An earlier run of this same probe reported `offsetStart: -3000`. That was an artifact of a
+stale `container.scrollY` left by a previous probe, not a defect; re-running from a clean
+reload gave the correct `0`. Recorded because a reader might otherwise repeat it.
+
+### Why the scroll target is `#content` and not `#stage`
+
+`#stage` is `position: sticky`, so its rect never travels:
+
+| scrollY | #stage top/bottom | #content top/bottom |
+|---|---|---|
+| 0 | 0 / 768 | 0 / 7520 |
+| 3760 | **0 / 768** | −3760 / 3760 |
+| 6752 | **0 / 768** | −6751 / 768 |
+
+A ScrollObserver derives progress from target travel, so a sticky target sits at progress 0
+forever — the explosion silently never ran. `createChoreography` now throws if handed a
+sticky or fixed target (`tests/choreography.dom.test.js`).
+
+## 6. Diabolo appearance — framebuffer readback
+
+Measured over non-transparent pixels of the rendered canvas:
+
+| | before palette pass | after |
+|---|---|---|
+| mean RGB | (198, 183, 209) | **(155, 119, 198)** |
+| clearly violet | 41 % | **83.2 %** |
+
+One frame: 9 draw calls, 30,624 triangles, 19 % canvas coverage. ASCII readback of the
+framebuffer confirms the silhouette — wide rims, narrow waist, dark axle.
+
+Seam continuity after the hub-cone fix: bearing seam 0.0135, gasket seam 0.0112
+(was 0.0515 / 0.0538 with the cone mounted inverted).
+
+## 7. Content and responsiveness
+
+```
+sections            : hero, about, events, media, board, contact  (all with mono index counters)
+board               : 3 cards, 1 placeholder (no <img>), 5 semesters, defaults to Fall 2025
+media               : 10 facades, 0 live iframes before activation
+forms               : 2 facades
+outbound links      : 6, all resolving to the club's real destinations
+horizontal overflow : none
+fonts               : Space Grotesk + Space Mono both confirmed loaded
+```
+
+Mobile (375 × 812) screenshotted: display type legible over the canvas via a scrim, tagline
+in mono, single column. Desktop hero screenshotted: translucent violet diabolo with cyan
+gaskets, black hubs and chrome bearing over a graph-paper ground.
+
+**Not verified:** section screenshots below the fold — the pane will not recomposite the
+sticky WebGL canvas after a scroll jump. Those sections were verified structurally via the
+DOM instead, and the numbers above are from that.
+
+## 8. Bundle
+
+```
+dist/index.html   3.66 kB │ gzip   1.46 kB
+dist/assets/*.css 9.33 kB │ gzip   2.80 kB
+dist/assets/*.js  602 kB  │ gzip 157.88 kB
+largest image     307 kB  (from an 11.3 MB master; 240 kB AVIF is what actually serves)
+```
+
+## Outstanding for a human on a real machine
+
+1. Scroll the stage fully offscreen and confirm the render loop stops (§2).
+2. Watch the explosion scrub live end to end (§5).
+3. Toggle OS reduced-motion and confirm `data-stage="static"` looks deliberate.
+4. Disable WebGL and confirm `data-stage="unsupported"` shows the static SVG diabolo.
