@@ -8,6 +8,17 @@ describe('image pipeline', () => {
     expect(names).toEqual(expect.arrayContaining(['group-usadc', 'usadc-wide', 'aaron', 'jon']));
   });
 
+  it('caps widths at 2000, since 2400 cannot meet the size budget at usable quality', () => {
+    for (const t of TARGETS) expect(Math.max(...t.widths)).toBeLessThanOrEqual(2000);
+  });
+
+  it('emits no last-resort JPEG at the largest width', () => {
+    for (const t of TARGETS) {
+      if (t.jpgWidths.length === 0) continue;
+      expect(Math.max(...t.jpgWidths)).toBeLessThan(Math.max(...t.widths));
+    }
+  });
+
   it('emits an 800px derivative for each board portrait', () => {
     for (const name of ['aaron', 'jon']) {
       const t = TARGETS.find((x) => x.name === name);
