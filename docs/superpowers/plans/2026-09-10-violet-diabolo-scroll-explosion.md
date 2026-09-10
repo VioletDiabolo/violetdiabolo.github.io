@@ -782,7 +782,7 @@ Flat lights make moulded plastic read as clay. `RoomEnvironment` + `PMREMGenerat
 - Produces:
   - `GRADIENT_STOPS: Array<{ offset: number, color: string }>`
   - `createGradientTexture(): CanvasTexture` — violet at the neck fading to milky white at the rim
-  - `createEnvironment(renderer): Texture` — PMREM-prefiltered `RoomEnvironment`
+  - `createEnvironment(renderer): WebGLRenderTarget` — PMREM-prefiltered `RoomEnvironment`. Returns the **target**, not the texture, so its framebuffer can be freed; read `.texture` off it.
   - `createMaterials({ renderer, tier }): { cup, gasket, hub, bearing }`
   - `disposeMaterials(materials): void`
 - Note: `createMaterials` needs a real WebGL context, so it is **not** unit-tested here — it is covered by the browser verification in Task 12. Only the pure gradient data is unit-tested, in jsdom.
@@ -858,11 +858,25 @@ export function createGradientTexture() {
   return tex;
 }
 
+/**
+ * Returns the PMREM **render target**, not just its texture.
+ *
+ * `fromScene()` allocates a WebGLRenderTarget with a real framebuffer and depth
+ * renderbuffer. Only `WebGLRenderTarget.dispose()` frees those; disposing the bare
+ * texture calls `gl.deleteTexture` and leaks the rest. `renderer.dispose()` does not
+ * rescue it either — `WebGLProperties.dispose()` swaps in a fresh WeakMap without
+ * walking the old one. On a page that tears down and re-inits, that leak is unbounded.
+ *
+ * The RoomEnvironment scene owns a BoxGeometry and 8 materials and is only needed
+ * synchronously, so it is disposed as soon as `fromScene` returns.
+ */
 export function createEnvironment(renderer) {
   const pmrem = new PMREMGenerator(renderer);
-  const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const room = new RoomEnvironment();
+  const target = pmrem.fromScene(room, 0.04);
+  room.dispose();
   pmrem.dispose();
-  return env;
+  return target;
 }
 
 /**
@@ -871,7 +885,8 @@ export function createEnvironment(renderer) {
  */
 export function createMaterials({ renderer, tier }) {
   const map = createGradientTexture();
-  const env = createEnvironment(renderer);
+  const envTarget = createEnvironment(renderer);
+  const env = envTarget.texture;
   const high = tier === 'high';
 
   const cup = new MeshPhysicalMaterial({
@@ -902,7 +917,8 @@ export function createMaterials({ renderer, tier }) {
     color: new Color('#cfd2d8'), envMap: env, roughness: 0.18, metalness: 1.0,
   });
 
-  return { cup, gasket, hub, bearing, _map: map, _env: env };
+  // _envTarget, not _env: disposing the target frees its framebuffer AND its texture.
+  return { cup, gasket, hub, bearing, _map: map, _envTarget: envTarget };
 }
 
 export function disposeMaterials(materials) {
@@ -1233,7 +1249,7 @@ export function createStage({ canvas, tier }) {
   const materials = createMaterials({ renderer, tier });
   const { root, parts } = buildDiabolo({ materials, segments: settings.segments });
   scene.add(root);
-  scene.environment = materials._env;
+  scene.environment = materials._envTarget.texture;
 
   /** anime.js writes this scalar; the render loop reads it. Never the reverse. */
   const state = { spinRate: 1 };
