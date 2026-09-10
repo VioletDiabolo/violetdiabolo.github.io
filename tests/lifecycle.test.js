@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createLifecycle } from '../src/diabolo/lifecycle.js';
 
 function harness({ hidden = false } = {}) {
@@ -136,11 +137,31 @@ describe('lifecycle', () => {
     expect(delta).toBeLessThanOrEqual(0.1);
   });
 
+  it('starts the frame after a resume at delta 0, not a huge jump', () => {
+    const h = harness();
+    h.intersect(true);
+    h.tick(1000);
+    h.tick(1016);
+    h.setHidden(true);          // stop
+    h.setHidden(false);         // resume
+    h.tick(9000);               // 8 seconds of wall clock passed while stopped
+    const [delta] = h.onFrame.mock.calls.at(-1);
+    expect(delta).toBe(0);
+  });
+
   it('releases the observer and pending frame on dispose', () => {
     const h = harness();
     h.intersect(true);
     h.lifecycle.dispose();
     expect(h.scheduled.size).toBe(0);
     expect(h.lifecycle.isRunning()).toBe(false);
+  });
+});
+
+describe('engine independence', () => {
+  it('never imports anime.js, whose global engine other visible animations share', () => {
+    const source = readFileSync(new URL('../src/diabolo/lifecycle.js', import.meta.url), 'utf8');
+    expect(source).not.toMatch(/from\s+['"]animejs/);
+    expect(source).not.toMatch(/require\(\s*['"]animejs/);
   });
 });

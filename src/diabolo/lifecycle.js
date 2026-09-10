@@ -27,6 +27,9 @@ export function createLifecycle({
 
   const active = () => visible && !doc.hidden;
 
+  // Invariant: onFrame must not call start/stop/dispose synchronously. Between this
+  // function nulling rafId and re-arming at its exit, a reentrant stop() would no-op
+  // while the trailing re-arm still fires — leaving an orphaned loop running.
   function frame(now) {
     rafId = null;
     const delta = lastTime === null ? 0 : Math.min((now - lastTime) / 1000, MAX_DELTA);
@@ -52,7 +55,9 @@ export function createLifecycle({
   const sync = () => (active() ? start() : stop());
 
   const observer = observerFactory((entries) => {
-    visible = entries.some((e) => e.isIntersecting);
+    // Entries arrive in chronological order. Take the newest rather than `some()`, which
+    // would latch onto a stale `true` if two entries were ever queued in one callback.
+    visible = entries[entries.length - 1].isIntersecting;
     sync();
   });
   observer.observe(element);
