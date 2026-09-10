@@ -8,9 +8,9 @@ describe('content', () => {
     expect(SITE.tagline).toBe('PREMIER DIABOLO TEAM AT NYU');
   });
 
-  it('preserves the founding year and Hell’s Kitchen credit in the about copy', () => {
+  it("preserves the founding year and Hell's Kitchen credit in the about copy", () => {
     expect(ABOUT.body).toContain('Spring of 2019');
-    expect(ABOUT.body).toContain('Hell’s Kitchen');
+    expect(ABOUT.body).toContain("Hell’s Kitchen");
   });
 
   it('preserves practice logistics exactly', () => {
@@ -52,13 +52,23 @@ describe('content', () => {
     expect(SOCIALS.map((s) => s.label)).toEqual(['Instagram', 'YouTube', 'NYU Engage', 'GitHub']);
   });
 
-  it('preserves the source apostrophes exactly, curly and ASCII alike', () => {
+  it("preserves the source apostrophes exactly, curly and ASCII alike", () => {
     const aaron = BOARD['Fall 2025'].find((m) => m.name === 'Aaron Hui');
+    const aaronSecretary = BOARD['Spring 2024'].find((m) => m.name === 'Aaron Hui');
     const jon = BOARD['Fall 2025'].find((m) => m.name === 'Jonathan Sun');
-    expect(aaron.description).toContain("Sometimes you'll catch me");   // U+0027
-    expect(aaron.description).toContain("Heyo, I'm Aaron");             // U+0027
-    expect(jon.description).toContain("I’m all about");            // U+2019
-    expect(ABOUT.body).toContain("NYU’s award-winning");           // U+2019
-    expect(ABOUT.body).toContain("Ramsey’s Hell’s Kitchen");  // U+2019
+
+    // U+2019 curly
+    expect(ABOUT.body).toContain("NYU’s award-winning");
+    expect(ABOUT.body).toContain("Ramsey’s Hell’s Kitchen ");
+    expect(jon.description).toContain("I’m all about carefully crafting ");
+
+    // U+0027 ASCII
+    expect(aaron.description).toContain("Heyo, I'm Aaron");
+    expect(aaron.description).toContain("I'm the current president");
+    expect(aaron.description).toContain("I'm currently working on 3D");
+    expect(aaron.description).toContain("Sometimes you'll catch me");
+    expect(aaronSecretary.description).toContain("can't really write");
+    expect(jon.description).toContain("I'm currently working on getting DNA");
+    expect(jon.description).toContain("I'm not spinning");
   });
 });
