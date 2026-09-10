@@ -51,4 +51,14 @@ describe('content', () => {
     for (const f of FORMS) expect(f.url).toContain('docs.google.com/forms');
     expect(SOCIALS.map((s) => s.label)).toEqual(['Instagram', 'YouTube', 'NYU Engage', 'GitHub']);
   });
+
+  it('preserves the source apostrophes exactly, curly and ASCII alike', () => {
+    const aaron = BOARD['Fall 2025'].find((m) => m.name === 'Aaron Hui');
+    const jon = BOARD['Fall 2025'].find((m) => m.name === 'Jonathan Sun');
+    expect(aaron.description).toContain("Sometimes you'll catch me");   // U+0027
+    expect(aaron.description).toContain("Heyo, I'm Aaron");             // U+0027
+    expect(jon.description).toContain("I’m all about");            // U+2019
+    expect(ABOUT.body).toContain("NYU’s award-winning");           // U+2019
+    expect(ABOUT.body).toContain("Ramsey’s Hell’s Kitchen");  // U+2019
+  });
 });
