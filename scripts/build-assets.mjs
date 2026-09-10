@@ -34,9 +34,16 @@ export async function buildAssets() {
         base.clone().avif({ quality: 55 }).toFile(path.join(OUT, `${t.name}-${w}.avif`)),
         base.clone().webp({ quality: 72 }).toFile(path.join(OUT, `${t.name}-${w}.webp`)),
       ];
-      if (t.jpgWidths.includes(w)) jobs.push(base.clone().jpeg({ quality: 78, mozjpeg: true }).toFile(path.join(OUT, `${t.name}-${w}.jpg`)));
+      const extensions = ['avif', 'webp'];
+      if (t.jpgWidths.includes(w)) {
+        jobs.push(base.clone().jpeg({ quality: 78, mozjpeg: true }).toFile(path.join(OUT, `${t.name}-${w}.jpg`)));
+        extensions.push('jpg');
+      }
       const results = await Promise.all(jobs);
-      results.forEach((r, i) => written.push({ file: `${t.name}-${w}`, kb: Math.round(r.size / 1024), i }));
+      results.forEach((r, i) => {
+        const ext = extensions[i];
+        written.push({ file: `${t.name}-${w}.${ext}`, bytes: r.size });
+      });
     }
   }
   return written;
@@ -45,10 +52,12 @@ export async function buildAssets() {
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
   const written = await buildAssets();
-  const worst = Math.max(...written.map((w) => w.kb));
-  console.log(`wrote ${written.length} files, largest ${worst} KB`);
-  if (worst >= 400) {
-    console.error(`FAIL: ${worst} KB exceeds the 400 KB budget`);
+  const BUDGET = 400 * 1024;
+  const worstBytes = Math.max(...written.map((w) => w.bytes));
+  const worstFile = written.find((w) => w.bytes === worstBytes);
+  console.log(`wrote ${written.length} files, largest ${worstFile.file} is ${Math.round(worstFile.bytes / 1024)} KB`);
+  if (worstBytes >= BUDGET) {
+    console.error(`FAIL: ${worstFile.file} = ${Math.round(worstBytes / 1024)} KB exceeds the 400 KB budget`);
     process.exit(1);
   }
 }
