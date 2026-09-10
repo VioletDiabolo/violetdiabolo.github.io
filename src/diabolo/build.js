@@ -37,8 +37,15 @@ const MATERIAL_FOR = {
 };
 
 export function buildDiabolo({ materials, segments = 96 }) {
-  const root = new Group();
-  root.name = 'diaboloRoot';
+  // Two nested groups, so the scroll-driven turn and the continuous spin never write
+  // the same object. anime.js owns tilt.rotation.x; the render loop owns
+  // spinner.rotation.y. Collapsing these into one group reintroduces the collision.
+  const tilt = new Group();
+  tilt.name = 'diaboloTilt';
+  const spinner = new Group();
+  spinner.name = 'diaboloSpinner';
+  tilt.add(spinner);
+
   const parts = {};
 
   const radialSegments = Math.max(24, Math.round(segments * 0.75));
@@ -66,9 +73,9 @@ export function buildDiabolo({ materials, segments = 96 }) {
 
     group.add(mesh);
     group.position.y = HOME[id].y;
-    root.add(group);
+    spinner.add(group);
     parts[id] = group;
   }
 
-  return { root, parts };
+  return { tilt, spinner, parts };
 }

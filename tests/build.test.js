@@ -13,10 +13,10 @@ describe('buildDiabolo', () => {
     for (const id of PART_IDS) expect(parts[id]).toBeInstanceOf(Group);
   });
 
-  it('parents every part to root', () => {
-    const { root, parts } = build();
-    expect(root.children).toHaveLength(PART_IDS.length);
-    for (const id of PART_IDS) expect(parts[id].parent).toBe(root);
+  it('parents every part to spinner', () => {
+    const { spinner, parts } = build();
+    expect(spinner.children).toHaveLength(PART_IDS.length);
+    for (const id of PART_IDS) expect(parts[id].parent).toBe(spinner);
   });
 
   it('tags each group with its part id', () => {
@@ -96,5 +96,32 @@ describe('seam continuity', () => {
     const hubAtNeck = hubConeProfile().at(-1).x;
     const gasketBore = gasketProfile()[0].x;
     expect(Math.abs(hubAtNeck - gasketBore)).toBeLessThan(SEAM_TOLERANCE);
+  });
+});
+
+describe('scene graph nesting', () => {
+  it('wraps the spinner in a tilt group so the turn and the spin never share an object', () => {
+    const { tilt, spinner } = build();
+    expect(tilt).toBeInstanceOf(Group);
+    expect(spinner).toBeInstanceOf(Group);
+    expect(spinner.parent).toBe(tilt);
+    expect(tilt.parent).toBeNull();
+  });
+
+  it('gives tilt exactly one child, so nothing else is caught by the turn', () => {
+    const { tilt, spinner } = build();
+    expect(tilt.children).toEqual([spinner]);
+  });
+
+  it('parents every part to the spinner', () => {
+    const { spinner, parts } = build();
+    expect(spinner.children).toHaveLength(PART_IDS.length);
+    for (const id of PART_IDS) expect(parts[id].parent).toBe(spinner);
+  });
+
+  it('names both groups, so a debugger shows which owns what', () => {
+    const { tilt, spinner } = build();
+    expect(tilt.name).toBe('diaboloTilt');
+    expect(spinner.name).toBe('diaboloSpinner');
   });
 });

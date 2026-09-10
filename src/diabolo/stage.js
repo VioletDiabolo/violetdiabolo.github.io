@@ -67,8 +67,8 @@ export function createStage({ canvas, tier }) {
   camera.lookAt(0, 0, 0);
 
   const materials = createMaterials({ renderer, settings });
-  const { root, parts } = buildDiabolo({ materials, segments: settings.segments });
-  scene.add(root);
+  const { tilt, spinner, parts } = buildDiabolo({ materials, segments: settings.segments });
+  scene.add(tilt);
   scene.environment = materials._envTarget.texture;
 
   /** anime.js writes this scalar; the render loop reads it. Never the reverse. */
@@ -77,7 +77,7 @@ export function createStage({ canvas, tier }) {
 
   function render(deltaSeconds) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
-    root.rotation.y += spin.root;
+    spinner.rotation.y += spin.root;
     spinMesh.rotation.y += spin.bearing;
     renderer.render(scene, camera);
   }
@@ -103,11 +103,11 @@ export function createStage({ canvas, tier }) {
   }
 
   function dispose() {
-    root.traverse((o) => o.geometry?.dispose());
+    tilt.traverse((o) => o.geometry?.dispose());
     disposeMaterials(materials);
     renderer.dispose();
   }
 
   resize();
-  return { renderer, scene, camera, root, parts, state, render, resize, dispose };
+  return { renderer, scene, camera, tilt, spinner, parts, state, render, resize, dispose };
 }
