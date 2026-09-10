@@ -40,11 +40,32 @@ export function beatTarget(beat) {
   };
 }
 
-export function createChoreography({ parts, state, stageEl }) {
+/**
+ * Builds the scroll-driven explode/reassemble timeline for the diabolo parts.
+ *
+ * `scrollTarget` must be an element that actually travels with the page as the user
+ * scrolls — never the sticky `#stage`. anime.js's ScrollObserver derives progress from
+ * how far `scrollTarget`'s bounding rect moves through the viewport; a `position: sticky`
+ * (or `fixed`) element is pinned at the same viewport coordinates at every scroll offset,
+ * so its rect never travels and progress can never advance past 0.
+ */
+export function createChoreography({ parts, state, scrollTarget }) {
+  // A sticky or fixed element's rect never travels, so scroll progress can never
+  // advance and the timeline would silently sit at 0. Fail loudly instead.
+  if (typeof getComputedStyle === 'function' && scrollTarget) {
+    const position = getComputedStyle(scrollTarget).position;
+    if (position === 'sticky' || position === 'fixed') {
+      throw new Error(
+        `createChoreography: scrollTarget has position:${position}, so its rect never ` +
+        `travels and scroll progress cannot advance. Pass an element that scrolls with the page.`
+      );
+    }
+  }
+
   const timeline = createTimeline({
     defaults: { ease: 'inOutQuad', duration: BEAT_DURATION },
     autoplay: onScroll({
-      target: stageEl,
+      target: scrollTarget,
       sync: 0.15,
       enter: 'top top',
       leave: 'bottom bottom',
