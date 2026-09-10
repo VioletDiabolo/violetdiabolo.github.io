@@ -22,6 +22,14 @@ export const BEAT_DURATION = 100;
 // rather than moving one strictly after another. Raising this to BEAT_DURATION would
 // silently kill the cascade.
 export const BEAT_STAGGER = 68;
+// Nothing moves for this long, so the hero shows an assembled diabolo before anything
+// detaches. Without it cupTop's beat starts at 0 and the object is never seen whole.
+export const HERO_HOLD = 90;
+// The footer's reassembly beat: scheduled one stagger step after the last explode beat
+// starts (beats overlap, so by the time the timeline reaches here every part is at least
+// well underway). Every part returns to HOME here, so the page resolves fully assembled
+// rather than ending in pieces (spec §5, footer: "snaps back together").
+export const REASSEMBLE_AT = HERO_HOLD + SCROLL_BEATS.length * BEAT_STAGGER;
 // Each part tilts in proportion to how far it travels, so the exploded view reads as a
 // technical diagram rather than a rigid grid. Tuned by eye; no physical meaning.
 const ROTATION_TILT_Z = 0.35; // from the part's z offset
@@ -75,7 +83,7 @@ export function createChoreography({ parts, state, scrollTarget }) {
   SCROLL_BEATS.forEach((beat, index) => {
     const group = parts[beat.part];
     const target = beatTarget(beat);
-    const at = index * BEAT_STAGGER;
+    const at = HERO_HOLD + index * BEAT_STAGGER;
 
     timeline.add(group.position, target.position, at);
     timeline.add(group.rotation, target.rotation, at);
@@ -86,6 +94,14 @@ export function createChoreography({ parts, state, scrollTarget }) {
         .add(state, { spinRate: 1 }, at + BEAT_DURATION);
     }
   });
+
+  // The footer beat: everything snaps back together.
+  for (const beat of SCROLL_BEATS) {
+    const group = parts[beat.part];
+    const home = HOME[beat.part];
+    timeline.add(group.position, { x: 0, y: home.y, z: 0 }, REASSEMBLE_AT);
+    timeline.add(group.rotation, { x: 0, z: 0 }, REASSEMBLE_AT);
+  }
 
   return {
     timeline,

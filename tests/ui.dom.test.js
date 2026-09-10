@@ -15,7 +15,7 @@ describe('sections', () => {
   it('renders every scroll section with a data-section hook', () => {
     renderSections(document.getElementById('content'));
     const found = [...document.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
-    expect(found).toEqual(['hero', 'about', 'events', 'media', 'board', 'contact']);
+    expect(found).toEqual(['hero', 'about', 'events', 'media', 'board', 'contact', 'footer']);
   });
 
   it('puts the club name in the one and only h1', () => {
@@ -116,6 +116,16 @@ describe('form facades', () => {
     button.focus();
     button.click();
     expect(document.activeElement.tagName).toBe('IFRAME');
+  });
+});
+
+describe('footer', () => {
+  it('renders the reassembly footer with the club name and the current, computed year', () => {
+    renderSections(document.getElementById('content'));
+    const footer = document.querySelector('[data-section="footer"]');
+    expect(footer).not.toBeNull();
+    expect(footer.textContent).toContain(SITE.name);
+    expect(footer.textContent).toContain(String(new Date().getFullYear()));
   });
 });
 

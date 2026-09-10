@@ -75,5 +75,16 @@ export function renderSections(root) {
   widePhoto.append(buildPicture({ ...PHOTOS.wide, sizes: '(max-width: 900px) 92vw, 46vw' }));
   contact.append(widePhoto);
 
-  root.replaceChildren(hero, about, events, media, board, contact);
+  // The reassembly beat (src/scroll/choreography.js REASSEMBLE_AT) plays out here: every
+  // part returns to HOME, so the timeline resolves fully assembled rather than ending in
+  // pieces. Year is computed at render time, never hardcoded.
+  const footer = document.createElement('footer');
+  footer.dataset.section = 'footer';
+  footer.className = 'section-footer';
+  const footerLine = document.createElement('p');
+  footerLine.className = 'footer-line';
+  footerLine.textContent = `${SITE.name} ${new Date().getFullYear()}`;
+  footer.append(footerLine);
+
+  root.replaceChildren(hero, about, events, media, board, contact, footer);
 }

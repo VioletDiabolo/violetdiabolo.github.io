@@ -435,6 +435,33 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Footer -- the reassembly beat (src/scroll/choreography.js REASSEMBLE_AT) plays
+ * out here: every part returns to HOME, so the page resolves fully assembled
+ * rather than ending in pieces (spec §5). Not a `.section` -- there is no part
+ * flying to an empty column here, so it skips the two-column grid entirely.
+ * min-height gives that beat real scroll distance to complete in.
+ * ------------------------------------------------------------------------- */
+
+.section-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding-block: clamp(3rem, 8vh, 6rem);
+  padding-inline: var(--gutter);
+  border-top: 1px solid var(--rule);
+}
+
+.footer-line {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
  * Narrow screens: single column. The empty-column trick needs two columns to
  * work, so below tablet width every section collapses to one, and the callout
  * rule (which points "toward" a column that no longer exists) is dropped. The

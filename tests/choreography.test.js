@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SCROLL_BEATS, beatTarget, BEAT_DURATION, BEAT_STAGGER } from '../src/scroll/choreography.js';
+import { SCROLL_BEATS, beatTarget, BEAT_DURATION, BEAT_STAGGER, HERO_HOLD, REASSEMBLE_AT } from '../src/scroll/choreography.js';
 import { PART_IDS } from '../src/diabolo/profiles.js';
 import { HOME } from '../src/diabolo/build.js';
 
@@ -89,6 +89,24 @@ describe('timeline shape', () => {
     const spinDownEnds = bearingIndex * BEAT_STAGGER + 2 * BEAT_DURATION;
     const timelineEnds = (SCROLL_BEATS.length - 1) * BEAT_STAGGER + BEAT_DURATION;
     expect(spinDownEnds).toBeLessThanOrEqual(timelineEnds);
+  });
+});
+
+describe('hero hold and reassembly', () => {
+  it('holds the assembled state before the first part detaches', () => {
+    expect(HERO_HOLD).toBeGreaterThan(0);
+  });
+
+  it('schedules the reassembly after every beat has finished', () => {
+    const lastBeatEnds = HERO_HOLD + (SCROLL_BEATS.length - 1) * BEAT_STAGGER + BEAT_DURATION;
+    expect(REASSEMBLE_AT).toBeGreaterThanOrEqual(lastBeatEnds - BEAT_STAGGER);
+  });
+
+  it('returns every part to its HOME rest position', () => {
+    for (const beat of SCROLL_BEATS) {
+      expect(HOME[beat.part]).toBeDefined();
+      expect(typeof HOME[beat.part].y).toBe('number');
+    }
   });
 });
 
