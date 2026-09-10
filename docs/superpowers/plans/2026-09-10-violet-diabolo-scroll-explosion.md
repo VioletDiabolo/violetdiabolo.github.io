@@ -88,6 +88,18 @@ Every task's requirements implicitly include this section.
 
 `base: './'` is required — GitHub Pages serves this from a subpath in some configurations and absolute asset URLs would 404.
 
+**jsdom routing:** Vitest 5 removed `environmentMatchGlobs` (it is silently ignored, not an error —
+verified against the installed `vitest@5.0.0`: the string appears nowhere in the package, and a
+`.dom.test.js` file run without a docblock gets `document === undefined`). Per-file environment is
+now declared with a docblock on the **first line** of the test file:
+
+```js
+// @vitest-environment jsdom
+```
+
+Every `tests/*.dom.test.js` in this plan carries that line. Omitting it produces
+`ReferenceError: document is not defined` with nothing pointing at the cause.
+
 ```js
 import { defineConfig } from 'vite';
 
@@ -96,7 +108,6 @@ export default defineConfig({
   build: { outDir: 'dist', assetsInlineLimit: 0 },
   test: {
     environment: 'node',
-    environmentMatchGlobs: [['tests/**/*.dom.test.js', 'jsdom']],
     include: ['tests/**/*.test.js'],
   },
 });
@@ -750,6 +761,7 @@ Flat lights make moulded plastic read as clay. `RoomEnvironment` + `PMREMGenerat
 
 ```js
 // tests/materials.dom.test.js
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { GRADIENT_STOPS } from '../src/diabolo/materials.js';
 
@@ -1683,6 +1695,7 @@ git commit -m "feat: add scroll-scrubbed explosion choreography"
 
 ```js
 // tests/ui.dom.test.js
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderSections } from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
@@ -2069,6 +2082,7 @@ Two things land together because the design director's pass needs the fallback s
 
 ```js
 // tests/detect.dom.test.js
+// @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { supportsWebGL, prefersReducedMotion } from '../src/fallback/detect.js';
 
