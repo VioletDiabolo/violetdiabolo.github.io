@@ -3,6 +3,7 @@ import { initReveal } from './ui/reveal.js';
 import { createStage, resolveQualityTier, readSignals } from './diabolo/stage.js';
 import { createLifecycle } from './diabolo/lifecycle.js';
 import { createChoreography } from './scroll/choreography.js';
+import { createEntrance } from './scroll/entrance.js';
 import { supportsWebGL, prefersReducedMotion } from './fallback/detect.js';
 
 export const APP_NAME = 'violet-diabolo';
@@ -26,20 +27,40 @@ function boot() {
   const stage = createStage({ canvas, tier });
   window.addEventListener('resize', stage.resize);
 
-  if (prefersReducedMotion()) {
-    document.documentElement.dataset.stage = 'static';
+  const reducedMotion = prefersReducedMotion();
+  document.documentElement.dataset.stage = reducedMotion ? 'static' : 'live';
+
+  // Exposed for external verification tooling.
+  window.__vd = { stage, lifecycle: null, choreography: null, entrance: null };
+
+  const attachScroll = () => {
+    // Created here, not earlier: the entrance and the scroll timeline both write part
+    // positions, and two live timelines on one property fight.
+    // #content, not #stage: the stage is position:sticky and its rect never travels,
+    // so a ScrollObserver watching it would sit at progress 0 forever.
+    window.__vd.choreography = createChoreography({
+      parts: stage.parts,
+      tilt: stage.tilt,
+      state: stage.state,
+      scrollTarget: content,
+    });
+  };
+
+  const entrance = createEntrance({ parts: stage.parts, tilt: stage.tilt, onComplete: attachScroll });
+  window.__vd.entrance = entrance;
+
+  if (reducedMotion) {
+    // No lifecycle: its render loop applies a continuous idle spin every frame purely
+    // from elapsed time (diabolo/stage.js's rotationDeltas), with no user input driving
+    // it. That is exactly the autoplaying motion reduced-motion users must not get.
+    // entrance.skip() still resolves the object to its assembled, face-on state and
+    // fires attachScroll, so scrolling stays 1:1 with the user's own input — nothing
+    // animates on its own. A single manual render paints that resolved frame.
+    entrance.skip();
     stage.render(0);
-    return;
+  } else {
+    window.__vd.lifecycle = createLifecycle({ element: stageEl, onFrame: stage.render });
   }
-
-  document.documentElement.dataset.stage = 'live';
-  // #content, not #stage: the stage is position:sticky and its rect never travels,
-  // so a ScrollObserver watching it would sit at progress 0 forever.
-  const choreography = createChoreography({ parts: stage.parts, tilt: stage.tilt, state: stage.state, scrollTarget: content });
-  const lifecycle = createLifecycle({ element: stageEl, onFrame: stage.render });
-
-  // Exposed for the Task 12 verification probe.
-  window.__vd = { stage, lifecycle, choreography };
 }
 
 if (typeof document !== 'undefined') {
