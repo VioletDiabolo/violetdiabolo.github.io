@@ -16,6 +16,8 @@ export function resolveQualityTier(signals) {
   const { pointerFine, viewportWidth, deviceMemory } = signals;
   if (pointerFine !== true) return 'base';
   if (!(viewportWidth >= 1024)) return 'base';
+  // navigator.deviceMemory is Chromium-only; treating `undefined` as "enough" means
+  // Safari and Firefox are gated by pointer and viewport alone.
   if (deviceMemory !== undefined && deviceMemory < 8) return 'base';
   return 'high';
 }
@@ -28,13 +30,34 @@ export function readSignals() {
   };
 }
 
-const IDLE_SPIN = 0.22; // radians/sec for the whole assembly
+const IDLE_SPIN = 0.22;            // radians/sec for the whole assembly
+const BEARING_SPIN_MULTIPLIER = 6; // the bearing spins faster than the body
+
+/**
+ * Pure: the per-frame rotation increments. Extracted from the render closure so the
+ * arithmetic is testable without a GPU — a sign error here is invisible until runtime.
+ */
+export function rotationDeltas(deltaSeconds, spinRate) {
+  return {
+    root: IDLE_SPIN * deltaSeconds,
+    bearing: IDLE_SPIN * BEARING_SPIN_MULTIPLIER * spinRate * deltaSeconds,
+  };
+}
+
+/**
+ * Pure: resolves a canvas box and the current DPR into what the renderer and camera
+ * should adopt. Returns null when the box is unmeasurable, so callers no-op rather
+ * than dividing by zero.
+ */
+export function resolveViewport({ width, height, devicePixelRatio, maxDpr }) {
+  if (!(width > 0) || !(height > 0)) return null;
+  return { width, height, aspect: width / height, pixelRatio: Math.min(devicePixelRatio, maxDpr) };
+}
 
 export function createStage({ canvas, tier }) {
   const settings = TIER_SETTINGS[tier];
 
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, settings.dpr));
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
 
@@ -43,7 +66,7 @@ export function createStage({ canvas, tier }) {
   camera.position.set(0, 0.15, 5.4);
   camera.lookAt(0, 0, 0);
 
-  const materials = createMaterials({ renderer, tier });
+  const materials = createMaterials({ renderer, settings });
   const { root, parts } = buildDiabolo({ materials, segments: settings.segments });
   scene.add(root);
   scene.environment = materials._envTarget.texture;
@@ -53,17 +76,25 @@ export function createStage({ canvas, tier }) {
   const spinMesh = parts.axleBearing.userData.spinMesh;
 
   function render(deltaSeconds) {
-    root.rotation.y += IDLE_SPIN * deltaSeconds;
-    spinMesh.rotation.y += IDLE_SPIN * 6 * state.spinRate * deltaSeconds;
+    const spin = rotationDeltas(deltaSeconds, state.spinRate);
+    root.rotation.y += spin.root;
+    spinMesh.rotation.y += spin.bearing;
     renderer.render(scene, camera);
   }
 
   function resize() {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    if (w === 0 || h === 0) return;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
+    const view = resolveViewport({
+      width: canvas.clientWidth,
+      height: canvas.clientHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      maxDpr: settings.dpr,
+    });
+    if (view === null) return;
+    // Re-applied on every resize, not just at construction: DPR changes when a window
+    // moves between displays of different density.
+    renderer.setPixelRatio(view.pixelRatio);
+    renderer.setSize(view.width, view.height, false);
+    camera.aspect = view.aspect;
     camera.updateProjectionMatrix();
   }
 

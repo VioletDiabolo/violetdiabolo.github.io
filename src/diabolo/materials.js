@@ -48,14 +48,16 @@ export function createEnvironment(renderer) {
 }
 
 /**
- * `transmission` is gated to the `high` tier: it forces an extra render pass per
- * frame and is the most expensive single feature on the page.
+ * `transmission` is controlled by `settings.transmission` (from `TIER_SETTINGS`): it
+ * forces an extra render pass per frame and is the most expensive single feature on
+ * the page.
  */
-export function createMaterials({ renderer, tier }) {
+export function createMaterials({ renderer, settings }) {
   const map = createGradientTexture();
   const envTarget = createEnvironment(renderer);
   const env = envTarget.texture;
-  const high = tier === 'high';
+  // Driven by TIER_SETTINGS, not re-derived from the tier name, so the two cannot drift.
+  const high = settings.transmission;
 
   const cup = new MeshPhysicalMaterial({
     map,
