@@ -77,16 +77,20 @@ share it. `tests/lifecycle.test.js` fails if `src/diabolo/lifecycle.js` ever imp
 
 ## 4. Explosion timeline — verified by direct seek
 
-`timeline.duration === 508`. Seeking drives a correct staggered cascade:
+`timeline.duration === 666`. Re-measured after the hero hold and reassembly beat were
+added. Seeking drives a correct staggered cascade and resolves:
 
 | t | state |
 |---|---|
 | 0 | all seven parts at HOME (assembled) |
-| 100 | `cupTop` out at [-1.55, 2.42]; `gasketTop` mid-flight [0.35, 0.70] |
-| 254 | `axleBearing` mid-flight [-0.90, 0.03] |
-| 408 | bearing out [-1.80, 0.05]; `gasketBottom` mid-flight |
-| 508 | all seven exploded |
-| seek(0) | exact HOME again — reversible |
+| 60 | **still exactly HOME** — the hero hold, so the object is seen whole before anything detaches |
+| 333 | mid-explosion: `cupTop` y 2.42, `gasketTop` 1.73, `hubConeTop` 0.75, bearing leaving |
+| 666 | **exact HOME again** — the footer beat snaps it back together |
+
+Verified programmatically: `heroHolds: true`, `explodesMidway: true`, `reassembles: true`
+(end state compared field-by-field against the assembled state). This is spec success
+criterion 1 — assembled → exploded → reassembled — met within a single forward pass, not
+only by scrolling back up.
 
 ## 5. Scroll → timeline wiring — structurally verified
 
@@ -141,7 +145,10 @@ Seam continuity after the hub-cone fix: bearing seam 0.0135, gasket seam 0.0112
 ## 7. Content and responsiveness
 
 ```
-sections            : hero, about, events, media, board, contact  (all with mono index counters)
+sections            : hero, about, events, media, board, contact, footer
+footer              : "VIOLET DIABOLO 2026" — year computed via getFullYear(), not hardcoded
+photographs         : all 4 pipeline bases referenced in the DOM (group-usadc, usadc-wide, aaron, jon)
+responsive images   : 4 <picture> elements, 4 AVIF + 4 WebP sources, 0 <img> without alt
 board               : 3 cards, 1 placeholder (no <img>), 5 semesters, defaults to Fall 2025
 media               : 10 facades, 0 live iframes before activation
 forms               : 2 facades
@@ -163,7 +170,7 @@ DOM instead, and the numbers above are from that.
 ```
 dist/index.html   3.66 kB │ gzip   1.46 kB
 dist/assets/*.css 9.33 kB │ gzip   2.80 kB
-dist/assets/*.js  602 kB  │ gzip 157.88 kB
+dist/assets/*.js  603 kB  │ gzip 158.41 kB
 largest image     307 kB  (from an 11.3 MB master; 240 kB AVIF is what actually serves)
 ```
 
