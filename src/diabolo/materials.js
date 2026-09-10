@@ -26,11 +26,25 @@ export function createGradientTexture() {
   return tex;
 }
 
+/**
+ * Returns the PMREM **render target**, not just its texture.
+ *
+ * `fromScene()` allocates a WebGLRenderTarget with a real framebuffer and depth
+ * renderbuffer. Only `WebGLRenderTarget.dispose()` frees those; disposing the bare
+ * texture calls `gl.deleteTexture` and leaks the rest. `renderer.dispose()` does not
+ * rescue it either — `WebGLProperties.dispose()` swaps in a fresh WeakMap without
+ * walking the old one. On a page that tears down and re-inits, that leak is unbounded.
+ *
+ * The RoomEnvironment scene owns a BoxGeometry and 8 materials and is only needed
+ * synchronously, so it is disposed as soon as `fromScene` returns.
+ */
 export function createEnvironment(renderer) {
   const pmrem = new PMREMGenerator(renderer);
-  const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const room = new RoomEnvironment();
+  const target = pmrem.fromScene(room, 0.04);
+  room.dispose();
   pmrem.dispose();
-  return env;
+  return target;
 }
 
 /**
@@ -39,7 +53,8 @@ export function createEnvironment(renderer) {
  */
 export function createMaterials({ renderer, tier }) {
   const map = createGradientTexture();
-  const env = createEnvironment(renderer);
+  const envTarget = createEnvironment(renderer);
+  const env = envTarget.texture;
   const high = tier === 'high';
 
   const cup = new MeshPhysicalMaterial({
@@ -70,7 +85,8 @@ export function createMaterials({ renderer, tier }) {
     color: new Color('#cfd2d8'), envMap: env, roughness: 0.18, metalness: 1.0,
   });
 
-  return { cup, gasket, hub, bearing, _map: map, _env: env };
+  // _envTarget, not _env: disposing the target frees its framebuffer AND its texture.
+  return { cup, gasket, hub, bearing, _map: map, _envTarget: envTarget };
 }
 
 export function disposeMaterials(materials) {

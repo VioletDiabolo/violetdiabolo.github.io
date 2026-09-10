@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
-import { GRADIENT_STOPS } from '../src/diabolo/materials.js';
+import { describe, it, expect, vi } from 'vitest';
+import { SRGBColorSpace } from 'three';
+import { GRADIENT_STOPS, createGradientTexture } from '../src/diabolo/materials.js';
 
 describe('cup gradient', () => {
   it('runs neck to rim across the full range', () => {
@@ -24,5 +25,28 @@ describe('cup gradient', () => {
     };
     const values = GRADIENT_STOPS.map((s) => lum(s.color));
     for (let i = 1; i < values.length; i++) expect(values[i]).toBeGreaterThan(values[i - 1]);
+  });
+});
+
+describe('gradient texture', () => {
+  it('runs bottom-to-top so violet lands on the neck, not the rim', () => {
+    const calls = { axis: null, stops: [] };
+    const fakeCtx = {
+      fillStyle: null,
+      createLinearGradient(...axis) {
+        calls.axis = axis;
+        return { addColorStop(offset, color) { calls.stops.push([offset, color]); } };
+      },
+      fillRect() {},
+    };
+    const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fakeCtx);
+    const texture = createGradientTexture();
+    spy.mockRestore();
+
+    // Bottom (y = height) to top (y = 0). Reversing this inverts the cup.
+    expect(calls.axis).toEqual([0, 256, 0, 0]);
+    expect(calls.stops[0]).toEqual([0, '#7b3fd4']);
+    expect(calls.stops.at(-1)).toEqual([1, '#f6f1fb']);
+    expect(texture.colorSpace).toBe(SRGBColorSpace);
   });
 });
