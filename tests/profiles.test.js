@@ -61,9 +61,11 @@ describe('small parts', () => {
     expect(gasketProfile().length).toBeGreaterThan(2);
   });
 
-  it('tapers the hub cone inward toward the bearing', () => {
+  it('runs the hub cone narrow-at-the-bearing to wide-at-the-neck, matching assembly order', () => {
     const p = hubConeProfile();
-    expect(p[0].x).toBeGreaterThan(p.at(-1).x);
+    expect(p[0].x).toBeCloseTo(DIMS.bearingRadius, 6);
+    expect(p.at(-1).x).toBeCloseTo(DIMS.neckRadius, 6);
+    expect(p[0].x).toBeLessThan(p.at(-1).x);
   });
 
   it('keeps the bearing the narrowest part of the assembly', () => {

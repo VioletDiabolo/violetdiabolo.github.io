@@ -53,13 +53,19 @@ export function gasketProfile() {
   ];
 }
 
-/** Black cone tapering from the cup neck down to the bearing. */
+/**
+ * Black cone joining the bearing to the cup's neck.
+ *
+ * Runs bottom-up in the same sense as the assembly: local y=0 is the BEARING end
+ * (narrow), local y=hubHeight is the CUP-NECK end (wide). Authoring it the other way
+ * round mounts the cone inverted, leaving a ~0.05 radius step at both of its seams.
+ */
 export function hubConeProfile() {
   const pts = [];
   const segments = 24;
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const radius = DIMS.neckRadius * (1 - t) + DIMS.bearingRadius * t;
+    const radius = DIMS.bearingRadius * (1 - t) + DIMS.neckRadius * t;
     pts.push(new Vector2(radius, DIMS.hubHeight * t));
   }
   return pts;

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { Group } from 'three';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
-import { PART_IDS, DIMS } from '../src/diabolo/profiles.js';
+import { PART_IDS, DIMS, bearingProfile, hubConeProfile, gasketProfile } from '../src/diabolo/profiles.js';
 
-const stubMaterials = { cup: {}, gasket: {}, hub: {}, bearing: {} };
+const stubMaterials = { cup: { id: 'cup' }, gasket: { id: 'gasket' }, hub: { id: 'hub' }, bearing: { id: 'bearing' } };
 const build = () => buildDiabolo({ materials: stubMaterials, segments: 32 });
 
 describe('buildDiabolo', () => {
@@ -66,5 +66,35 @@ describe('buildDiabolo', () => {
     const total = HOME.cupTop.y - HOME.cupBottom.y + 2 * DIMS.cupHeight;
     expect(total).toBeGreaterThan(0);
     expect(total).toBeLessThan(6);
+  });
+
+  it('assigns each part its intended material', () => {
+    const { parts } = build();
+    const materialIdOf = (id) => parts[id].children.find((c) => c.geometry).material.id;
+    expect(materialIdOf('cupTop')).toBe('cup');
+    expect(materialIdOf('cupBottom')).toBe('cup');
+    expect(materialIdOf('gasketTop')).toBe('gasket');
+    expect(materialIdOf('gasketBottom')).toBe('gasket');
+    expect(materialIdOf('hubConeTop')).toBe('hub');
+    expect(materialIdOf('hubConeBottom')).toBe('hub');
+    expect(materialIdOf('axleBearing')).toBe('bearing');
+  });
+});
+
+describe('seam continuity', () => {
+  // The bug this guards: a profile authored in the opposite direction to the assembly
+  // mounts its part inverted, leaving a visible radius step where two parts meet.
+  const SEAM_TOLERANCE = 0.02;
+
+  it('meets the bearing and the hub cone at a comparable radius', () => {
+    const bearingMax = Math.max(...bearingProfile().map((p) => p.x));
+    const hubAtBearing = hubConeProfile()[0].x;
+    expect(Math.abs(hubAtBearing - bearingMax)).toBeLessThan(SEAM_TOLERANCE);
+  });
+
+  it('meets the hub cone and the gasket bore at a comparable radius', () => {
+    const hubAtNeck = hubConeProfile().at(-1).x;
+    const gasketBore = gasketProfile()[0].x;
+    expect(Math.abs(hubAtNeck - gasketBore)).toBeLessThan(SEAM_TOLERANCE);
   });
 });
