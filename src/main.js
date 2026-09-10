@@ -46,16 +46,23 @@ function boot() {
     });
   };
 
-  const entrance = createEntrance({ parts: stage.parts, tilt: stage.tilt, onComplete: attachScroll });
+  const entrance = createEntrance({
+    parts: stage.parts,
+    tilt: stage.tilt,
+    // Under reduced motion nothing drives a repaint, so attaching the scroll timeline
+    // would mutate part positions against a canvas that never redraws — the scene data
+    // and the pixels would diverge. Assembled and face-on is the whole experience.
+    onComplete: reducedMotion ? () => {} : attachScroll,
+  });
   window.__vd.entrance = entrance;
 
   if (reducedMotion) {
     // No lifecycle: its render loop applies a continuous idle spin every frame purely
     // from elapsed time (diabolo/stage.js's rotationDeltas), with no user input driving
     // it. That is exactly the autoplaying motion reduced-motion users must not get.
-    // entrance.skip() still resolves the object to its assembled, face-on state and
-    // fires attachScroll, so scrolling stays 1:1 with the user's own input — nothing
-    // animates on its own. A single manual render paints that resolved frame.
+    // entrance.skip() resolves the object to its assembled, face-on state with no scroll
+    // timeline attached (see onComplete above), so nothing ever mutates it again. A
+    // single manual render paints that resolved frame.
     entrance.skip();
     stage.render(0);
   } else {
