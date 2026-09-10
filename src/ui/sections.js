@@ -1,7 +1,8 @@
-import { SITE, ABOUT, EVENTS, CONTACT, SOCIALS, SECTION_HEADINGS } from '../content/index.js';
+import { SITE, ABOUT, EVENTS, CONTACT, SOCIALS, SECTION_HEADINGS, PHOTOS } from '../content/index.js';
 import { mountBoard } from './board.js';
 import { mountMedia } from './media.js';
 import { mountForms } from './forms.js';
+import { buildPicture } from './picture.js';
 
 function section(id, headingText, level = 'h2') {
   const el = document.createElement('section');
@@ -27,6 +28,10 @@ export function renderSections(root) {
 
   const about = section('about', ABOUT.heading);
   about.append(paragraph(ABOUT.body));
+  const groupPhoto = document.createElement('figure');
+  groupPhoto.className = 'section-photo';
+  groupPhoto.append(buildPicture({ ...PHOTOS.group, sizes: '(max-width: 900px) 92vw, 46vw', loading: 'lazy' }));
+  about.append(groupPhoto);
 
   const events = section('events', EVENTS.heading);
   events.append(paragraph(EVENTS.body));
@@ -64,6 +69,11 @@ export function renderSections(root) {
     socials.append(a);
   }
   contact.append(socials);
+
+  const widePhoto = document.createElement('figure');
+  widePhoto.className = 'section-photo';
+  widePhoto.append(buildPicture({ ...PHOTOS.wide, sizes: '(max-width: 900px) 92vw, 46vw' }));
+  contact.append(widePhoto);
 
   root.replaceChildren(hero, about, events, media, board, contact);
 }

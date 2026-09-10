@@ -1,4 +1,5 @@
 import { BOARD } from '../content/index.js';
+import { buildPicture } from './picture.js';
 
 function card(member) {
   const article = document.createElement('article');
@@ -7,14 +8,13 @@ function card(member) {
   if (member.placeholder) article.dataset.placeholder = 'true';
 
   if (member.image) {
-    const img = document.createElement('img');
-    img.src = member.image;
-    img.alt = `${member.name}, ${member.position}`;
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    img.width = 800;
-    img.height = 800;
-    article.append(img);
+    const picture = buildPicture({
+      base: member.image,
+      widths: [400, 800],
+      alt: `${member.name}, ${member.position}`,
+      sizes: '(max-width: 720px) 90vw, 320px',
+    });
+    article.append(picture);
   }
 
   const name = document.createElement('h3');

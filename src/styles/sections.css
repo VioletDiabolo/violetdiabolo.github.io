@@ -164,6 +164,26 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Section photographs (About, Contact) -- the club's two carried-over photos
+ * (src/content/index.js PHOTOS), built via src/ui/picture.js. Direct children of
+ * their section, so they fall under the same `.section > *` / grid-column rules as
+ * the heading and body text above them and stay on the text side of the grid --
+ * the empty column stays empty for the diabolo part flying into it.
+ * ------------------------------------------------------------------------- */
+
+.section-photo {
+  margin: 0;
+}
+
+.section-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------------------
  * Board cards
  * ------------------------------------------------------------------------- */
 
@@ -186,13 +206,9 @@
 .board-card img {
   display: block;
   width: 100%;
-  /* board.js sets width/height="800" HTML attributes (to hint the browser's own
-     preload aspect-ratio and avoid layout shift). Those attributes count as a
-     definite `height`, and CSS aspect-ratio only fills in an axis left `auto` --
-     it does not override two already-definite, conflicting dimensions. Without this,
-     images render at the HTML attributes' raw 800px height regardless of column
-     width (measured: 147.6 x 800, ratio 0.18, not square). `height: auto` clears
-     that so aspect-ratio can compute height from the rendered width instead. */
+  /* buildPicture (src/ui/picture.js) sets neither a width nor a height attribute,
+     so there is no competing definite dimension here -- `aspect-ratio` alone forces
+     the square box, and `height: auto` lets it compute from the rendered width. */
   height: auto;
   aspect-ratio: 1 / 1;
   object-fit: cover;

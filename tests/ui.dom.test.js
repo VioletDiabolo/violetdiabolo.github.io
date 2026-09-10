@@ -119,6 +119,22 @@ describe('form facades', () => {
   });
 });
 
+describe('section photographs', () => {
+  it('renders the about and contact photos as real <picture> elements with avif/webp sources and alt text', () => {
+    renderSections(document.getElementById('content'));
+    for (const id of ['about', 'contact']) {
+      const el = document.querySelector(`[data-section="${id}"]`);
+      const picture = el.querySelector('picture');
+      expect(picture, `[data-section="${id}"] has no <picture>`).not.toBeNull();
+      expect(picture.querySelectorAll('source[type="image/avif"]').length).toBeGreaterThan(0);
+      expect(picture.querySelectorAll('source[type="image/webp"]').length).toBeGreaterThan(0);
+      const img = picture.querySelector('img');
+      expect(img).not.toBeNull();
+      expect(img.alt.length).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('content boundary', () => {
   it('keeps club copy out of ui modules, which must read it from content/', () => {
     // Built from a plain path, not `new URL(..., import.meta.url)`: under this file's

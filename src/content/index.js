@@ -46,7 +46,7 @@ export const MEDIA = [
 const AARON = {
   name: 'Aaron Hui',
   position: 'President',
-  image: './images/aaron-800.avif',
+  image: 'aaron',
   description:
     "Heyo, I'm Aaron and I'm the current president of Violet Diabolo! I am a vertax one-trick (which " +
     "means that you should be very careful near me when I'm yoyoing), but I'm currently working on 3D " +
@@ -67,7 +67,7 @@ const AARON_SECRETARY = {
 const JON = {
   name: 'Jonathan Sun',
   position: 'Artistic Director',
-  image: './images/jon-800.avif',
+  image: 'jon',
   description:
     "Yo. I'm JonaSun. Resident transplant from UMich Revolution. I’m all about carefully crafting " +
     'combos for creative, yet chaotic, choreography. Proud proponent of plasma torch for cutting yo-yo ' +
@@ -115,3 +115,9 @@ export const SOCIALS = [
   { label: 'NYU Engage', href: 'https://engage.nyu.edu/organization/violet-diabolo-all-university', icon: 'engage' },
   { label: 'GitHub', href: 'https://github.com/VioletDiabolo/violetdiabolo.github.io', icon: 'github' },
 ];
+
+/** The club's two photographs, carried over from the previous site. */
+export const PHOTOS = {
+  group: { base: 'group-usadc', widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo performing together at the USADA National Diabolo Competition' },
+  wide:  { base: 'usadc-wide',  widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo on stage at the USADA National Diabolo Competition' },
+};

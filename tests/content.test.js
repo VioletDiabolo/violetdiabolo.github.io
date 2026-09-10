@@ -1,6 +1,6 @@
 // tests/content.test.js
 import { describe, it, expect } from 'vitest';
-import { SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, SECTION_HEADINGS } from '../src/content/index.js';
+import { SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, SECTION_HEADINGS, PHOTOS } from '../src/content/index.js';
 
 describe('content', () => {
   it('carries the site identity verbatim', () => {
@@ -40,9 +40,29 @@ describe('content', () => {
     }
   });
 
-  it('never hotlinks a third-party CDN for member photos', () => {
+  it('stores board images as bare derivative base names, not paths or filenames', () => {
+    // buildPicture (src/ui/picture.js) expands a base name into the full AVIF/WebP
+    // srcset itself; a path or extension baked into content would double up or drift
+    // from what scripts/build-assets.mjs actually emits.
     const images = Object.values(BOARD).flat().map((m) => m.image).filter(Boolean);
-    for (const src of images) expect(src).toMatch(/^\.\/images\//);
+    expect(images.length).toBeGreaterThan(0);
+    for (const src of images) expect(src).not.toMatch(/[/.]/);
+
+    for (const roster of Object.values(BOARD)) {
+      const placeholder = roster.find((m) => m.placeholder);
+      expect(placeholder.image).toBeNull();
+    }
+  });
+
+  it('gives every photograph non-empty alt text', () => {
+    // These are real photographs of real people at a real competition, not decoration —
+    // shipping them with empty alt would silence them for screen-reader visitors.
+    const photos = Object.values(PHOTOS);
+    expect(photos.length).toBeGreaterThan(0);
+    for (const photo of photos) {
+      expect(typeof photo.alt).toBe('string');
+      expect(photo.alt.length).toBeGreaterThan(0);
+    }
   });
 
   it('exposes contact and both forms', () => {
