@@ -35,7 +35,7 @@ function boot() {
   document.documentElement.dataset.stage = 'live';
   // #content, not #stage: the stage is position:sticky and its rect never travels,
   // so a ScrollObserver watching it would sit at progress 0 forever.
-  const choreography = createChoreography({ parts: stage.parts, state: stage.state, scrollTarget: content });
+  const choreography = createChoreography({ parts: stage.parts, tilt: stage.tilt, state: stage.state, scrollTarget: content });
   const lifecycle = createLifecycle({ element: stageEl, onFrame: stage.render });
 
   // Exposed for the Task 12 verification probe.

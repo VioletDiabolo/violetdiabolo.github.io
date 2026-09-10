@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { createChoreography, HERO_HOLD, REASSEMBLE_AT, BEAT_DURATION } from '../src/scroll/choreography.js';
+import { createChoreography, PART_RANK, explodedY, FACE_ON_X, PROFILE_X, SCRUB_DURATION } from '../src/scroll/choreography.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
 
 // jsdom implements neither ResizeObserver nor IntersectionObserver. anime.js's
@@ -18,12 +18,25 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   };
 }
 
+// Real Three.js Groups from the real geometry builder are simpler than hand-rolled
+// stubs and exercise the actual .position/.rotation objects anime.js writes in
+// production (Vector3 / Euler instances with numeric x/y/z, not plain objects) --
+// LatheGeometry and Group are pure math/scene-graph, no WebGL context required, so
+// this works fine under jsdom. Materials are never sampled by anime.js, so plain
+// placeholder objects stand in for them.
+function buildScene() {
+  const materials = { cup: {}, gasket: {}, hub: {}, bearing: {} };
+  return buildDiabolo({ materials, segments: 16 });
+}
+
 describe('scroll target validation', () => {
   const build = (position) => {
     const el = document.createElement('div');
     el.style.position = position;
     document.body.append(el);
-    return () => createChoreography({ parts: {}, state: { spinRate: 1 }, scrollTarget: el });
+    const { tilt, parts } = buildScene();
+    const state = { spinRate: 1 };
+    return () => createChoreography({ parts, tilt, state, scrollTarget: el });
   };
 
   it('refuses a sticky target, whose rect never travels', () => {
@@ -39,54 +52,56 @@ describe('scroll target validation', () => {
   });
 });
 
-describe('happy path: a real timeline against real groups', () => {
-  // Real Three.js Groups from the real geometry builder are simpler than hand-rolled
-  // stubs and exercise the actual .position/.rotation objects anime.js writes in
-  // production (Vector3 / Euler instances with numeric x/y/z, not plain objects) --
-  // LatheGeometry and Group are pure math/scene-graph, no WebGL context required, so
-  // this works fine under jsdom. Materials are never sampled by anime.js, so plain
-  // placeholder objects stand in for them.
-  function buildScene() {
-    const materials = { cup: {}, gasket: {}, hub: {}, bearing: {} };
-    const { parts } = buildDiabolo({ materials, segments: 24 });
+describe('simultaneous explosion', () => {
+  const setup = () => {
+    const target = document.createElement('div');
+    target.style.position = 'static';
+    document.body.append(target);
+    const { tilt, spinner, parts } = buildDiabolo({
+      materials: { cup: {}, gasket: {}, hub: {}, bearing: {} }, segments: 16,
+    });
+    // In production, `tilt.rotation.x` is already FACE_ON_X by the time createChoreography
+    // runs: entrance.js (Task 4) sets it synchronously and completes before the scroll
+    // timeline is ever created. buildDiabolo alone leaves it at Three.js's Group default of
+    // 0, so this test establishes the same precondition entrance.js will own in production.
+    tilt.rotation.x = FACE_ON_X;
     const state = { spinRate: 1 };
-    const scrollTarget = document.createElement('div');
-    document.body.append(scrollTarget);
-    return { parts, state, scrollTarget };
-  }
+    const choreo = createChoreography({ parts, tilt, state, scrollTarget: target });
+    return { ...choreo, parts, tilt, spinner, state };
+  };
 
-  it('schedules a hero hold, an explode cascade, and a reassembly, then disposes cleanly', () => {
-    const { parts, state, scrollTarget } = buildScene();
-    const { timeline, dispose } = createChoreography({ parts, state, scrollTarget });
+  it('has every part in motion at the same time, rather than one after another', () => {
+    const { timeline, parts } = setup();
+    timeline.seek(SCRUB_DURATION * 0.5);
+    for (const id of Object.keys(PART_RANK)) {
+      if (id === 'axleBearing') continue;
+      const y = parts[id].position.y;
+      expect(Math.abs(y - HOME[id].y), `${id} has not started`).toBeGreaterThan(1e-6);
+      expect(Math.abs(y - explodedY(id)), `${id} has already finished`).toBeGreaterThan(1e-6);
+    }
+  });
 
-    // The reassembly beat is the last thing added to the timeline, so its own duration
-    // (BEAT_DURATION, from the timeline's `defaults`) is what the whole timeline ends on.
-    expect(timeline.duration).toBe(REASSEMBLE_AT + BEAT_DURATION);
+  it('lands every part on its exploded position at the end', () => {
+    const { timeline, parts } = setup();
+    timeline.seek(SCRUB_DURATION);
+    for (const id of Object.keys(PART_RANK)) {
+      expect(parts[id].position.y).toBeCloseTo(explodedY(id), 4);
+    }
+  });
 
+  it('turns the object from face-on to profile across the same span', () => {
+    const { timeline, tilt } = setup();
     timeline.seek(0);
-    for (const id of Object.keys(HOME)) {
-      expect(parts[id].position.y, `${id} not at HOME before the hero hold`).toBeCloseTo(HOME[id].y, 5);
-    }
+    const atStart = tilt.rotation.x;
+    timeline.seek(SCRUB_DURATION);
+    expect(tilt.rotation.x).toBeCloseTo(PROFILE_X, 4);
+    expect(Math.abs(atStart - tilt.rotation.x)).toBeGreaterThan(0.5);
+  });
 
-    // cupTop is the first beat (index 0), scheduled at HERO_HOLD; by HERO_HOLD +
-    // BEAT_DURATION its own animation has fully played out.
-    timeline.seek(HERO_HOLD + BEAT_DURATION);
-    expect(parts.cupTop.position.y).not.toBeCloseTo(HOME.cupTop.y, 2);
-
-    // The reassembly actually lands: every part is back at HOME once the timeline ends.
-    timeline.seek(timeline.duration);
-    for (const id of Object.keys(HOME)) {
-      expect(parts[id].position.y, `${id} did not reassemble to HOME`).toBeCloseTo(HOME[id].y, 5);
-      expect(parts[id].rotation.x, `${id} did not reassemble its rotation`).toBeCloseTo(0, 5);
-      expect(parts[id].rotation.z, `${id} did not reassemble its rotation`).toBeCloseTo(0, 5);
-    }
-
-    // Reversible: scrolling back up returns to the assembled hero state.
-    timeline.seek(0);
-    for (const id of Object.keys(HOME)) {
-      expect(parts[id].position.y, `${id} did not reverse back to HOME`).toBeCloseTo(HOME[id].y, 5);
-    }
-
-    expect(() => dispose()).not.toThrow();
+  it('never writes the spinner, which the render loop owns', () => {
+    const { timeline, spinner } = setup();
+    const before = spinner.rotation.y;
+    timeline.seek(SCRUB_DURATION * 0.7);
+    expect(spinner.rotation.y).toBe(before);
   });
 });

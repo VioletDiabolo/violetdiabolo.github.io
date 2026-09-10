@@ -2,62 +2,44 @@ import { createTimeline, onScroll } from 'animejs';
 import { HOME } from '../diabolo/build.js';
 
 /**
- * One beat per part, in scroll order. `offset` is added to the part's HOME position;
- * `spinRate` scales the bearing's local spin, which the render loop reads from state.
- * Frozen (array, each beat, each offset) so a later consumer — e.g. a task placing HTML
- * labels — can read this without an in-place mutation silently desyncing the 3D scene.
+ * Distance from the centre in assembly order. The bearing is the reference part and
+ * does not move; everything else travels outward in proportion to its rank, which is
+ * what produces the even spacing of a technical exploded view.
  */
-export const SCROLL_BEATS = Object.freeze([
-  Object.freeze({ section: 'about',   part: 'cupTop',        offset: Object.freeze([-1.55,  1.95, 0.15]), spinRate: 1.0 }),
-  Object.freeze({ section: 'events',  part: 'gasketTop',     offset: Object.freeze([ 1.70,  1.30, 0.10]), spinRate: 1.0 }),
-  Object.freeze({ section: 'events',  part: 'hubConeTop',    offset: Object.freeze([ 1.35,  0.62, 0.30]), spinRate: 1.0 }),
-  Object.freeze({ section: 'media',   part: 'axleBearing',   offset: Object.freeze([-1.80,  0.05, 0.55]), spinRate: 4.5 }),
-  Object.freeze({ section: 'board',   part: 'hubConeBottom', offset: Object.freeze([ 1.35, -0.62, 0.30]), spinRate: 1.0 }),
-  Object.freeze({ section: 'board',   part: 'gasketBottom',  offset: Object.freeze([ 1.70, -1.30, 0.10]), spinRate: 1.0 }),
-  Object.freeze({ section: 'contact', part: 'cupBottom',     offset: Object.freeze([-1.55, -1.95, 0.15]), spinRate: 1.0 }),
-]);
+export const PART_RANK = Object.freeze({
+  axleBearing: 0,
+  hubConeTop: 1,
+  hubConeBottom: 1,
+  gasketTop: 2,
+  gasketBottom: 2,
+  cupTop: 3,
+  cupBottom: 3,
+});
 
-export const BEAT_DURATION = 100;
-// Deliberately shorter than BEAT_DURATION: beats overlap so parts cascade outward
-// rather than moving one strictly after another. Raising this to BEAT_DURATION would
-// silently kill the cascade.
-export const BEAT_STAGGER = 68;
-// Nothing moves for this long, so the hero shows an assembled diabolo before anything
-// detaches. Without it cupTop's beat starts at 0 and the object is never seen whole.
-export const HERO_HOLD = 90;
-// The footer's reassembly beat: scheduled one stagger step after the last explode beat
-// starts (beats overlap, so by the time the timeline reaches here every part is at least
-// well underway). Every part returns to HOME here, so the page resolves fully assembled
-// rather than ending in pieces (spec §5, footer: "snaps back together").
-export const REASSEMBLE_AT = HERO_HOLD + SCROLL_BEATS.length * BEAT_STAGGER;
-// Each part tilts in proportion to how far it travels, so the exploded view reads as a
-// technical diagram rather than a rigid grid. Tuned by eye; no physical meaning.
-const ROTATION_TILT_Z = 0.35; // from the part's z offset
-const ROTATION_TILT_X = 0.18; // from the part's x offset
+/** Scene units between adjacent parts when fully exploded. The one number to retune. */
+export const SPACING = 0.55;
+
+/** Looking straight down the axle: the object reads as concentric circles. */
+export const FACE_ON_X = -Math.PI / 2;
+/** The familiar hourglass silhouette. */
+export const PROFILE_X = 0;
+
+/** Arbitrary timeline length; scroll progress maps onto it, so only ratios matter. */
+export const SCRUB_DURATION = 1000;
 
 /**
- * Pure: the absolute target transform for one beat, resolved against its HOME rest
- * position. Extracted from the timeline so the offset arithmetic is testable without a
- * scroll container — an inverted sign here would otherwise be invisible until runtime.
+ * Pure: where a part sits when fully exploded. Extracted from the timeline so the
+ * spacing arithmetic is testable without a scroll container.
  */
-export function beatTarget(beat) {
-  const home = HOME[beat.part];
-  return {
-    position: { x: beat.offset[0], y: home.y + beat.offset[1], z: beat.offset[2] },
-    rotation: { x: beat.offset[2] * ROTATION_TILT_Z, z: beat.offset[0] * ROTATION_TILT_X },
-  };
+export function explodedY(partId) {
+  // A function of rank alone, not of the rest position. Adding SPACING to HOME would
+  // inherit the assembly's own uneven gaps (0.045 / 0.120 / 0.070) and the exploded
+  // view would not read as a measured diagram. Measured gaps here: exactly 0.550.
+  const direction = Math.sign(HOME[partId].y);
+  return direction * PART_RANK[partId] * SPACING;
 }
 
-/**
- * Builds the scroll-driven explode/reassemble timeline for the diabolo parts.
- *
- * `scrollTarget` must be an element that actually travels with the page as the user
- * scrolls — never the sticky `#stage`. anime.js's ScrollObserver derives progress from
- * how far `scrollTarget`'s bounding rect moves through the viewport; a `position: sticky`
- * (or `fixed`) element is pinned at the same viewport coordinates at every scroll offset,
- * so its rect never travels and progress can never advance past 0.
- */
-export function createChoreography({ parts, state, scrollTarget }) {
+export function createChoreography({ parts, tilt, state, scrollTarget }) {
   // A sticky or fixed element's rect never travels, so scroll progress can never
   // advance and the timeline would silently sit at 0. Fail loudly instead.
   if (typeof getComputedStyle === 'function' && scrollTarget) {
@@ -71,37 +53,29 @@ export function createChoreography({ parts, state, scrollTarget }) {
   }
 
   const timeline = createTimeline({
-    defaults: { ease: 'inOutQuad', duration: BEAT_DURATION },
+    defaults: { ease: 'inOutQuad', duration: SCRUB_DURATION },
     autoplay: onScroll({
       target: scrollTarget,
-      sync: 0.15,
+      sync: 0.2,
       enter: 'top top',
       leave: 'bottom bottom',
     }),
   });
 
-  SCROLL_BEATS.forEach((beat, index) => {
-    const group = parts[beat.part];
-    const target = beatTarget(beat);
-    const at = HERO_HOLD + index * BEAT_STAGGER;
-
-    timeline.add(group.position, target.position, at);
-    timeline.add(group.rotation, target.rotation, at);
-
-    if (beat.spinRate !== 1) {
-      timeline
-        .add(state, { spinRate: beat.spinRate }, at)
-        .add(state, { spinRate: 1 }, at + BEAT_DURATION);
-    }
-  });
-
-  // The footer beat: everything snaps back together.
-  for (const beat of SCROLL_BEATS) {
-    const group = parts[beat.part];
-    const home = HOME[beat.part];
-    timeline.add(group.position, { x: 0, y: home.y, z: 0 }, REASSEMBLE_AT);
-    timeline.add(group.rotation, { x: 0, z: 0 }, REASSEMBLE_AT);
+  // Every part starts at the same instant. Position 0 for all of them is the whole
+  // point: a staggered start reads as a queue, which is what this replaced.
+  for (const partId of Object.keys(PART_RANK)) {
+    timeline.add(parts[partId].position, { y: explodedY(partId) }, 0);
   }
+
+  // The turn runs across the same span, so the object arrives in profile exactly as
+  // the parts finish separating.
+  timeline.add(tilt.rotation, { x: PROFILE_X }, 0);
+
+  // The bearing spins up as the object opens, then settles.
+  timeline
+    .add(state, { spinRate: 3.5, duration: SCRUB_DURATION * 0.5 }, 0)
+    .add(state, { spinRate: 1, duration: SCRUB_DURATION * 0.5 }, SCRUB_DURATION * 0.5);
 
   return {
     timeline,

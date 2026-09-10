@@ -1,119 +1,76 @@
 import { describe, it, expect } from 'vitest';
-import { SCROLL_BEATS, beatTarget, BEAT_DURATION, BEAT_STAGGER, HERO_HOLD, REASSEMBLE_AT } from '../src/scroll/choreography.js';
-import { PART_IDS } from '../src/diabolo/profiles.js';
+import {
+  PART_RANK, SPACING, FACE_ON_X, PROFILE_X, explodedY,
+} from '../src/scroll/choreography.js';
 import { HOME } from '../src/diabolo/build.js';
+import { PART_IDS } from '../src/diabolo/profiles.js';
 
-describe('SCROLL_BEATS', () => {
-  it('assigns every part exactly one beat', () => {
-    const parts = SCROLL_BEATS.map((b) => b.part);
-    expect(new Set(parts).size).toBe(parts.length);
-    expect(parts.slice().sort()).toEqual([...PART_IDS].sort());
+describe('PART_RANK', () => {
+  it('ranks every part by how far out it sits in the assembly', () => {
+    expect(Object.keys(PART_RANK).sort()).toEqual([...PART_IDS].sort());
+    expect(PART_RANK.axleBearing).toBe(0);
+    expect(PART_RANK.hubConeTop).toBe(1);
+    expect(PART_RANK.gasketTop).toBe(2);
+    expect(PART_RANK.cupTop).toBe(3);
   });
 
-  it('walks the documented section order', () => {
-    expect(SCROLL_BEATS.map((b) => b.section)).toEqual([
-      'about', 'events', 'events', 'media', 'board', 'board', 'contact',
-    ]);
-  });
-
-  it('moves every part away from the origin', () => {
-    for (const b of SCROLL_BEATS) {
-      const distance = Math.hypot(b.offset[0], b.offset[1], b.offset[2]);
-      expect(distance, `${b.part} never leaves home`).toBeGreaterThan(0.4);
-    }
-  });
-
-  it('sends the top half up and the bottom half down', () => {
-    const y = (part) => SCROLL_BEATS.find((b) => b.part === part).offset[1];
-    expect(y('cupTop')).toBeGreaterThan(0);
-    expect(y('gasketTop')).toBeGreaterThan(0);
-    expect(y('hubConeTop')).toBeGreaterThan(0);
-    expect(y('cupBottom')).toBeLessThan(0);
-    expect(y('gasketBottom')).toBeLessThan(0);
-    expect(y('hubConeBottom')).toBeLessThan(0);
-  });
-
-  it('spins the bearing up hardest at the media beat', () => {
-    const bearing = SCROLL_BEATS.find((b) => b.part === 'axleBearing');
-    expect(bearing.section).toBe('media');
-    const fastest = Math.max(...SCROLL_BEATS.map((b) => b.spinRate));
-    expect(bearing.spinRate).toBe(fastest);
-    expect(bearing.spinRate).toBeGreaterThan(1);
-  });
-
-  it('separates parts laterally so labels do not collide', () => {
-    const xs = SCROLL_BEATS.map((b) => b.offset[0]);
-    expect(new Set(xs).size).toBeGreaterThan(1);
+  it('ranks mirrored parts identically, so the explosion stays symmetric', () => {
+    expect(PART_RANK.hubConeTop).toBe(PART_RANK.hubConeBottom);
+    expect(PART_RANK.gasketTop).toBe(PART_RANK.gasketBottom);
+    expect(PART_RANK.cupTop).toBe(PART_RANK.cupBottom);
   });
 });
 
-describe('beatTarget', () => {
-  it('adds each offset to its part HOME position rather than replacing or subtracting it', () => {
-    for (const beat of SCROLL_BEATS) {
-      expect(beatTarget(beat).position.y).toBeCloseTo(HOME[beat.part].y + beat.offset[1], 10);
+describe('explodedY', () => {
+  it('leaves the centre bearing exactly where it rests, as the reference part', () => {
+    expect(explodedY('axleBearing')).toBe(0);
+    expect(explodedY('axleBearing')).toBe(HOME.axleBearing.y);
+  });
+
+  it('orders the top half outward by rank', () => {
+    const order = ['axleBearing', 'hubConeTop', 'gasketTop', 'cupTop'];
+    for (let i = 1; i < order.length; i++) {
+      expect(explodedY(order[i])).toBeGreaterThan(explodedY(order[i - 1]));
     }
   });
 
-  it('lifts the top half above its rest height and drops the bottom half below', () => {
-    const targetFor = (id) => beatTarget(SCROLL_BEATS.find((b) => b.part === id));
-    for (const id of ['cupTop', 'gasketTop', 'hubConeTop']) {
-      expect(targetFor(id).position.y).toBeGreaterThan(HOME[id].y);
-    }
-    for (const id of ['cupBottom', 'gasketBottom', 'hubConeBottom']) {
-      expect(targetFor(id).position.y).toBeLessThan(HOME[id].y);
+  it('stays symmetric about the centre', () => {
+    expect(explodedY('cupTop')).toBeCloseTo(-explodedY('cupBottom'), 10);
+    expect(explodedY('gasketTop')).toBeCloseTo(-explodedY('gasketBottom'), 10);
+    expect(explodedY('hubConeTop')).toBeCloseTo(-explodedY('hubConeBottom'), 10);
+  });
+
+  it('spaces parts exactly evenly, which is what makes it read as a measured diagram', () => {
+    const ladder = ['cupTop', 'gasketTop', 'hubConeTop', 'axleBearing'].map(explodedY);
+    for (let i = 1; i < ladder.length; i++) {
+      expect(ladder[i - 1] - ladder[i]).toBeCloseTo(SPACING, 10);
     }
   });
 
-  it('never lands two parts on the same exploded position', () => {
-    const keys = SCROLL_BEATS.map((b) => {
-      const p = beatTarget(b).position;
-      return `${p.x},${p.y},${p.z}`;
-    });
-    expect(new Set(keys).size).toBe(keys.length);
+  it('moves every part except the bearing away from home', () => {
+    for (const id of PART_IDS) {
+      if (id === 'axleBearing') continue;
+      expect(Math.abs(explodedY(id))).toBeGreaterThan(Math.abs(HOME[id].y));
+    }
   });
 
-  it('gives a part with no lateral offset no lateral tilt', () => {
-    const flat = { part: 'axleBearing', offset: [0, 0, 0], spinRate: 1 };
-    expect(beatTarget(flat).rotation.z).toBe(0);
-    expect(beatTarget(flat).rotation.x).toBe(0);
+  it('derives from rank and SPACING alone, so retuning the spread needs one number', () => {
+    expect(explodedY('cupTop')).toBeCloseTo(3 * SPACING, 10);
+    expect(explodedY('gasketTop')).toBeCloseTo(2 * SPACING, 10);
+    expect(explodedY('hubConeTop')).toBeCloseTo(1 * SPACING, 10);
   });
 });
 
-describe('timeline shape', () => {
-  it('overlaps beats so parts cascade instead of moving one at a time', () => {
-    expect(BEAT_STAGGER).toBeLessThan(BEAT_DURATION);
+describe('orientation', () => {
+  it('starts face-on, looking straight down the axle', () => {
+    expect(FACE_ON_X).toBeCloseTo(-Math.PI / 2, 10);
   });
 
-  it('ends the bearing spin-down before the timeline runs out', () => {
-    const bearingIndex = SCROLL_BEATS.findIndex((b) => b.spinRate !== 1);
-    const spinDownEnds = bearingIndex * BEAT_STAGGER + 2 * BEAT_DURATION;
-    const timelineEnds = (SCROLL_BEATS.length - 1) * BEAT_STAGGER + BEAT_DURATION;
-    expect(spinDownEnds).toBeLessThanOrEqual(timelineEnds);
-  });
-});
-
-describe('hero hold and reassembly', () => {
-  it('holds the assembled state before the first part detaches', () => {
-    expect(HERO_HOLD).toBeGreaterThan(0);
+  it('ends in profile', () => {
+    expect(PROFILE_X).toBe(0);
   });
 
-  it('schedules the reassembly after every beat has finished', () => {
-    const lastBeatEnds = HERO_HOLD + (SCROLL_BEATS.length - 1) * BEAT_STAGGER + BEAT_DURATION;
-    expect(REASSEMBLE_AT).toBeGreaterThanOrEqual(lastBeatEnds - BEAT_STAGGER);
-  });
-
-  it('returns every part to its HOME rest position', () => {
-    for (const beat of SCROLL_BEATS) {
-      expect(HOME[beat.part]).toBeDefined();
-      expect(typeof HOME[beat.part].y).toBe('number');
-    }
-  });
-});
-
-describe('SCROLL_BEATS immutability', () => {
-  it('cannot be mutated in place by a consumer', () => {
-    const before = SCROLL_BEATS[0].offset[1];
-    try { SCROLL_BEATS[0].offset[1] = 999; } catch { /* frozen throws in strict mode */ }
-    expect(SCROLL_BEATS[0].offset[1]).toBe(before);
+  it('turns a quarter turn in total', () => {
+    expect(Math.abs(PROFILE_X - FACE_ON_X)).toBeCloseTo(Math.PI / 2, 10);
   });
 });
