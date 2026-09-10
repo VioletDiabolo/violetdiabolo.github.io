@@ -15,9 +15,9 @@ export const DIMS = Object.freeze({
   cupHeight: 0.86,
   gasketRadius: 0.19,
   gasketThickness: 0.045,
-  hubHeight: 0.3,
+  hubHeight: 0.12,
   bearingRadius: 0.075,
-  bearingHeight: 0.26,
+  bearingHeight: 0.14,
 });
 
 /** Shape exponents: <1 flares late (concave), >1 flares early (convex/cone-like). */

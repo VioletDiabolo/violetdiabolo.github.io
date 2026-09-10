@@ -73,3 +73,17 @@ describe('small parts', () => {
     expect(bearingProfile().length).toBeGreaterThan(2);
   });
 });
+
+describe('proportions', () => {
+  it('keeps the black axle assembly a minor share of total height, as in the reference photo', () => {
+    const totalHeight = 2 * (DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness + DIMS.cupHeight);
+    const blackHeight = 2 * DIMS.hubHeight + DIMS.bearingHeight;
+    const share = blackHeight / totalHeight;
+    expect(share).toBeGreaterThan(0.12);
+    expect(share).toBeLessThan(0.22);
+  });
+
+  it('keeps the cups the dominant mass', () => {
+    expect(DIMS.cupHeight).toBeGreaterThan(DIMS.hubHeight * 4);
+  });
+});
