@@ -61,6 +61,11 @@ export function createLabels({ parts, container, state }) {
     el.append(index, name);
 
     const sprite = new CSS3DSprite(el);
+    // CSS3DObject's constructor sets element.style.userSelect = 'none' inline
+    // (three/examples/jsm/renderers/CSS3DRenderer.js). That inline style beats any
+    // stylesheet rule, and it would defeat the whole reason this layer is real DOM:
+    // the text must stay selectable. Undo it after construction, not before.
+    el.style.userSelect = 'text';
     sprite.scale.setScalar(LABEL_SCALE);
     // Alternate sides so stacked labels never collide once the object is exploded.
     sprite.position.set(LABEL_OFFSET_X * (order % 2 === 0 ? 1 : -1), 0, 0);

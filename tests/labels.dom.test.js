@@ -78,6 +78,14 @@ describe('createLabels', () => {
     expect(el.dataset.part).toBe('cupTop');
   });
 
+  it('keeps label text selectable, which is the reason this layer is real DOM', () => {
+    // three's CSS3DObject constructor sets userSelect:'none' inline; if that is ever
+    // left in place the accessibility payoff of CSS3D over a canvas overlay is lost.
+    const { parts } = scene();
+    const { elements } = createLabels({ parts, container: document.createElement('div'), state: { labelOpacity: 1 } });
+    expect(elements.cupTop.style.userSelect).toBe('text');
+  });
+
   it('mounts its renderer into the given container', () => {
     const { parts } = scene();
     const container = document.createElement('div');
