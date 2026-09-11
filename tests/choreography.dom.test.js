@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { createChoreography, PART_RANK, explodedY, FACE_ON_X, PROFILE_X, SCRUB_DURATION } from '../src/scroll/choreography.js';
-import { CAMERA_NEAR_Z, CAMERA_FAR_Z } from '../src/diabolo/stage.js';
+import { createChoreography, ACTS, PART_RANK, explodedY, FACE_ON_X, PROFILE_X } from '../src/scroll/choreography.js';
+import { CAMERA_NEAR_Z, CAMERA_FOV } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
+import { DIMS } from '../src/diabolo/profiles.js';
 
 // jsdom implements neither ResizeObserver nor IntersectionObserver. anime.js's
 // ScrollObserver (what onScroll(...) constructs) creates a ResizeObserver
@@ -53,7 +54,7 @@ describe('scroll target validation', () => {
   });
 });
 
-describe('simultaneous explosion', () => {
+describe('acts', () => {
   const setup = () => {
     const target = document.createElement('div');
     target.style.position = 'static';
@@ -61,79 +62,109 @@ describe('simultaneous explosion', () => {
     const { tilt, spinner, parts } = buildDiabolo({
       materials: { cup: {}, gasket: {}, hub: {}, bearing: {} }, segments: 16,
     });
-    // In production, `tilt.rotation.x` is already FACE_ON_X by the time createChoreography
-    // runs: entrance.js (Task 4) sets it synchronously and completes before the scroll
-    // timeline is ever created. buildDiabolo alone leaves it at Three.js's Group default of
-    // 0, so this test establishes the same precondition entrance.js will own in production.
-    tilt.rotation.x = FACE_ON_X;
     const state = { spinRate: 1, labelOpacity: 0 };
-    // A plain stub, not a real Three.js camera: createChoreography only ever tweens
-    // camera.position.z, so this is all the shape it needs (same approach as
-    // tests/entrance.test.js's stubCamera()).
-    const camera = { position: { z: CAMERA_NEAR_Z } };
+    const camera = { position: { x: 0, y: 0, z: CAMERA_NEAR_Z } };
     const choreo = createChoreography({ parts, tilt, state, camera, scrollTarget: target });
     return { ...choreo, parts, tilt, spinner, state, camera };
   };
+  const at = (tl, f) => tl.seek(tl.duration * f);
 
-  it('has every part in motion at the same time, rather than one after another', () => {
+  it('reaches a visibly different state at each act boundary', () => {
+    const { timeline, parts, tilt, camera } = setup();
+    const seen = new Set();
+    for (const act of ACTS) {
+      at(timeline, act.end);
+      seen.add([
+        parts.cupTop.position.y.toFixed(2), tilt.rotation.x.toFixed(2),
+        tilt.position.x.toFixed(2), camera.position.x.toFixed(2), camera.position.z.toFixed(2),
+      ].join('|'));
+    }
+    expect(seen.size, 'two acts land on the same state').toBe(ACTS.length);
+  });
+
+  it('explodes every part simultaneously within the apart act', () => {
     const { timeline, parts } = setup();
-    timeline.seek(SCRUB_DURATION * 0.5);
-    // Every tween is added at timeline position 0 with one shared duration, so at the
-    // midpoint every moving part must sit at the *same* normalized progress between its
-    // rest and exploded position. A merely-not-at-rest-and-not-finished check (the old
-    // body of this test) cannot distinguish that from a staggered cascade: it passes at
-    // 40ms/part and 60ms/part stagger and only fails at 100ms/part, which is inside the
-    // band the build this replaced actually used (BEAT_STAGGER = 68).
+    at(timeline, 0.21);
+    const moving = Object.keys(PART_RANK).filter((id) => id !== 'axleBearing');
     const progress = (id) => {
       const rest = HOME[id].y, done = explodedY(id);
       return (parts[id].position.y - rest) / (done - rest);
     };
-    const moving = Object.keys(PART_RANK).filter((id) => id !== 'axleBearing');
     const first = progress(moving[0]);
     expect(first).toBeGreaterThan(0.05);
     expect(first).toBeLessThan(0.95);
-    for (const id of moving) {
-      expect(progress(id), `${id} is out of step`).toBeCloseTo(first, 6);
-    }
+    for (const id of moving) expect(progress(id), `${id} is out of step`).toBeCloseTo(first, 6);
   });
 
-  it('lands every part on its exploded position at the end', () => {
-    const { timeline, parts } = setup();
-    timeline.seek(SCRUB_DURATION);
-    for (const id of Object.keys(PART_RANK)) {
-      expect(parts[id].position.y).toBeCloseTo(explodedY(id), 4);
-    }
-  });
-
-  it('turns the object from face-on to profile across the same span', () => {
-    const { timeline, tilt } = setup();
-    timeline.seek(0);
-    const atStart = tilt.rotation.x;
-    timeline.seek(SCRUB_DURATION);
-    expect(tilt.rotation.x).toBeCloseTo(PROFILE_X, 4);
-    expect(Math.abs(atStart - tilt.rotation.x)).toBeGreaterThan(0.5);
+  it('recombines while turning, rather than replaying the explosion backwards', () => {
+    const { timeline, parts, tilt } = setup();
+    at(timeline, 0.42);
+    expect(Math.abs(parts.cupTop.position.y - HOME.cupTop.y)).toBeGreaterThan(0.01);
+    expect(tilt.rotation.x).toBeGreaterThan(FACE_ON_X + 0.05);
+    expect(tilt.rotation.x).toBeLessThan(PROFILE_X - 0.001);
   });
 
   it('never writes the spinner, which the render loop owns', () => {
     const { timeline, spinner } = setup();
     const before = spinner.rotation.y;
-    timeline.seek(SCRUB_DURATION * 0.7);
+    at(timeline, 0.63);
     expect(spinner.rotation.y).toBe(before);
   });
 
-  it('dollies the real camera from its near to its far distance across the same span', () => {
-    const { timeline, camera } = setup();
-    timeline.seek(0);
-    expect(camera.position.z).toBeCloseTo(CAMERA_NEAR_Z, 6);
-    timeline.seek(SCRUB_DURATION);
-    expect(camera.position.z).toBeCloseTo(CAMERA_FAR_Z, 4);
+  it('drives the spin rate from scroll position', () => {
+    const { timeline, state } = setup();
+    at(timeline, 0.30);
+    const whileApart = state.spinRate;
+    at(timeline, 0.68);
+    expect(state.spinRate, 'spin does not change between acts').toBeGreaterThan(whileApart * 1.5);
   });
 
-  it('raises labelOpacity from 0 to 1 across the scrub, so labels.js has something to read', () => {
-    const { timeline, state } = setup();
-    timeline.seek(0);
-    expect(state.labelOpacity).toBeCloseTo(0, 6);
-    timeline.seek(SCRUB_DURATION);
-    expect(state.labelOpacity).toBe(1);
+  it('keeps the object out of the reading column for nearly the whole scrub', () => {
+    // The endpoint-based clearance test in choreography.test.js passes by construction:
+    // act boundaries are clean and the tween between them was never sampled.
+    const { timeline, tilt } = setup();
+    const COLUMN = 0.38;
+    let overlapping = 0;
+    const SAMPLES = 400;
+    for (let i = 0; i <= SAMPLES; i++) {
+      const f = i / SAMPLES;
+      timeline.seek(timeline.duration * f);
+      const act = ACTS.find((a) => f <= a.end) ?? ACTS.at(-1);
+      if (act.textSide === 'center') continue;
+      const visibleWidth = 2 * act.camZ * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
+      const centre = 0.5 + tilt.position.x / visibleWidth;
+      const half = DIMS.rimRadius / visibleWidth;
+      const near = act.textSide === 'left' ? centre - half : centre + half;
+      if (act.textSide === 'left' ? near < COLUMN : near > 1 - COLUMN) overlapping += 1;
+    }
+    expect(overlapping / SAMPLES, 'the object spends too long over the text').toBeLessThan(0.08);
+  });
+
+  it('lifts clear of the closing title for nearly the whole settle act', () => {
+    // The vertical counterpart of the test above. arrival never has this problem:
+    // entrance.js seeds tilt.position.y to arrival's own target before this timeline
+    // exists, so arrival's y tween runs seeded-value-to-itself, a no-op regardless of
+    // duration (see entrance.test.js). settle has no such seed — its y genuinely ramps
+    // from the previous act's 0 up to 0.6 — and the endpoint-only clearance test in
+    // choreography.test.js only ever samples that ramp's un-ramped final state.
+    const { timeline, tilt, camera } = setup();
+    const settle = ACTS.find((a) => a.id === 'settle');
+    const prevEnd = ACTS[ACTS.indexOf(settle) - 1].end;
+    const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
+    const half = DIMS.cupHeight + DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness;
+    // [data-side='center'] h1/h2 sit at top: 66vh (sections.css) — the object's bottom
+    // edge must clear above that line, i.e. clearBelowPct (percent of viewport clear
+    // beneath it, measured from the very bottom) must exceed 100 - 66 = 34.
+    const TITLE_TOP_PCT = 66;
+    const SAMPLES = 400;
+    let violating = 0;
+    for (let i = 0; i <= SAMPLES; i++) {
+      const f = prevEnd + (settle.end - prevEnd) * (i / SAMPLES);
+      timeline.seek(timeline.duration * f);
+      const vh = visibleHalfHeight(Math.hypot(camera.position.x, camera.position.z));
+      const clearBelowPct = 100 * ((vh + tilt.position.y - half) / (2 * vh));
+      if (clearBelowPct <= 100 - TITLE_TOP_PCT) violating += 1;
+    }
+    expect(violating / SAMPLES, 'the object sits over the closing title for too long').toBeLessThan(0.08);
   });
 });

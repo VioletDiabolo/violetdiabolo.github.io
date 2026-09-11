@@ -1,4 +1,4 @@
-import { ACESFilmicToneMapping, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+import { ACESFilmicToneMapping, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { buildDiabolo } from './build.js';
 import { createMaterials, disposeMaterials } from './materials.js';
 
@@ -10,9 +10,18 @@ export const TIER_SETTINGS = Object.freeze({
 /** Camera framing. Exported because the scroll choreography dollies between these and
  *  its tests assert the exploded object actually fits the frustum. */
 export const CAMERA_FOV = 34;
-/** Face-on and assembled: frames the cup disc. */
-export const CAMERA_NEAR_Z = 5.4;
-/** Profile and fully exploded: the object spans ~5.02 units and needs the room. */
+/** Face-on and assembled: frames the cup disc. Kept equal to the arrival act's own
+ *  camZ (src/scroll/choreography.js ACTS) -- entrance.js seeds the camera to this
+ *  value synchronously, so the very first painted frame already matches arrival's
+ *  target instead of dollying in over the first few percent of scroll. If arrival's
+ *  camZ ever changes, this must move with it. */
+export const CAMERA_NEAR_Z = 6.2;
+/** Profile and fully exploded: the object spans ~5.02 units and needs the room. Like
+ *  CAMERA_NEAR_Z, kept equal to an ACTS camZ (`apart`'s) by convention rather than by
+ *  import -- the table hardcodes its own literal so it stays plain data (see ACTS's own
+ *  doc comment in choreography.js). No production code reads this constant itself any
+ *  more; it now exists purely as the far bound the "keeps the camera between its near
+ *  and far distances" test (choreography.test.js) checks every act's distance against. */
 export const CAMERA_FAR_Z = 10;
 
 /**
@@ -62,6 +71,26 @@ export function resolveViewport({ width, height, devicePixelRatio, maxDpr }) {
   return { width, height, aspect: width / height, pixelRatio: Math.min(devicePixelRatio, maxDpr) };
 }
 
+/**
+ * Point a camera at a target. anime.js owns camera.position; this owns where the camera
+ * looks — separate properties, so the two drivers never collide. Which target to pass is
+ * the render loop's decision below; see AIM_TARGET for why it is always the world origin.
+ */
+export function aimCamera(camera, target) {
+  camera.lookAt(target);
+}
+
+/**
+ * The camera always looks at the world origin, never at the object.
+ *
+ * Aiming at the object would re-centre it every frame: its lateral offset would stop
+ * moving it on screen (so it could never clear the reading column) and anything
+ * projecting its position through this camera would read dead centre forever. The
+ * object's offset is a compositional shift away from the subject point, not a
+ * relocation of it.
+ */
+const AIM_TARGET = new Vector3(0, 0, 0);
+
 export function createStage({ canvas, tier }) {
   const settings = TIER_SETTINGS[tier];
 
@@ -91,6 +120,7 @@ export function createStage({ canvas, tier }) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
     spinner.rotation.y += spin.spinner;
     spinMesh.rotation.y += spin.bearing;
+    aimCamera(camera, AIM_TARGET);
     renderer.render(scene, camera);
     for (const overlay of overlays) overlay.render(scene, camera);
   }
@@ -120,6 +150,9 @@ export function createStage({ canvas, tier }) {
     tilt.traverse((o) => o.geometry?.dispose());
     disposeMaterials(materials);
     renderer.dispose();
+    // Mirrors render()'s and resize()'s own loops above: without this, an overlay's DOM
+    // subtree (the CSS3D label layer, the spill element) outlives the stage that owned it.
+    for (const overlay of overlays) overlay.dispose();
   }
 
   resize();

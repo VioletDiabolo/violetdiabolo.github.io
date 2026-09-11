@@ -75,9 +75,9 @@ export function renderSections(root) {
   widePhoto.append(buildPicture({ ...PHOTOS.wide, sizes: '(max-width: 900px) 92vw, 46vw' }));
   contact.append(widePhoto);
 
-  // The choreography (src/scroll/choreography.js) finishes exploded and in profile by
-  // the time scroll reaches here -- it is one continuous animation and does not
-  // reassemble. Year is computed at render time, never hardcoded.
+  // The choreography (src/scroll/choreography.js) is one continuous animation that
+  // finishes back where it began -- assembled and face-on (the `settle` act) -- by the
+  // time scroll reaches here. Year is computed at render time, never hardcoded.
   const footer = document.createElement('footer');
   footer.dataset.section = 'footer';
   footer.className = 'section-footer';

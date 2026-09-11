@@ -92,7 +92,6 @@ html[data-stage='unsupported'] .stage-fallback {
   display: flex;
   align-items: baseline;
   gap: 0;
-  padding-left: 1.5em;
   font-family: var(--font-mono);
   text-transform: uppercase;
   font-size: var(--mono-2xs);
@@ -102,16 +101,17 @@ html[data-stage='unsupported'] .stage-fallback {
 }
 
 /*
- * Colour/weight/tracking for the numeral itself comes from base.css's shared
- * "index numeral" rule -- this is only the part of the treatment specific to
- * a PART label rather than a section or the hero: its own size (one step up
- * from the name beside it, same size as every other index on the page) and
- * the " / " that follows it, rhyming with the section heading's own
- * `counter(...) ' / '` (sections.css) so "04 / AXLE BEARING" in the 3D scene
- * and "01 / ABOUT US" in the 2D column read as the same kind of statement.
+ * The one place --font-mono still appears on the page: annotating the object's own
+ * parts, never the reading column (see base.css's --font-mono comment). Colour,
+ * weight and tracking used to come from a rule shared with the (now-deleted) hero
+ * and section-heading numerals; now that those are gone, the part-label index owns
+ * its own identity outright.
  */
 .part-label-index {
   font-size: var(--mono-xs);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--violet-lift);
 }
 
 .part-label-index::after {
@@ -125,23 +125,32 @@ html[data-stage='unsupported'] .stage-fallback {
   font-weight: 400;
 }
 
-/* Hairline leader with a filled dot at the part end, echoing the section
-   headings' own rule-to-dot callout (sections.css h2::after) -- the same
-   device pointing the other way: there, the rule points FROM a heading
-   TOWARD the diabolo; here, it points FROM the part label back at its part.
-   A schematic pointer, not a literal one: the object keeps spinning under it. */
-.part-label::before {
-  content: '';
+/* ---------------------------------------------------------------------------
+ * The light spill (see src/diabolo/spill.js): a soft bloom tracking the object's
+ * projected screen position every frame. This is the page's connective tissue in
+ * place of a grid or hairline rules -- light emitted by the subject, not decoration
+ * applied to the page.
+ * ------------------------------------------------------------------------- */
+#spill-layer { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+
+.light-spill {
   position: absolute;
-  left: 0;
-  top: 50%;
-  width: 1.1em;
-  height: 6px;
-  transform: translateY(-50%);
-  background-repeat: no-repeat;
-  background-size: 100% 1px, 4px 4px;
-  background-position: center, left center;
-  background-image:
-    linear-gradient(var(--rule), var(--rule)),
-    radial-gradient(circle, var(--violet-lift) 0 2px, transparent 2.5px);
+  inset: -20%;
+  /* A hot, small core (--violet-lift, the same "glow/hover" colour used everywhere
+     else on the page light touches something) so the source itself reads as
+     bright, then falls through the mid violet into the deep anchor colour before
+     fading out well short of the edges -- reaching toward the reading column
+     without ever washing all the way into it. Wider and hotter than the previous
+     pass: this is now the page's only connective device, so it has to carry that
+     job alone rather than share it with a grid or hairline rules.
+   */
+  background: radial-gradient(
+    circle at var(--spill-x, 50%) var(--spill-y, 50%),
+    color-mix(in oklab, var(--violet-lift) 55%, transparent) 0%,
+    color-mix(in oklab, var(--violet) 30%, transparent) 16%,
+    color-mix(in oklab, var(--violet-deep) 16%, transparent) 36%,
+    transparent 68%
+  );
+  /* No transition here: the position is driven per frame, and a CSS transition would be a
+     second animation driver fighting the render loop. */
 }

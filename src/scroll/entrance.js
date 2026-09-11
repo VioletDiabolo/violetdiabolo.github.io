@@ -1,7 +1,12 @@
 import { createTimeline } from 'animejs';
 import { HOME } from '../diabolo/build.js';
-import { FACE_ON_X } from './choreography.js';
+import { FACE_ON_X, ACTS } from './choreography.js';
 import { CAMERA_NEAR_Z } from '../diabolo/stage.js';
+
+// The scroll choreography's first act. Its target state is what the entrance below
+// establishes synchronously, alongside FACE_ON_X and CAMERA_NEAR_Z, so the very first
+// painted frame already matches it instead of tweening in over the first scroll.
+const ARRIVAL = ACTS.find((act) => act.id === 'arrival');
 
 /**
  * How far out parts begin, comfortably beyond any exploded position (1.65 units at
@@ -43,8 +48,13 @@ export function createEntrance({ parts, tilt, camera, onComplete }) {
   // Establish the starting state synchronously, so the first painted frame is already
   // correct rather than flashing the assembled object for one frame. The camera is
   // pinned here too: a reload mid-page must not begin at whatever z the last scrub
-  // left the camera at.
+  // left the camera at. tilt.position matches the arrival act for the same reason --
+  // without this it starts at the Group default (0, 0), and the choreography then
+  // tweens the lift in gradually across the first 10% of scroll instead of the title
+  // clearing the object from the very first frame.
   tilt.rotation.x = FACE_ON_X;
+  tilt.position.x = ARRIVAL.x;
+  tilt.position.y = ARRIVAL.y;
   camera.position.z = CAMERA_NEAR_Z;
   for (const partId of Object.keys(HOME)) {
     parts[partId].position.y = entranceStartY(partId);
@@ -63,6 +73,8 @@ export function createEntrance({ parts, tilt, camera, onComplete }) {
     timeline,
     skip() {
       tilt.rotation.x = FACE_ON_X;
+      tilt.position.x = ARRIVAL.x;
+      tilt.position.y = ARRIVAL.y;
       camera.position.z = CAMERA_NEAR_Z;
       for (const partId of Object.keys(HOME)) {
         parts[partId].position.y = HOME[partId].y;
