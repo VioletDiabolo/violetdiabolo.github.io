@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { resolveQualityTier, TIER_SETTINGS, rotationDeltas, resolveViewport } from '../src/diabolo/stage.js';
+import { PerspectiveCamera, Vector3 } from 'three';
+import {
+  resolveQualityTier,
+  TIER_SETTINGS,
+  rotationDeltas,
+  resolveViewport,
+  aimCamera,
+  CAMERA_FOV,
+  CAMERA_NEAR_Z,
+} from '../src/diabolo/stage.js';
 
 const HIGH_END = { pointerFine: true, viewportWidth: 1440, deviceMemory: 16 };
 
@@ -96,5 +105,42 @@ describe('resolveViewport', () => {
   it('returns null for an unmeasurable box rather than dividing by zero', () => {
     expect(resolveViewport({ ...BASE, width: 0 })).toBeNull();
     expect(resolveViewport({ ...BASE, height: 0 })).toBeNull();
+  });
+});
+
+describe('aimCamera', () => {
+  const forwardOf = (camera) => new Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const angleToTarget = (camera, target) =>
+    forwardOf(camera).angleTo(target.clone().sub(camera.position).normalize());
+
+  it('points the camera at the target', () => {
+    const camera = new PerspectiveCamera(CAMERA_FOV, 1.6, 0.1, 100);
+    camera.position.set(0, 0, CAMERA_NEAR_Z);
+    const target = new Vector3(0, 0, 0);
+    aimCamera(camera, target);
+    expect(angleToTarget(camera, target)).toBeLessThan(1e-6);
+  });
+
+  it('tracks an off-centre object, which is what the lateral offset needs', () => {
+    const camera = new PerspectiveCamera(CAMERA_FOV, 1.6, 0.1, 100);
+    camera.position.set(0, 0, 7);
+    const target = new Vector3(-1.6, 0, 0);
+    aimCamera(camera, target);
+    expect(angleToTarget(camera, target)).toBeLessThan(1e-6);
+  });
+
+  it('still frames the object from the orbit position, which is the whole point', () => {
+    const camera = new PerspectiveCamera(CAMERA_FOV, 1.6, 0.1, 100);
+    camera.position.set(4.5, 0, 5.362);
+    const target = new Vector3(-1.6, 0, 0);
+    aimCamera(camera, target);
+    expect(angleToTarget(camera, target)).toBeLessThan(1e-6);
+  });
+
+  it('leaves the camera position alone — anime.js owns that', () => {
+    const camera = new PerspectiveCamera(CAMERA_FOV, 1.6, 0.1, 100);
+    camera.position.set(4.5, 0, 5.362);
+    aimCamera(camera, new Vector3(-1.6, 0, 0));
+    expect(camera.position.toArray()).toEqual([4.5, 0, 5.362]);
   });
 });

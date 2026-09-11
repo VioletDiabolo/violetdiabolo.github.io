@@ -1,4 +1,4 @@
-import { ACESFilmicToneMapping, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+import { ACESFilmicToneMapping, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { buildDiabolo } from './build.js';
 import { createMaterials, disposeMaterials } from './materials.js';
 
@@ -62,6 +62,15 @@ export function resolveViewport({ width, height, devicePixelRatio, maxDpr }) {
   return { width, height, aspect: width / height, pixelRatio: Math.min(devicePixelRatio, maxDpr) };
 }
 
+/**
+ * Point the camera at the object. anime.js owns camera.position; this owns where the
+ * camera looks. Separate properties, so the two drivers never collide — but without it
+ * the orbit act slides the object out of frame instead of circling it.
+ */
+export function aimCamera(camera, target) {
+  camera.lookAt(target);
+}
+
 export function createStage({ canvas, tier }) {
   const settings = TIER_SETTINGS[tier];
 
@@ -87,10 +96,14 @@ export function createStage({ canvas, tier }) {
   // returned object) so the only way to add one is the seam meant for it.
   const overlays = [];
 
+  const aimTarget = new Vector3();
+
   function render(deltaSeconds) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
     spinner.rotation.y += spin.spinner;
     spinMesh.rotation.y += spin.bearing;
+    tilt.getWorldPosition(aimTarget);
+    aimCamera(camera, aimTarget);
     renderer.render(scene, camera);
     for (const overlay of overlays) overlay.render(scene, camera);
   }
