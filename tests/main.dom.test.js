@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HOME } from '../src/diabolo/build.js';
+// Read once, from the real module, before it gets wholesale-mocked below — so the
+// mock re-exports the same camera constants entrance.js and choreography.js import,
+// instead of a second, driftable copy of the numbers.
+import { CAMERA_FOV, CAMERA_NEAR_Z, CAMERA_FAR_Z } from '../src/diabolo/stage.js';
 
 // A minimal stand-in for createStage()'s return value. Real HOME part ids/shape (plain
 // { position: { y } } is all entrance.js touches), but none of three.js: jsdom's canvas
@@ -14,6 +18,7 @@ function stubStage() {
     parts,
     tilt: { rotation: { x: 0 } },
     state: { spinRate: 1 },
+    camera: { position: { z: 0 } },
     render: vi.fn(),
     resize: vi.fn(),
   };
@@ -40,6 +45,9 @@ describe('reduced motion boot path', () => {
       resolveQualityTier: () => 'base',
       readSignals: () => ({}),
       createStage: () => stubStage(),
+      CAMERA_FOV,
+      CAMERA_NEAR_Z,
+      CAMERA_FAR_Z,
     }));
 
     document.body.innerHTML =

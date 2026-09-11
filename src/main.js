@@ -42,6 +42,7 @@ function boot() {
       parts: stage.parts,
       tilt: stage.tilt,
       state: stage.state,
+      camera: stage.camera,
       scrollTarget: content,
     });
   };
@@ -49,6 +50,7 @@ function boot() {
   const entrance = createEntrance({
     parts: stage.parts,
     tilt: stage.tilt,
+    camera: stage.camera,
     // Under reduced motion nothing drives a repaint, so attaching the scroll timeline
     // would mutate part positions against a canvas that never redraws — the scene data
     // and the pixels would diverge. Assembled and face-on is the whole experience.

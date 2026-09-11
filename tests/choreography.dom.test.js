@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { createChoreography, PART_RANK, explodedY, FACE_ON_X, PROFILE_X, SCRUB_DURATION } from '../src/scroll/choreography.js';
+import { CAMERA_NEAR_Z, CAMERA_FAR_Z } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
 
 // jsdom implements neither ResizeObserver nor IntersectionObserver. anime.js's
@@ -66,8 +67,12 @@ describe('simultaneous explosion', () => {
     // 0, so this test establishes the same precondition entrance.js will own in production.
     tilt.rotation.x = FACE_ON_X;
     const state = { spinRate: 1 };
-    const choreo = createChoreography({ parts, tilt, state, scrollTarget: target });
-    return { ...choreo, parts, tilt, spinner, state };
+    // A plain stub, not a real Three.js camera: createChoreography only ever tweens
+    // camera.position.z, so this is all the shape it needs (same approach as
+    // tests/entrance.test.js's stubCamera()).
+    const camera = { position: { z: CAMERA_NEAR_Z } };
+    const choreo = createChoreography({ parts, tilt, state, camera, scrollTarget: target });
+    return { ...choreo, parts, tilt, spinner, state, camera };
   };
 
   it('has every part in motion at the same time, rather than one after another', () => {
@@ -103,5 +108,13 @@ describe('simultaneous explosion', () => {
     const before = spinner.rotation.y;
     timeline.seek(SCRUB_DURATION * 0.7);
     expect(spinner.rotation.y).toBe(before);
+  });
+
+  it('dollies the real camera from its near to its far distance across the same span', () => {
+    const { timeline, camera } = setup();
+    timeline.seek(0);
+    expect(camera.position.z).toBeCloseTo(CAMERA_NEAR_Z, 6);
+    timeline.seek(SCRUB_DURATION);
+    expect(camera.position.z).toBeCloseTo(CAMERA_FAR_Z, 4);
   });
 });

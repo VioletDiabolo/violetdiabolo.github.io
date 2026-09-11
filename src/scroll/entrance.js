@@ -1,6 +1,7 @@
 import { createTimeline } from 'animejs';
 import { HOME } from '../diabolo/build.js';
 import { FACE_ON_X } from './choreography.js';
+import { CAMERA_NEAR_Z } from '../diabolo/stage.js';
 
 /** How far out parts begin, comfortably beyond any exploded position. */
 export const ENTRANCE_SCATTER = 4.5;
@@ -23,7 +24,7 @@ export function entranceStartY(partId) {
  * before this fires — the entrance and the scroll timeline both write part positions,
  * and two live timelines on one property fight.
  */
-export function createEntrance({ parts, tilt, onComplete }) {
+export function createEntrance({ parts, tilt, camera, onComplete }) {
   let completed = false;
   const finish = () => {
     if (completed) return;
@@ -32,8 +33,11 @@ export function createEntrance({ parts, tilt, onComplete }) {
   };
 
   // Establish the starting state synchronously, so the first painted frame is already
-  // correct rather than flashing the assembled object for one frame.
+  // correct rather than flashing the assembled object for one frame. The camera is
+  // pinned here too: a reload mid-page must not begin at whatever z the last scrub
+  // left the camera at.
   tilt.rotation.x = FACE_ON_X;
+  camera.position.z = CAMERA_NEAR_Z;
   for (const partId of Object.keys(HOME)) {
     parts[partId].position.y = entranceStartY(partId);
   }
@@ -51,6 +55,7 @@ export function createEntrance({ parts, tilt, onComplete }) {
     timeline,
     skip() {
       tilt.rotation.x = FACE_ON_X;
+      camera.position.z = CAMERA_NEAR_Z;
       for (const partId of Object.keys(HOME)) {
         parts[partId].position.y = HOME[partId].y;
       }

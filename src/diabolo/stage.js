@@ -7,6 +7,14 @@ export const TIER_SETTINGS = Object.freeze({
   base: { dpr: 1.5, segments: 64, transmission: false },
 });
 
+/** Camera framing. Exported because the scroll choreography dollies between these and
+ *  its tests assert the exploded object actually fits the frustum. */
+export const CAMERA_FOV = 34;
+/** Face-on and assembled: frames the cup disc. */
+export const CAMERA_NEAR_Z = 5.4;
+/** Profile and fully exploded: the object spans ~5.02 units and needs the room. */
+export const CAMERA_FAR_Z = 10;
+
 /**
  * Capability signals only — never user-agent sniffing. `base` is the safe default
  * whenever a signal is missing.
@@ -62,8 +70,8 @@ export function createStage({ canvas, tier }) {
   renderer.toneMappingExposure = 1.05;
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(34, 1, 0.1, 100);
-  camera.position.set(0, 0.15, 5.4);
+  const camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
+  camera.position.set(0, 0.15, CAMERA_NEAR_Z);
   camera.lookAt(0, 0, 0);
 
   const materials = createMaterials({ renderer, settings });

@@ -3,7 +3,8 @@ import {
   PART_RANK, SPACING, FACE_ON_X, PROFILE_X, explodedY,
 } from '../src/scroll/choreography.js';
 import { HOME } from '../src/diabolo/build.js';
-import { PART_IDS } from '../src/diabolo/profiles.js';
+import { PART_IDS, DIMS } from '../src/diabolo/profiles.js';
+import { CAMERA_FOV, CAMERA_NEAR_Z, CAMERA_FAR_Z } from '../src/diabolo/stage.js';
 
 describe('PART_RANK', () => {
   it('ranks every part by how far out it sits in the assembly', () => {
@@ -72,5 +73,25 @@ describe('orientation', () => {
 
   it('turns a quarter turn in total', () => {
     expect(Math.abs(PROFILE_X - FACE_ON_X)).toBeCloseTo(Math.PI / 2, 10);
+  });
+});
+
+describe('camera framing', () => {
+  const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
+
+  it('frames the face-on disc snugly at the start, without wasted space', () => {
+    const half = visibleHalfHeight(CAMERA_NEAR_Z);
+    expect(half).toBeGreaterThan(DIMS.rimRadius * 1.1);
+    expect(half).toBeLessThan(DIMS.rimRadius * 2.2);
+  });
+
+  it('pulls back far enough that the fully exploded object still fits the frustum', () => {
+    // The outermost point of the object when exploded: the far rim of the top cup.
+    const halfExtent = explodedY('cupTop') + DIMS.cupHeight;
+    expect(visibleHalfHeight(CAMERA_FAR_Z)).toBeGreaterThan(halfExtent * 1.1);
+  });
+
+  it('only ever moves the camera outward', () => {
+    expect(CAMERA_FAR_Z).toBeGreaterThan(CAMERA_NEAR_Z);
   });
 });

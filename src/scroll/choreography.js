@@ -1,5 +1,6 @@
 import { createTimeline, onScroll } from 'animejs';
 import { HOME } from '../diabolo/build.js';
+import { CAMERA_FAR_Z } from '../diabolo/stage.js';
 
 /**
  * Distance from the centre in assembly order. The bearing is the reference part and
@@ -39,7 +40,7 @@ export function explodedY(partId) {
   return direction * PART_RANK[partId] * SPACING;
 }
 
-export function createChoreography({ parts, tilt, state, scrollTarget }) {
+export function createChoreography({ parts, tilt, state, camera, scrollTarget }) {
   // A sticky or fixed element's rect never travels, so scroll progress can never
   // advance and the timeline would silently sit at 0. Fail loudly instead.
   if (typeof getComputedStyle === 'function' && scrollTarget) {
@@ -71,6 +72,10 @@ export function createChoreography({ parts, tilt, state, scrollTarget }) {
   // The turn runs across the same span, so the object arrives in profile exactly as
   // the parts finish separating.
   timeline.add(tilt.rotation, { x: PROFILE_X }, 0);
+
+  // The object roughly doubles its extent as it opens, so the camera withdraws to keep
+  // it framed. Fixed at CAMERA_NEAR_Z the exploded cups fall outside the frustum.
+  timeline.add(camera.position, { z: CAMERA_FAR_Z }, 0);
 
   // The bearing spins up as the object opens, then settles.
   timeline
