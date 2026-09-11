@@ -9,7 +9,7 @@ npm install
 npm run dev          # Start dev server on localhost:5173
 npm run build        # Build production (runs `npm run assets` first)
 npm run preview      # Preview built dist/ locally
-npm test             # Run 165 tests across 16 test files
+npm test             # Run 220 tests across 20 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -28,12 +28,12 @@ To deploy:
 |-----------|---------|
 | `src/content/` | Club identity, board members, events, videos, contact info. No markup. Mutations here flow everywhere. |
 | `src/ui/` | DOM rendering: sections, board cards, media facades, forms, reveal animations. No 3D geometry. |
-| `src/diabolo/` | Three.js scene, materials, geometry build, render loop, and the CSS3D label layer (`labels.js`) that annotates each part with real DOM. No club copy. |
-| `src/scroll/` | The entrance sequence and the anime.js/ScrollObserver choreography binding scroll position to the explosion timeline. |
+| `src/diabolo/` | Three.js scene, materials, geometry build, render loop, the CSS3D label layer (`labels.js`), and the light-bloom spill (`spill.js`). No club copy. |
+| `src/scroll/` | The entrance sequence and the anime.js/ScrollObserver choreography binding scroll position to the six acts. |
 | `src/fallback/` | Feature detection (WebGL support, reduced-motion preference). |
 | `src/styles/` | Base typography/layout, section styles, stage canvas styles, and the CSS3D label layer's own rules (`.label-layer`, `.part-label`). |
 | `scripts/build-assets.mjs` | Image optimization pipeline (resize, AVIF/WebP/JPEG conversion). |
-| `tests/` | 165 unit tests across 16 test files: content, geometry, lifecycle, scroll binding, entrance sequencing, CSS3D labels, DOM structure, feature detection. |
+| `tests/` | 220 unit tests across 20 test files: content, geometry, lifecycle, choreography, entrance sequencing, CSS3D labels, spill tracking, layout binding, DOM structure, feature detection. |
 | `public/images/` | Generated derivative images (run `npm run assets` to refresh). |
 | `docs/VERIFICATION.md` | Real-condition verification record from Chromium; see it for what is/isn't verified. |
 
@@ -50,17 +50,22 @@ To deploy:
 
 Seven parts (two cups, two gaskets, two hub cones, one bearing) are built procedurally using Three.js `LatheGeometry`, revolved from 2D half-profiles defined in `src/diabolo/profiles.js`. No downloaded 3D model files.
 
-The explosion is driven by an anime.js timeline (1000 ms duration: every part starts moving at the same instant and finishes together — no hero hold, no staggered cascade, no reassembly beat) that animates each part's `.position.y` outward from the axle in proportion to its rank. Across that same span the object turns from face-on (looking straight down the axle) to profile (the familiar hourglass silhouette), and the camera dollies back from its near to its far distance so the exploded object stays framed. Page scroll (0 to 1) is mapped onto timeline progress (0 to 1000) by a ScrollObserver in `src/scroll/choreography.js`, which calls `timeline.seek()` on every scroll tick. Three.js's render loop ticks every frame independent of scroll, reading part positions written by anime and rendering them. A one-time entrance sequence (`src/scroll/entrance.js`) converges every part onto its assembled, face-on rest position before the scroll timeline ever attaches.
+The scroll choreography spans six named acts, each mapping a section of the page to a target object state. The object **arrives** face-on and centred, **separates** into an exploded view while sliding sideways, **recombines** while rotating to profile orientation, **spins** hard on its axis, **orbits** the camera around it at constant radius, then **settles** back to face-on at the end. Page scroll (0 to 1) is mapped onto anime.js timeline progress by a ScrollObserver in `src/scroll/choreography.js`, which calls `timeline.seek()` on every scroll tick. Across each act, anime.js animates part positions, the object's tilt, the camera position, spin rate, and label visibility as specified in the `ACTS` table in `choreography.js` — the choreography is pure data, tunable without touching timeline code. Three.js's render loop ticks every frame independent of scroll, reading part positions written by anime and rendering them. A one-time entrance sequence (`src/scroll/entrance.js`) converges every part onto its assembled, face-on rest position before the scroll timeline ever attaches.
+
+## Changing the choreography
+
+The `ACTS` table in `src/scroll/choreography.js` holds six rows, one per act: `arrival`, `apart`, `recombine`, `spin`, `orbit`, `settle`. Each row specifies the target state at the **end** of that act — position, rotation, camera distance, spin rate, and label visibility. To retune an act, edit its row. The timeline tweens from one act's state to the next, so the whole choreography derives from these six lines of data.
+
+Several tests pin the `ACTS` table values, so changes will tell you what they affected:
+- `choreography.test.js` validates that each act's state is reachable and the camera stays in frustum.
+- `choreography.dom.test.js` tests the object's position relative to the reading column across the acts.
+- The entrance sequence and the spill tracking also depend on these values, so run the full suite after tuning.
 
 ## The one rule: one owner per transform
 
-Two nested groups hold the ownership boundary: **`tilt` wraps `spinner`, which wraps every
-part.** anime.js owns `tilt.rotation.x` (the face-on-to-profile turn) and every part's
-`.position.y` (the explosion, purely vertical — never `.rotation`) — never `spinner.rotation.y`.
-**The render loop owns `spinner.rotation.y`** (the idle spin) and `bearing.spinMesh.rotation.y`
-(the bearing spool spin) — never anything anime.js writes.
+**anime.js owns** all scroll-driven animation: `tilt.rotation.{x,z}`, `tilt.position.{x,y}`, every part's `.position`, `camera.position.{x,z}`, `state.spinRate`, and `state.labelOpacity`. **The render loop owns** `spinner.rotation.y` (the idle spin), `bearing.spinMesh.rotation.y` (the bearing spool), and `camera` aiming (it calls `camera.lookAt()` to fix the camera's quaternion and direction). The render loop **reads** the scalar state values anime wrote but **writes** nothing anime reads.
 
-Why: Two drivers writing to the same transform cause the explosion (or the turn) to fight the idle spin. The bearing must spin on its own axis while its container group explodes outward—hence separate meshes. Splitting `tilt` from `spinner` is the same reasoning one level up: the scroll-driven turn and the continuous spin must never share a rotation. anime.js self-idles when it has no children to animate, so the global engine never pauses; pausing it would freeze reveal animations and other content animations that share it.
+Why: Two drivers writing the same transform property fight, producing jitter or cancellation. This exact bug shipped twice on this project—once as parts fighting the idle spin, once as a camera aimed at the object which cancelled the lateral offset on screen. Splitting ownership prevents it: tilt and spinner are two nested groups so rotation never collides; the bearing has its own spinMesh for the same reason; camera position and aiming are separate concerns so a screen-space spill can track projected position correctly.
 
 ## Editing content
 
@@ -87,21 +92,24 @@ Widths are capped at 2000 px (not 2400) to stay under budget while preserving qu
 npm test
 ```
 
-Runs 165 tests across 16 test files:
+Runs 220 tests across 20 test files:
 - `content.test.js` — apostrophe preservation, board structure, media list, contact details
 - `lifecycle.test.js` — render loop pause/resume on visibility changes; guards against anime.js global engine import
-- `choreography.test.js`, `choreography.dom.test.js` — timeline seek, scroll→timeline binding, sticky target rejection, simultaneity, the face-on-to-profile turn, the camera dolly
+- `choreography.test.js`, `choreography.dom.test.js` — six acts, timeline seek, scroll→timeline binding, sticky target rejection, simultaneity, the tilt rotations, the camera dolly, object-to-reading-column clearance
 - `entrance.test.js` — the scattered-to-assembled entrance sequence, run before the scroll timeline ever attaches
 - `profiles.test.js`, `build.test.js` — geometry dimensions and LatheGeometry construction
 - `stage.test.js`, `materials.dom.test.js`, `detect.dom.test.js`, `ui.dom.test.js`, `reveal.dom.test.js`, `assets.test.js`, `smoke.test.js` — rendering, materials, feature detection, DOM structure, image budget
 - `labels.dom.test.js` — the CSS3D part-label layer: sprite placement, side alternation, opacity/accessibility, text selectability
+- `spill.dom.test.js`, `stage-spill.dom.test.js` — the light-bloom spill: screen-space tracking, clamping, overlay integration
+- `sections-layout.dom.test.js` — reading-column placement, act-to-section mapping, side stamping
+- `visual-language.test.js` — absence of deleted design elements (grid, hairlines, Space Grotesk)
 - `main.dom.test.js` — boot-time wiring, including the reduced-motion path
 
 ## Known limitations
 
 See **Outstanding for a human on a real machine** in [`docs/VERIFICATION.md`](docs/VERIFICATION.md):
 
-1. **Scroll-offscreen pause is unreachable by design, not just unverified.** `#stage` is `position: sticky; top: 0; height: 100dvh`, pinned to the viewport for the entire document height — its `IntersectionObserver` reports `isIntersecting: true` from first paint and can never flip to `false` in any browser, so this branch never fires for this page as built (there is nothing to scroll to that would trigger it — see `docs/VERIFICATION.md` §9). `document.hidden` is the only pause gate that actually runs live. The IntersectionObserver wiring is defensive depth, exercised by the 16 `tests/lifecycle.test.js` unit tests through an injected observer rather than a real one.
+1. **Scroll-offscreen pause is unreachable by design, not just unverified.** `#stage` is `position: sticky; top: 0; height: 100dvh`, pinned to the viewport for the entire document height — its `IntersectionObserver` reports `isIntersecting: true` from first paint and can never flip to `false` in any browser. `document.hidden` is the only pause gate that actually runs live. The IntersectionObserver wiring is defensive depth, exercised by unit tests through an injected observer rather than a real one.
 
 2. **Live scroll scrub not verified.** The ScrollObserver's scroll→timeline binding is structurally correct but was not exercised end-to-end with live scroll events.
 
