@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { PerspectiveCamera, Vector3 } from 'three';
 import {
   resolveQualityTier,
@@ -162,5 +163,21 @@ describe('camera aim target', () => {
     camera.updateMatrixWorld(true);
     const offset = object.clone().project(camera);
     expect(Math.abs(offset.x), 'aiming at the origin lets the offset show').toBeGreaterThan(0.2);
+  });
+
+  it('aims the camera at a fixed origin, never at the object', () => {
+    // createStage() needs a real WebGL context, so it never runs under jsdom/vitest —
+    // there is no render() to call here and observe. Source inspection is the only route
+    // available to pin what the render loop actually passes. That exact bug (aimCamera(
+    // camera, tilt.position) instead of AIM_TARGET) shipped on this branch once: it
+    // re-centres the object every frame, cancelling the lateral offset the whole
+    // composition depends on.
+    const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
+    // Excludes the function's own declaration line (`function aimCamera(camera, target)`),
+    // which textually matches the same shape purely because its parameter is also named
+    // `camera` — the call site inside render() is what actually matters here.
+    const aimCall = source.match(/(?<!function )aimCamera\(camera,\s*([^)]+)\)/);
+    expect(aimCall, 'no aimCamera call found in the render loop').not.toBeNull();
+    expect(aimCall[1].trim()).toBe('AIM_TARGET');
   });
 });

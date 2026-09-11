@@ -84,6 +84,14 @@ describe('ACTS', () => {
     }
   });
 
+  it('starts the scrub at the distance the entrance seeds, so there is no opening dolly', () => {
+    // entrance.js seeds camera.position.z to CAMERA_NEAR_Z synchronously before the
+    // scroll timeline exists (see its own doc comment and frustum test). If arrival's
+    // camZ ever drifts from that value, the very first scroll tick would dolly the
+    // camera to arrival's camZ, an opening jump nothing here currently guards.
+    expect(ACTS[0].camZ).toBe(CAMERA_NEAR_Z);
+  });
+
   it('keeps the camera between its near and far distances', () => {
     // Distance from the object, not raw camZ: the orbit act swings camX away from 0,
     // so at 40 degrees off-axis camZ alone (5.362) reads as nearer than CAMERA_NEAR_Z

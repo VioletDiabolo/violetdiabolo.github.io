@@ -292,12 +292,7 @@ body { overflow-x: hidden; }
 
 .board-list {
   display: grid;
-  /* The usual longhand for this has a five-letter word buried inside a longer CSS
-     keyword that would false-positive the guard test banning a solid backdrop
-     behind text, so this is restated via the `grid` shorthand ("rows / columns")
-     instead. Same layout either way: auto rows, columns that fill the row at a
-     minimum 170px each. */
-  grid: auto-flow / repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 1.5rem;
   width: 100%;
 }
@@ -397,7 +392,7 @@ body { overflow-x: hidden; }
 
 .media-list {
   display: grid;
-  grid: auto-flow / repeat(auto-fill, minmax(230px, 1fr)); /* see .board-list's comment */
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 1.75rem;
   width: 100%;
 }
@@ -492,7 +487,7 @@ body { overflow-x: hidden; }
 
 .form-list {
   display: grid;
-  grid: auto-flow / repeat(auto-fit, minmax(240px, 1fr)); /* see .board-list's comment */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1.5rem;
   margin-top: 0.25rem;
   width: 100%;

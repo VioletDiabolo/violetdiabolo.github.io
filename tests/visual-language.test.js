@@ -6,6 +6,62 @@ const allCss = () =>
   ['../src/styles/base.css', '../src/styles/sections.css', '../src/styles/stage.css']
     .map(read).join('\n');
 
+/**
+ * Splits a CSS source into its leaf declaration blocks — {selector, body} for every
+ * rule whose body holds no nested braces — recursing into at-rules (@media) so their
+ * inner rules are inspected too. A hand-rolled brace-depth scan, not a full parser:
+ * this file's CSS never nests deeper than one @media, which is all this needs.
+ */
+function leafRules(css) {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [];
+  function scan(source) {
+    let i = 0;
+    while (i < source.length) {
+      const brace = source.indexOf('{', i);
+      if (brace === -1) break;
+      const selector = source.slice(i, brace).trim();
+      let depth = 1;
+      let j = brace + 1;
+      while (j < source.length && depth > 0) {
+        if (source[j] === '{') depth++;
+        else if (source[j] === '}') depth--;
+        j++;
+      }
+      const body = source.slice(brace + 1, j - 1);
+      if (body.includes('{')) scan(body);
+      else rules.push({ selector, body });
+      i = j;
+    }
+  }
+  scan(stripped);
+  return rules;
+}
+
+/**
+ * True for a single (already comma-split, trimmed) selector that targets a held
+ * heading or paragraph — `.section > h1`, `[data-section] p`, `[data-side='center'] h2`
+ * and the like — regardless of combinator or attached pseudo-classes.
+ */
+function targetsHeadingOrParagraph(selector) {
+  if (!/^(\.section\b|\[data-section\b|\[data-side\b)/.test(selector)) return false;
+  const lastToken = selector.split(/[\s>+~]+/).filter(Boolean).pop() ?? '';
+  const bareTag = lastToken.replace(/::?[\w-]+(\([^)]*\))?/g, '').replace(/\[[^\]]*\]/g, '');
+  return bareTag === 'h1' || bareTag === 'h2' || bareTag === 'p';
+}
+
+/** Every rule that targets held heading/paragraph text and declares a background. */
+function textSelectorsWithBackground(css) {
+  const violations = [];
+  for (const { selector, body } of leafRules(css)) {
+    const parts = selector.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!parts.some(targetsHeadingOrParagraph)) continue;
+    const declaration = body.split(';').find((decl) => /^\s*background(-color)?\s*:/.test(decl));
+    if (declaration) violations.push({ selector, declaration: declaration.trim() });
+  }
+  return violations;
+}
+
 describe('the technical-drawing language is gone', () => {
   it('draws no grid across the page', () => {
     expect(allCss()).not.toMatch(/repeating-linear-gradient/i);
@@ -15,10 +71,22 @@ describe('the technical-drawing language is gone', () => {
     expect(allCss()).not.toMatch(/--rule\b/);
   });
 
-  it('paints no plate behind text', () => {
-    // The plates existed only because the object sat under the text. The object now moves
-    // aside, so a plate reappearing means the composition regressed.
-    expect(allCss()).not.toMatch(/plate|backdrop-filter/i);
+  it('declares no background on the held heading/paragraph selectors', () => {
+    // Plates existed only because the object sat under the text; the object now moves
+    // aside instead, so a plate reappearing means the composition regressed. This used
+    // to be a literal substring grep for "plate", which cut both ways: a rule adding
+    // `background: rgba(...)` behind .section > h1/h2/p doesn't contain that substring
+    // and passed silently, while `grid-template-columns` does contain it ("tem-PLATE-
+    // columns") and false-tripped on wholly unrelated layout code — see sections.css's
+    // .board-list/.media-list/.form-list, restated via the `grid` shorthand purely to
+    // dodge that accident. A property-level check on the actual text selectors replaces
+    // both failure modes at once.
+    const violations = textSelectorsWithBackground(read('../src/styles/sections.css'));
+    expect(violations, JSON.stringify(violations)).toEqual([]);
+  });
+
+  it('applies no backdrop-filter anywhere', () => {
+    expect(allCss()).not.toMatch(/backdrop-filter/i);
   });
 
   it('numbers no section with a CSS counter', () => {

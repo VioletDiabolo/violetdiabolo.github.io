@@ -67,9 +67,9 @@ export function resolveViewport({ width, height, devicePixelRatio, maxDpr }) {
 }
 
 /**
- * Point the camera at the object. anime.js owns camera.position; this owns where the
- * camera looks. Separate properties, so the two drivers never collide — but without it
- * the orbit act slides the object out of frame instead of circling it.
+ * Point a camera at a target. anime.js owns camera.position; this owns where the camera
+ * looks — separate properties, so the two drivers never collide. Which target to pass is
+ * the render loop's decision below; see AIM_TARGET for why it is always the world origin.
  */
 export function aimCamera(camera, target) {
   camera.lookAt(target);
