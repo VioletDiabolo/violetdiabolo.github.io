@@ -42,6 +42,14 @@ export function explodedY(partId) {
 /** How far the object slides off centre so the reading column has clear space. */
 export const LATERAL_OFFSET = 1.6;
 
+/**
+ * Fraction of an act the object spends crossing to its new side. The rest of the act it
+ * holds still, clear of the reading column. Tweening `x` across the whole act means the
+ * object sits on the incoming text's side for most of it — which is the obstruction this
+ * composition exists to remove.
+ */
+export const LATERAL_SETTLE = 0.22;
+
 /** The orbit swings the camera around the object at a constant radius; it does not dolly. */
 const ORBIT_RADIUS = 7;
 const ORBIT_ANGLE = 40 * (Math.PI / 180);
@@ -116,7 +124,7 @@ export function createChoreography({ parts, tilt, state, camera, scrollTarget })
       timeline.add(parts[partId].position, { y: partYAt(partId, act.explode), duration }, at);
     }
     timeline.add(tilt.rotation, { x: act.tiltX, z: act.tiltZ, duration }, at);
-    timeline.add(tilt.position, { x: act.x, y: act.y, duration }, at);
+    timeline.add(tilt.position, { x: act.x, y: act.y, duration: duration * LATERAL_SETTLE }, at);
     timeline.add(camera.position, { x: act.camX, z: act.camZ, duration }, at);
     timeline.add(state, { spinRate: act.spin, labelOpacity: act.labels, duration }, at);
 

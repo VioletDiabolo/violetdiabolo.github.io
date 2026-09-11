@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { createChoreography, ACTS, PART_RANK, explodedY, FACE_ON_X, PROFILE_X } from '../src/scroll/choreography.js';
-import { CAMERA_NEAR_Z } from '../src/diabolo/stage.js';
+import { CAMERA_NEAR_Z, CAMERA_FOV } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
+import { DIMS } from '../src/diabolo/profiles.js';
 
 // jsdom implements neither ResizeObserver nor IntersectionObserver. anime.js's
 // ScrollObserver (what onScroll(...) constructs) creates a ResizeObserver
@@ -116,5 +117,26 @@ describe('acts', () => {
     const whileApart = state.spinRate;
     at(timeline, 0.68);
     expect(state.spinRate, 'spin does not change between acts').toBeGreaterThan(whileApart * 1.5);
+  });
+
+  it('keeps the object out of the reading column for nearly the whole scrub', () => {
+    // The endpoint-based clearance test in choreography.test.js passes by construction:
+    // act boundaries are clean and the tween between them was never sampled.
+    const { timeline, tilt } = setup();
+    const COLUMN = 0.38;
+    let overlapping = 0;
+    const SAMPLES = 400;
+    for (let i = 0; i <= SAMPLES; i++) {
+      const f = i / SAMPLES;
+      timeline.seek(timeline.duration * f);
+      const act = ACTS.find((a) => f <= a.end) ?? ACTS.at(-1);
+      if (act.textSide === 'center') continue;
+      const visibleWidth = 2 * act.camZ * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
+      const centre = 0.5 + tilt.position.x / visibleWidth;
+      const half = DIMS.rimRadius / visibleWidth;
+      const near = act.textSide === 'left' ? centre - half : centre + half;
+      if (act.textSide === 'left' ? near < COLUMN : near > 1 - COLUMN) overlapping += 1;
+    }
+    expect(overlapping / SAMPLES, 'the object spends too long over the text').toBeLessThan(0.08);
   });
 });
