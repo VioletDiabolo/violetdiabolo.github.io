@@ -18,8 +18,9 @@ export const PART_LABELS = Object.freeze({
 
 /** How far to the side of its part a label sits, in scene units. */
 export const LABEL_OFFSET_X = 1.15;
-/** CSS3D works in CSS pixels; this brings a ~200px element down to scene scale. */
-export const LABEL_SCALE = 0.006;
+/** CSS3D works in CSS pixels; this brings a ~200px element down to scene scale. Not
+ *  exported: used only by createLabels() below, unlike LABEL_OFFSET_X above. */
+const LABEL_SCALE = 0.006;
 
 /**
  * A CSS3DRenderer layer sharing the WebGL camera.

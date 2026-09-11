@@ -539,10 +539,10 @@ body { overflow-x: hidden; }
 /* ---------------------------------------------------------------------------
  * Footer -- not a `.section`: there is no reading column here, so it skips the
  * edge-anchored layout entirely. The choreography (src/scroll/choreography.js) is
- * one continuous animation that finishes exploded and in profile; it does not
- * reassemble. min-height simply gives the page enough scroll distance for that
- * full scrub to complete before the footer is reached. Separated from Contact by
- * space alone, not a rule.
+ * one continuous animation that finishes back where it began -- assembled and
+ * face-on (the `settle` act). min-height simply gives the page enough scroll
+ * distance for that full scrub to complete before the footer is reached.
+ * Separated from Contact by space alone, not a rule.
  * ------------------------------------------------------------------------- */
 
 .section-footer {

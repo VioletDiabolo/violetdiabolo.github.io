@@ -50,6 +50,22 @@ export const LATERAL_OFFSET = 1.6;
  */
 export const LATERAL_SETTLE = 0.22;
 
+/**
+ * Fraction of an act the object spends lifting to its vertical target in the centred
+ * acts (arrival, settle). A separate, smaller fraction than LATERAL_SETTLE: this guards
+ * clearance against a fixed CSS position (`[data-side='center'] h1`/`h2`'s `top: 66vh`,
+ * sections.css), not the reading column, and the two acts that use it behave
+ * differently against LATERAL_SETTLE's own fraction. arrival never shows a problem --
+ * entrance.js seeds tilt.position.y before the scroll timeline exists, so arrival's own
+ * y tween runs from that seeded value to the same value, a no-op regardless of duration
+ * (see entrance.test.js). settle has no such seeding: its y tween genuinely ramps from
+ * the previous act's 0 up to 0.6, and measured against LATERAL_SETTLE's 0.22 that left
+ * the object's bottom edge below the title's 66vh line for ~14% of the act's span.
+ * Tightening just this fraction closes that without re-tuning the lateral crossing the
+ * other four acts already rely on LATERAL_SETTLE for.
+ */
+export const VERTICAL_SETTLE = 0.10;
+
 /** The orbit swings the camera around the object at a constant radius; it does not dolly. */
 const ORBIT_RADIUS = 7;
 const ORBIT_ANGLE = 40 * (Math.PI / 180);
@@ -124,7 +140,11 @@ export function createChoreography({ parts, tilt, state, camera, scrollTarget })
       timeline.add(parts[partId].position, { y: partYAt(partId, act.explode), duration }, at);
     }
     timeline.add(tilt.rotation, { x: act.tiltX, z: act.tiltZ, duration }, at);
-    timeline.add(tilt.position, { x: act.x, y: act.y, duration: duration * LATERAL_SETTLE }, at);
+    // Split, not one shared tween: x settles against the reading column (LATERAL_SETTLE),
+    // y settles against the centred acts' fixed title position (VERTICAL_SETTLE) — see
+    // both constants' doc comments for why they need different fractions.
+    timeline.add(tilt.position, { x: act.x, duration: duration * LATERAL_SETTLE }, at);
+    timeline.add(tilt.position, { y: act.y, duration: duration * VERTICAL_SETTLE }, at);
     timeline.add(camera.position, { x: act.camX, z: act.camZ, duration }, at);
     timeline.add(state, { spinRate: act.spin, labelOpacity: act.labels, duration }, at);
 

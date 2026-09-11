@@ -78,6 +78,20 @@ describe('reduced motion boot path', () => {
     // redraws again, permanently diverging the scene data from the pixels on screen.
     expect(window.__vd.lifecycle).toBeNull();
     expect(window.__vd?.choreography ?? null).toBeNull();
+    // addOverlay was stubbed as a bare vi.fn() and never checked: main.js could stop
+    // registering either the CSS3D label layer or the light-spill layer and every other
+    // test here would stay green (both are real, unmocked modules in this file, so they
+    // would simply render nothing and, after stage.dispose()'s own fix, never leak
+    // either — nothing would fail). Assert both registrations happen, with the right
+    // objects: createLabels()'s return shape is the only one with `sprites`,
+    // createSpill()'s the only one with `element`.
+    expect(window.__vd.stage.addOverlay).toHaveBeenCalledTimes(2);
+    const registered = window.__vd.stage.addOverlay.mock.calls.map(([overlay]) => overlay);
+    const labelsOverlay = registered.find((o) => 'sprites' in o);
+    const spillOverlay = registered.find((o) => 'element' in o);
+    expect(labelsOverlay, 'the labels overlay was never registered').toBeDefined();
+    expect(spillOverlay, 'the spill overlay was never registered').toBeDefined();
+    expect(labelsOverlay).not.toBe(spillOverlay);
   });
 
   it('shows the object in profile with labels visible, rather than face-on with labels hidden', async () => {

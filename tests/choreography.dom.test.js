@@ -139,4 +139,32 @@ describe('acts', () => {
     }
     expect(overlapping / SAMPLES, 'the object spends too long over the text').toBeLessThan(0.08);
   });
+
+  it('lifts clear of the closing title for nearly the whole settle act', () => {
+    // The vertical counterpart of the test above. arrival never has this problem:
+    // entrance.js seeds tilt.position.y to arrival's own target before this timeline
+    // exists, so arrival's y tween runs seeded-value-to-itself, a no-op regardless of
+    // duration (see entrance.test.js). settle has no such seed — its y genuinely ramps
+    // from the previous act's 0 up to 0.6 — and the endpoint-only clearance test in
+    // choreography.test.js only ever samples that ramp's un-ramped final state.
+    const { timeline, tilt, camera } = setup();
+    const settle = ACTS.find((a) => a.id === 'settle');
+    const prevEnd = ACTS[ACTS.indexOf(settle) - 1].end;
+    const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
+    const half = DIMS.cupHeight + DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness;
+    // [data-side='center'] h1/h2 sit at top: 66vh (sections.css) — the object's bottom
+    // edge must clear above that line, i.e. clearBelowPct (percent of viewport clear
+    // beneath it, measured from the very bottom) must exceed 100 - 66 = 34.
+    const TITLE_TOP_PCT = 66;
+    const SAMPLES = 400;
+    let violating = 0;
+    for (let i = 0; i <= SAMPLES; i++) {
+      const f = prevEnd + (settle.end - prevEnd) * (i / SAMPLES);
+      timeline.seek(timeline.duration * f);
+      const vh = visibleHalfHeight(Math.hypot(camera.position.x, camera.position.z));
+      const clearBelowPct = 100 * ((vh + tilt.position.y - half) / (2 * vh));
+      if (clearBelowPct <= 100 - TITLE_TOP_PCT) violating += 1;
+    }
+    expect(violating / SAMPLES, 'the object sits over the closing title for too long').toBeLessThan(0.08);
+  });
 });

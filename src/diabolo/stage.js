@@ -16,7 +16,12 @@ export const CAMERA_FOV = 34;
  *  target instead of dollying in over the first few percent of scroll. If arrival's
  *  camZ ever changes, this must move with it. */
 export const CAMERA_NEAR_Z = 6.2;
-/** Profile and fully exploded: the object spans ~5.02 units and needs the room. */
+/** Profile and fully exploded: the object spans ~5.02 units and needs the room. Like
+ *  CAMERA_NEAR_Z, kept equal to an ACTS camZ (`apart`'s) by convention rather than by
+ *  import -- the table hardcodes its own literal so it stays plain data (see ACTS's own
+ *  doc comment in choreography.js). No production code reads this constant itself any
+ *  more; it now exists purely as the far bound the "keeps the camera between its near
+ *  and far distances" test (choreography.test.js) checks every act's distance against. */
 export const CAMERA_FAR_Z = 10;
 
 /**
@@ -145,6 +150,9 @@ export function createStage({ canvas, tier }) {
     tilt.traverse((o) => o.geometry?.dispose());
     disposeMaterials(materials);
     renderer.dispose();
+    // Mirrors render()'s and resize()'s own loops above: without this, an overlay's DOM
+    // subtree (the CSS3D label layer, the spill element) outlives the stage that owned it.
+    for (const overlay of overlays) overlay.dispose();
   }
 
   resize();

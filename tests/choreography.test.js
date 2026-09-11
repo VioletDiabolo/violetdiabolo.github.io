@@ -173,14 +173,22 @@ describe('ACTS', () => {
   it('pins every act state, so no field can drift unnoticed', () => {
     // The structural tests above say what must be true of any valid table. This says what
     // this particular table is. Both matter: invariants document intent, this catches drift.
-    const actual = ACTS.map((a) => [a.id, a.end, a.explode, +a.tiltZ.toFixed(2), a.spin, a.labels, a.textSide]);
+    // y, camX and camZ included: this test's own name previously overclaimed while omitting
+    // them, so nothing here caught arrival's camZ drifting from CAMERA_NEAR_Z (I3's own
+    // dedicated test is what actually pins that one field; this is the comprehensive check
+    // the name always implied). camX and camZ are rounded like tiltZ already was: orbit's
+    // are Math.sin/cos results, not clean literals, so exact equality would be fragile.
+    const actual = ACTS.map((a) => [
+      a.id, a.end, a.explode, +a.tiltZ.toFixed(2), a.y, +a.camX.toFixed(2), +a.camZ.toFixed(2),
+      a.spin, a.labels, a.textSide,
+    ]);
     expect(actual).toEqual([
-      ['arrival',   0.10, 0, 0,    1.0, 0, 'center'],
-      ['apart',     0.32, 1, 0,    0.4, 1, 'left'],
-      ['recombine', 0.52, 0, 0,    1.2, 0, 'right'],
-      ['spin',      0.70, 0, 0.14, 4.0, 0, 'left'],
-      ['orbit',     0.88, 0, 0.14, 1.2, 0, 'right'],
-      ['settle',    1.00, 0, 0,    0.5, 0, 'center'],
+      ['arrival',   0.10, 0, 0,    0.55, 0,    6.2,  1.0, 0, 'center'],
+      ['apart',     0.32, 1, 0,    0,    0,    10,   0.4, 1, 'left'],
+      ['recombine', 0.52, 0, 0,    0,    0,    7,    1.2, 0, 'right'],
+      ['spin',      0.70, 0, 0.14, 0,    0,    7,    4.0, 0, 'left'],
+      ['orbit',     0.88, 0, 0.14, 0,    4.50, 5.36, 1.2, 0, 'right'],
+      ['settle',    1.00, 0, 0,    0.6,  0,    6.8,  0.5, 0, 'center'],
     ]);
   });
 

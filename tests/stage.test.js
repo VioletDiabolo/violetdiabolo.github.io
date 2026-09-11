@@ -181,3 +181,16 @@ describe('camera aim target', () => {
     expect(aimCall[1].trim()).toBe('AIM_TARGET');
   });
 });
+
+describe('overlay disposal', () => {
+  it('disposes every registered overlay when the stage disposes, so their DOM subtrees do not leak', () => {
+    // createStage() needs a real WebGL context, so it never runs under jsdom/vitest —
+    // same constraint as the aimCamera guard above, so source inspection is again the
+    // only route available. dispose() already frees geometry, materials and the
+    // renderer but, unlike render() and resize() just above it (both of which already
+    // loop `for (const overlay of overlays)`), never iterated overlays at all — leaking
+    // the CSS3D label subtree and the spill element's DOM node on every teardown.
+    const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
+    expect(source).toMatch(/for\s*\(const overlay of overlays\)\s*overlay\.dispose\(\);/);
+  });
+});
