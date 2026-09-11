@@ -15,10 +15,11 @@ produce a condition, that is stated rather than papered over.
 | Bearing stays fixed as the centre reference | **Verified** |
 | Entrance runs before the scroll timeline is attached | **Verified** |
 | Transform ownership holds | **Verified** |
-| CSS3D labels render, alternate sides, fade with the turn | **Verified** |
-| Label text stays selectable | **Verified**, with a guard test |
+| CSS3D labels render, alternate sides, fade with the turn | **Verified at rest only — see §7** |
+| Label text is in the accessibility tree | **Verified** |
+| Label text is mouse-selectable | **No** — blocked by the content layer, see §7 |
 | Black axle proportion corrected | **Verified** |
-| Spin is visible rather than drift | **Verified** |
+| Spin is visible rather than drift | **Constant checked, never observed running** |
 | Live scroll drives the timeline | **Not verified** — host fires no scroll events |
 | Render loop stops when scrolled offscreen | **Unreachable by design** — see §9 |
 
@@ -121,10 +122,32 @@ Faded via `state.labelOpacity`, 30% → 85% of the scrub. They are hidden face-o
 at `tilt = -π/2` the parts' local Y collapses into camera depth and all seven would project onto
 one point. Labels annotate the exploded diagram, which does not exist yet at that angle.
 
+**A defect these measurements could never have caught.** The x-values above are a single
+frozen-state snapshot at `spinner.rotation.y === 0`, which is the only state this host can
+produce. The sprites were originally parented into the part groups, which live under the
+continuously-spinning `spinner`. `CSS3DSprite` billboards *orientation* but not *position*, so
+the side offset orbited:
+
+```
+spin   0deg -> label world x  1.150
+spin  90deg -> label world x  0.000   all seven collapse onto the axis
+spin 180deg -> label world x -1.150   sides inverted
+```
+
+A full revolution every 8.98 s and a collapse every **2.24 s** — permanent, in the headline
+feature, and invisible to every number in this record. Found by reading the transform chain, not
+by measuring. Fixed by attaching the labels to `tilt` instead: they inherit the face-on-to-profile
+turn and nothing else. Verified **0 sprites under `spinner`, 7 under `tilt`**, with a
+negative-controlled regression test.
+
 **Selectability:** three's `CSS3DObject` constructor sets `element.style.userSelect = 'none'`
-inline, which beats any stylesheet rule and would have silently destroyed the reason this layer
-is real DOM rather than a canvas overlay. Overridden after construction, with a guard test that
+inline, which beats any stylesheet rule. Overridden after construction, with a guard test that
 fails if the override is removed (negative-controlled).
+
+**But mouse selection still does not work, and claiming otherwise was wrong.** `#content` sits at
+`z-index: 1` over `#stage` at `z-index: 0`, so a drag across a label selects section text instead.
+The override is necessary but not sufficient. The labels are in the accessibility tree and
+screen-readable; they are not selectable with a cursor.
 
 Hidden labels use `opacity: 0` with `pointer-events: none`, never `visibility: hidden` or
 `display: none` — per ARIA, `visibility: hidden` removes an element from the accessibility tree
@@ -136,7 +159,7 @@ layer is real DOM. `opacity: 0` is the one hiding mechanism that keeps an elemen
 ```
 mean lit RGB     (175, 137, 208)      clearly violet: 82.3%
 one frame        9 draw calls, 30,624 triangles
-idle spin        0.700 rad/s          (was 0.22 — roughly one revolution per 28s, invisible)
+idle spin        0.700 rad/s          source constant, raised from 0.22; NOT observed running
 sections         hero about events media board contact footer
 media            10 facades, 0 live iframes before activation
 board            3 cards, 1 placeholder without an <img>
