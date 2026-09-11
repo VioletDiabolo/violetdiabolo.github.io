@@ -29,7 +29,11 @@ function boot() {
   // Registered after construction, not inside createStage: labels need stage.parts,
   // and the stage needs the labels as an overlay — constructor-time wiring would be
   // circular. See stage.js's addOverlay for the seam this uses.
-  const labels = createLabels({ parts: stage.parts, container: document.getElementById('label-layer') });
+  const labels = createLabels({
+    parts: stage.parts,
+    container: document.getElementById('label-layer'),
+    state: stage.state,
+  });
   stage.addOverlay(labels);
   window.addEventListener('resize', stage.resize);
 

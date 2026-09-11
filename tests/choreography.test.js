@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  PART_RANK, SPACING, FACE_ON_X, PROFILE_X, explodedY,
+  PART_RANK, SPACING, FACE_ON_X, PROFILE_X, explodedY, LABEL_FADE_START, LABEL_FADE_END,
 } from '../src/scroll/choreography.js';
 import { HOME } from '../src/diabolo/build.js';
 import { PART_IDS, DIMS } from '../src/diabolo/profiles.js';
@@ -93,5 +93,16 @@ describe('camera framing', () => {
 
   it('only ever moves the camera outward', () => {
     expect(CAMERA_FAR_Z).toBeGreaterThan(CAMERA_NEAR_Z);
+  });
+});
+
+describe('label fade', () => {
+  it('holds labels back until the object has begun to turn and open', () => {
+    expect(LABEL_FADE_START).toBeGreaterThan(0.15);
+  });
+
+  it('has labels fully visible before the scrub ends', () => {
+    expect(LABEL_FADE_END).toBeLessThanOrEqual(1);
+    expect(LABEL_FADE_END).toBeGreaterThan(LABEL_FADE_START);
   });
 });

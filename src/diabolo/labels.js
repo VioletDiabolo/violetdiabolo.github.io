@@ -29,8 +29,15 @@ export const LABEL_SCALE = 0.006;
  *
  * The elements are real DOM: selectable, focusable, translatable, screen-readable. That is
  * what makes going full spectacle cost nothing in accessibility.
+ *
+ * `state` follows the same rule as stage.js's `state.spinRate`: anime.js (scroll/
+ * choreography.js) owns `state.labelOpacity` and writes it; this module only reads it, in
+ * render() below. At face-on and assembled (labelOpacity's initial 0) the parts' local Y
+ * axis collapses into camera depth and every label would project onto nearly the same
+ * screen point — not a scale or offset problem, a projection one — so labels stay hidden
+ * until the choreography has turned and opened the object enough for them to mean anything.
  */
-export function createLabels({ parts, container }) {
+export function createLabels({ parts, container, state }) {
   const renderer = new CSS3DRenderer();
   renderer.domElement.className = 'label-layer';
   container.append(renderer.domElement);
@@ -65,6 +72,18 @@ export function createLabels({ parts, container }) {
   return {
     elements,
     render(scene, camera) {
+      // anime.js owns state.labelOpacity; this only reads it (see the module doc comment
+      // above). Labels annotate the exploded diagram, so they stay hidden while the object
+      // is face-on and stacked, and fade in as scroll/choreography.js turns and opens it.
+      const opacity = String(state.labelOpacity);
+      // Below a small threshold, also drop pointer/find-in-page hits on the now-invisible
+      // text. Not display:none, which would pull the label out of the accessibility tree —
+      // that would lose the very property (real, screen-readable DOM) this layer exists for.
+      const visibility = state.labelOpacity < 0.02 ? 'hidden' : 'visible';
+      for (const id of PART_IDS) {
+        elements[id].style.opacity = opacity;
+        elements[id].style.visibility = visibility;
+      }
       renderer.render(scene, camera);
     },
     setSize(width, height) {

@@ -28,6 +28,10 @@ export const PROFILE_X = 0;
 /** Arbitrary timeline length; scroll progress maps onto it, so only ratios matter. */
 export const SCRUB_DURATION = 1000;
 
+/** Labels fade in once the object has turned far enough for the diagram to make sense. */
+export const LABEL_FADE_START = 0.3;
+export const LABEL_FADE_END = 0.85;
+
 /**
  * Pure: where a part sits when fully exploded. Extracted from the timeline so the
  * spacing arithmetic is testable without a scroll container.
@@ -81,6 +85,16 @@ export function createChoreography({ parts, tilt, state, camera, scrollTarget })
   timeline
     .add(state, { spinRate: 3.5, duration: SCRUB_DURATION * 0.5 }, 0)
     .add(state, { spinRate: 1, duration: SCRUB_DURATION * 0.5 }, SCRUB_DURATION * 0.5);
+
+  // Labels annotate the exploded diagram, which does not exist yet at progress 0 (face-on,
+  // assembled — see diabolo/labels.js's render()). They fade in only once the turn and the
+  // explosion have progressed enough for the annotation to mean something, and finish before
+  // the scrub ends so they arrive settled rather than still animating at full explosion.
+  timeline.add(
+    state,
+    { labelOpacity: 1, duration: SCRUB_DURATION * (LABEL_FADE_END - LABEL_FADE_START) },
+    SCRUB_DURATION * LABEL_FADE_START,
+  );
 
   return {
     timeline,

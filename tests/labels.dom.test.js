@@ -1,5 +1,27 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// CSS3DRenderer.render() computes real perspective/matrix CSS from camera.projectionMatrix
+// and camera.matrixWorldInverse (see node_modules/three's CSS3DRenderer.js) — it throws on
+// the plain `{}` stand-ins for scene/camera the opacity tests below use, since those exist
+// only to exercise labels.js's own render() wrapper (the opacity/visibility assignment), not
+// three.js's CSS projection math. CSS3DSprite/CSS3DObject are untouched (kept via
+// importOriginal) — every other test in this file relies on the real ones for sprite
+// placement.
+vi.mock('three/examples/jsm/renderers/CSS3DRenderer.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    CSS3DRenderer: class {
+      constructor() {
+        this.domElement = document.createElement('div');
+      }
+      render() {}
+      setSize() {}
+    },
+  };
+});
+
 import { PART_LABELS, LABEL_OFFSET_X, createLabels } from '../src/diabolo/labels.js';
 import { buildDiabolo } from '../src/diabolo/build.js';
 import { PART_IDS } from '../src/diabolo/profiles.js';
@@ -61,5 +83,34 @@ describe('createLabels', () => {
     const container = document.createElement('div');
     createLabels({ parts, container });
     expect(container.children.length).toBeGreaterThan(0);
+  });
+});
+
+describe('label opacity', () => {
+  it('hides labels while the object is face-on, when they would all project onto one point', () => {
+    const { parts } = scene();
+    const state = { spinRate: 1, labelOpacity: 0 };
+    const labels = createLabels({ parts, container: document.createElement('div'), state });
+    labels.render({}, {});
+    expect(labels.elements.cupTop.style.opacity).toBe('0');
+    expect(labels.elements.cupTop.style.visibility).toBe('hidden');
+  });
+
+  it('shows labels once anime.js raises the scalar it owns', () => {
+    const { parts } = scene();
+    const state = { spinRate: 1, labelOpacity: 1 };
+    const labels = createLabels({ parts, container: document.createElement('div'), state });
+    labels.render({}, {});
+    expect(labels.elements.cupTop.style.opacity).toBe('1');
+    expect(labels.elements.cupTop.style.visibility).toBe('visible');
+  });
+
+  it('never removes hidden labels from the accessibility tree', () => {
+    const { parts } = scene();
+    const state = { spinRate: 1, labelOpacity: 0 };
+    const labels = createLabels({ parts, container: document.createElement('div'), state });
+    labels.render({}, {});
+    expect(labels.elements.cupTop.style.display).not.toBe('none');
+    expect(labels.elements.cupTop.textContent.length).toBeGreaterThan(0);
   });
 });

@@ -79,8 +79,8 @@ export function createStage({ canvas, tier }) {
   scene.add(tilt);
   scene.environment = materials._envTarget.texture;
 
-  /** anime.js writes this scalar; the render loop reads it. Never the reverse. */
-  const state = { spinRate: 1 };
+  /** anime.js writes these scalars; the render loop and overlays only read them. */
+  const state = { spinRate: 1, labelOpacity: 0 };
   const spinMesh = parts.axleBearing.userData.spinMesh;
 
   // Registered post-construction via addOverlay() — see below. Kept local (not on the
