@@ -71,6 +71,11 @@ describe('rotationDeltas', () => {
     expect(d.root).toBe(0);
     expect(d.bearing).toBe(0);
   });
+
+  it('spins fast enough to read as motion rather than drift', () => {
+    // At least one visible revolution every ~10 seconds.
+    expect(rotationDeltas(1, 1).root).toBeGreaterThan(0.6);
+  });
 });
 
 describe('resolveViewport', () => {

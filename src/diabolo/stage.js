@@ -38,7 +38,7 @@ export function readSignals() {
   };
 }
 
-const IDLE_SPIN = 0.22;            // radians/sec for the whole assembly
+const IDLE_SPIN = 0.7;             // radians/sec for the whole assembly
 const BEARING_SPIN_MULTIPLIER = 6; // the bearing spins faster than the body
 
 /**
