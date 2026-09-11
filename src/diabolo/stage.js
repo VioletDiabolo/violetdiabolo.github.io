@@ -7,6 +7,14 @@ export const TIER_SETTINGS = Object.freeze({
   base: { dpr: 1.5, segments: 64, transmission: false },
 });
 
+/** Camera framing. Exported because the scroll choreography dollies between these and
+ *  its tests assert the exploded object actually fits the frustum. */
+export const CAMERA_FOV = 34;
+/** Face-on and assembled: frames the cup disc. */
+export const CAMERA_NEAR_Z = 5.4;
+/** Profile and fully exploded: the object spans ~5.02 units and needs the room. */
+export const CAMERA_FAR_Z = 10;
+
 /**
  * Capability signals only — never user-agent sniffing. `base` is the safe default
  * whenever a signal is missing.
@@ -30,7 +38,7 @@ export function readSignals() {
   };
 }
 
-const IDLE_SPIN = 0.22;            // radians/sec for the whole assembly
+const IDLE_SPIN = 0.7;             // radians/sec for the whole assembly
 const BEARING_SPIN_MULTIPLIER = 6; // the bearing spins faster than the body
 
 /**
@@ -39,7 +47,7 @@ const BEARING_SPIN_MULTIPLIER = 6; // the bearing spins faster than the body
  */
 export function rotationDeltas(deltaSeconds, spinRate) {
   return {
-    root: IDLE_SPIN * deltaSeconds,
+    spinner: IDLE_SPIN * deltaSeconds,
     bearing: IDLE_SPIN * BEARING_SPIN_MULTIPLIER * spinRate * deltaSeconds,
   };
 }
@@ -62,24 +70,29 @@ export function createStage({ canvas, tier }) {
   renderer.toneMappingExposure = 1.05;
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(34, 1, 0.1, 100);
-  camera.position.set(0, 0.15, 5.4);
+  const camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
+  camera.position.set(0, 0.15, CAMERA_NEAR_Z);
   camera.lookAt(0, 0, 0);
 
   const materials = createMaterials({ renderer, settings });
-  const { root, parts } = buildDiabolo({ materials, segments: settings.segments });
-  scene.add(root);
+  const { tilt, spinner, parts } = buildDiabolo({ materials, segments: settings.segments });
+  scene.add(tilt);
   scene.environment = materials._envTarget.texture;
 
-  /** anime.js writes this scalar; the render loop reads it. Never the reverse. */
-  const state = { spinRate: 1 };
+  /** anime.js writes these scalars; the render loop and overlays only read them. */
+  const state = { spinRate: 1, labelOpacity: 0 };
   const spinMesh = parts.axleBearing.userData.spinMesh;
+
+  // Registered post-construction via addOverlay() — see below. Kept local (not on the
+  // returned object) so the only way to add one is the seam meant for it.
+  const overlays = [];
 
   function render(deltaSeconds) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
-    root.rotation.y += spin.root;
+    spinner.rotation.y += spin.spinner;
     spinMesh.rotation.y += spin.bearing;
     renderer.render(scene, camera);
+    for (const overlay of overlays) overlay.render(scene, camera);
   }
 
   function resize() {
@@ -96,6 +109,7 @@ export function createStage({ canvas, tier }) {
     renderer.setSize(view.width, view.height, false);
     camera.aspect = view.aspect;
     camera.updateProjectionMatrix();
+    for (const overlay of overlays) overlay.setSize(view.width, view.height);
 
     // Repaint immediately. setSize() clears the drawing buffer, and on the
     // reduced-motion path no loop exists to redraw — the canvas would stay blank.
@@ -103,11 +117,23 @@ export function createStage({ canvas, tier }) {
   }
 
   function dispose() {
-    root.traverse((o) => o.geometry?.dispose());
+    tilt.traverse((o) => o.geometry?.dispose());
     disposeMaterials(materials);
     renderer.dispose();
   }
 
   resize();
-  return { renderer, scene, camera, root, parts, state, render, resize, dispose };
+  return {
+    renderer, scene, camera, tilt, spinner, parts, state, render, resize, dispose,
+    /**
+     * Registration seam for renderers that share this scene/camera but live outside
+     * WebGL (e.g. the CSS3D label layer in diabolo/labels.js). Called after construction,
+     * not wired in here directly: overlays need `parts` from this return value, so
+     * building them at construction time would be circular.
+     */
+    addOverlay(overlay) {
+      overlays.push(overlay);
+      overlay.setSize(canvas.clientWidth, canvas.clientHeight);
+    },
+  };
 }

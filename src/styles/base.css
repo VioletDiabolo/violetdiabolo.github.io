@@ -7,11 +7,15 @@
 :root {
   /* ---- Palette. One dominant field, violet dominant, cyan used sparingly. ---- */
   --stage:        #08060d; /* near-black ground */
+  --stage-rgb:    8, 6, 13; /* same colour as --stage, as a triplet for rgba() plates -- see --plate-bg */
   --stage-raised: #0f0b18;
   --violet-deep:  #57068c; /* NYU violet, the anchor */
   --violet:       #8b45d6;
   --violet-lift:  #a86ef0; /* glow / hover */
-  --cyan:         #5fd7e8; /* the gasket. THE only other accent. used sparingly */
+  --cyan:         #5fd7e8; /* the gasket's colour. Marks a JOIN -- mechanical (the gasket
+                               seating cup to hub) or interactive (:focus-visible below,
+                               attention landing on a control). The only other accent,
+                               and used only where that meaning actually applies. */
   --ink:          #f4f0f8;
   --ink-dim:      #a79fb5;
   --rule:         rgba(168, 110, 240, 0.22); /* hairline diagram rules */
@@ -20,10 +24,35 @@
   --grid-line: rgba(168, 110, 240, 0.05);
   --bloom:     rgba(87, 6, 140, 0.16);
 
+  /*
+   * The plate: a guaranteed-contrast backdrop for text sitting over the WebGL
+   * canvas. Measured, not assumed -- sampling the actual rendered pixels behind
+   * the hero tagline (getImageData on the live scene, face-on) found 1.07:1
+   * contrast at the object's brighter zone, an outright WCAG failure no amount
+   * of text-shadow blur recovers, because the object's own highlights climb
+   * close to --ink's luminance. 0.88 alpha keeps >=6.5:1 for --ink-dim text
+   * against both the measured hotspot and a brighter hypothetical bloom;
+   * the blur pushes real-world contrast higher still, since it spreads a
+   * bright fleck's luminance across a wider sample instead of leaving its
+   * peak intact. Reacts to whatever is actually behind it -- the assembled
+   * object, the exploded one, the SVG fallback, the frozen static frame --
+   * rather than assuming a fixed dark background. See sections.css for where
+   * this is applied (the hero) and the narrow-screen equivalent.
+   */
+  --plate-bg:   rgba(var(--stage-rgb), 0.88);
+  --plate-blur: 10px;
+
   /* ---- Type. Two families, shared lineage, real fallback stacks. ---- */
   --font-display: 'Space Grotesk', ui-sans-serif, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-body:    'Space Grotesk', ui-sans-serif, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono:    'Space Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+
+  /* ---- Mono scale. Three sizes, each with one job -- see "the index numeral"
+   *      below for why the middle size is shared verbatim across the hero,
+   *      every section heading, and every exploded part label. ---- */
+  --mono-2xs: 0.68rem; /* quietest annotation: part-label names, board position, footer */
+  --mono-xs:  0.75rem; /* the index numeral -- hero "00", section "01"-"06", part "01"-"07" */
+  --mono-sm:  0.85rem; /* the one emphasised mono line: the hero tagline */
 
   /* ---- Shared geometry. ---- */
   --radius: 2px; /* technical, not pill-round */
@@ -89,9 +118,31 @@ p {
 .mono, .annotation {
   font-family: var(--font-mono);
   text-transform: uppercase;
-  font-size: 0.72rem;
+  font-size: var(--mono-xs);
   letter-spacing: 0.18em;
   color: var(--ink-dim);
+}
+
+/* ---------------------------------------------------------------------------
+ * The index numeral. Every numbered reference on the page -- the hero's own
+ * "00 /" cover mark (sections.css), each section's auto-numbered "01 /" to
+ * "06 /" heading prefix (sections.css), and every exploded part's "01"-"07"
+ * label floating in the CSS3D layer (stage.css, src/diabolo/labels.js) --
+ * shares this exact identity: same family, weight, tracking, colour. That
+ * repetition is the point. A bold, tracked, violet numeral is this site's one
+ * signal for "this is the system's cross-reference index," whether it shows
+ * up in the 2D layout or parented to a part in the 3D scene. Each call site
+ * still sets its own font-size and generated `content` below -- a hero
+ * eyebrow, a section prefix and a label in 3D space are not the same size --
+ * only the identity is pinned here, once, so the three cannot drift apart.
+ * ------------------------------------------------------------------------- */
+.section:not([data-section='hero']) h2::before,
+[data-section='hero'] h1::before,
+.part-label-index {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--violet-lift);
 }
 
 /* ---------------------------------------------------------------------------
@@ -113,12 +164,44 @@ a:hover {
 
 /* ---------------------------------------------------------------------------
  * Accessibility: a keyboard user must always be able to see where they are.
+ * Cyan, not violet -- see --cyan's own comment above. Keyboard focus is
+ * exactly the "interactive join" cyan is reserved for, and borrowing the
+ * gasket's colour for it means the accent still reads as rare (it only
+ * appears while tabbing) without inventing a fourth palette colour.
  * ------------------------------------------------------------------------- */
 
 :focus-visible {
-  outline: 2px solid var(--violet-lift);
+  outline: 2px solid var(--cyan);
   outline-offset: 3px;
   border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------------------
+ * The sheet frame: a hairline inset, fixed to the viewport, with a small
+ * violet registration mark at each corner -- the crop-mark language of a
+ * print/technical drawing sheet, echoing the same hairline-plus-dot device
+ * used everywhere else on the page (the section headings' callout rule, the
+ * part labels' leader line). Always present, independent of scroll position
+ * or #stage's state (live, static, or unsupported): a quiet, constant
+ * reminder that the whole page is one drawing, not a stack of unrelated
+ * sections. `pointer-events: none` and a z-index above both #stage (0) and
+ * #content (1) so it sits on top without ever intercepting a click or scroll.
+ * ------------------------------------------------------------------------- */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 14px;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px solid var(--rule);
+  background-repeat: no-repeat;
+  background-size: 3px 3px;
+  background-position: 0 0, 100% 0, 0 100%, 100% 100%;
+  background-image:
+    radial-gradient(circle, var(--violet-lift) 0 1.5px, transparent 2px),
+    radial-gradient(circle, var(--violet-lift) 0 1.5px, transparent 2px),
+    radial-gradient(circle, var(--violet-lift) 0 1.5px, transparent 2px),
+    radial-gradient(circle, var(--violet-lift) 0 1.5px, transparent 2px);
 }
 
 /* ---------------------------------------------------------------------------

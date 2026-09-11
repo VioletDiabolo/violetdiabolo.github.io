@@ -177,16 +177,23 @@ describe('engine independence', () => {
   // not opt into that environment, but resolving by plain path costs nothing and stays
   // safe regardless.
   const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src');
-  // The only module the spec's own boundary table (§10) lists as depending on anime.js.
-  const ANIME_OWNER = path.join(SRC, 'scroll', 'choreography.js');
+  // The only two modules that own anime.js timelines: choreography.js (the scroll-
+  // scrubbed explosion/turn) and entrance.js (the load-in convergence, Task 4). Both
+  // write the same tilt.rotation.x / part .position properties at different points in
+  // the object's lifecycle, never simultaneously (main.js creates the scroll timeline
+  // only inside entrance's onComplete) — see the Task 4 ordering requirement.
+  const ANIME_OWNERS = new Set([
+    path.join(SRC, 'scroll', 'choreography.js'),
+    path.join(SRC, 'scroll', 'entrance.js'),
+  ]);
 
-  it('keeps anime.js confined to the one module that owns the scrubbed timeline', () => {
+  it('keeps anime.js confined to the modules that own the scrubbed and entrance timelines', () => {
     for (const file of listJsFiles(SRC)) {
-      if (file === ANIME_OWNER) continue;
+      if (ANIME_OWNERS.has(file)) continue;
       const source = readFileSync(file, 'utf8');
       const rel = path.relative(SRC, file);
-      expect(source, `src/${rel} imports animejs; only scroll/choreography.js should`).not.toMatch(/from\s+['"]animejs['"]/);
-      expect(source, `src/${rel} requires animejs; only scroll/choreography.js should`).not.toMatch(/require\(\s*['"]animejs['"]\s*\)/);
+      expect(source, `src/${rel} imports animejs; only scroll/choreography.js and scroll/entrance.js should`).not.toMatch(/from\s+['"]animejs['"]/);
+      expect(source, `src/${rel} requires animejs; only scroll/choreography.js and scroll/entrance.js should`).not.toMatch(/require\(\s*['"]animejs['"]\s*\)/);
     }
   });
 

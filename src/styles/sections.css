@@ -3,12 +3,11 @@
  *
  * The core idea: each [data-section] is a two-column grid. The text block occupies
  * ONE column; the other column is left empty on purpose, so the sticky 3D stage
- * (painted behind #content, see the z-index note below) shows through it -- that
- * empty column is where the diabolo's part flies to for that beat. Which side the
- * text sits on is chosen to sit opposite SCROLL_BEATS' offset[0] for that section
- * (see src/scroll/choreography.js): about/media/contact fly their part left, so text
- * sits right; events/board fly right, so text sits left. That is the "callout sits
- * opposite its subject" grammar the whole page is built on.
+ * (painted behind #content, see the z-index note below) shows through it. The
+ * choreography (src/scroll/choreography.js) is one continuous explosion-and-turn
+ * bound to the whole page's scroll, not a per-section beat, so which side the text
+ * sits on is simply alternated for visual variety: events/board sit text-left,
+ * everything else sits text-right.
  */
 
 #content {
@@ -50,7 +49,7 @@
 
 [data-section='events'] > *,
 [data-section='board'] > * {
-  grid-column: 1; /* text left -- these two sections fly their part right */
+  grid-column: 1; /* text left -- alternates against the rest of the page (see the file header) */
 }
 
 /* ---------------------------------------------------------------------------
@@ -61,30 +60,85 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1.5rem;
+  gap: 0.6rem;
+}
+
+/*
+ * The hero plate. The hero is the one place on the page where text is
+ * GUARANTEED to sit over the object's brightest zone -- it is centred,
+ * face-on, directly behind the title, at every stage (live, static, and the
+ * SVG fallback all place it there) -- so it is the one place that gets a full
+ * backdrop rather than relying on text-shadow alone. See base.css's
+ * --plate-bg for the measured contrast rationale. `width: fit-content` +
+ * `align-self: flex-start` keep each plate hugging its own text -- the flex
+ * column's default stretch would otherwise draw it the full width of the
+ * hero, which reads as a UI panel, not a title block.
+ */
+[data-section='hero'] h1,
+[data-section='hero'] p {
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
+  background: var(--plate-bg);
+  backdrop-filter: blur(var(--plate-blur));
+  -webkit-backdrop-filter: blur(var(--plate-blur));
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 
 [data-section='hero'] h1 {
   font-size: clamp(3rem, 10vw, 8rem);
   text-transform: uppercase;
   max-width: 18ch;
+  padding: 0.2em 0.6em 0.25em;
+  /* The one heavy rule in the hero: this title block is the drawing set's
+     cover sheet, flagged the same way every section flags its own callout
+     (h2::after below) -- a violet edge marking "this is the referenced thing." */
+  border-left: 3px solid var(--violet-lift);
+}
+
+/* "00 /" -- the cover sheet's own index, using the identical numeral treatment
+   as every section heading and every exploded part label (base.css). Sheet 00
+   of a drawing set is conventionally the cover/title sheet; 01-06 (below) are
+   the sections that follow. */
+[data-section='hero'] h1::before {
+  content: '00 / ';
+  display: block;
+  font-size: var(--mono-xs);
+  margin-bottom: 0.5em;
 }
 
 [data-section='hero'] p {
   font-family: var(--font-mono);
   text-transform: uppercase;
-  font-size: clamp(0.8rem, 1.4vw, 1rem);
+  font-size: clamp(var(--mono-sm), 1.4vw, 1rem);
   letter-spacing: 0.2em;
   color: var(--ink-dim);
   max-width: 42ch;
+  padding: 0.7em 0.9em;
 }
 
-/* Large type sitting directly over the diabolo's rest position gets a soft dark
-   glow so it stays legible regardless of exactly what is behind it at any moment. */
-[data-section='hero'] h1,
-[data-section='hero'] p,
-.section:not([data-section='hero']) h2 {
-  text-shadow: 0 2px 28px rgba(8, 6, 13, 0.75);
+/*
+ * Section headings and their lead paragraph get the same plate as the hero.
+ * The assumption that the two-column grid alone keeps them off the object
+ * does NOT hold: measured at 768px (a section's column is narrower there,
+ * while the object's on-screen size barely changes with viewport width --
+ * it is framed by a fixed vertical FOV against viewport HEIGHT), the object
+ * spans both columns early in a section's scroll range and sits directly
+ * behind the heading. Only `> p` (a section's own direct-child lead
+ * paragraph) is included, not paragraphs nested inside board/media/form
+ * cards below -- those already sit on their own card backgrounds.
+ */
+.section:not([data-section='hero']) h2,
+.section:not([data-section='hero']) > p {
+  width: fit-content;
+  max-width: 100%;
+  background: var(--plate-bg);
+  backdrop-filter: blur(var(--plate-blur));
+  -webkit-backdrop-filter: blur(var(--plate-blur));
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.5em 0.7em;
 }
 
 /* ---------------------------------------------------------------------------
@@ -103,14 +157,16 @@
   text-transform: uppercase;
 }
 
+/* Family, weight, tracking and colour come from base.css's shared "index
+   numeral" rule -- this is only what makes THIS index a section heading's:
+   the counter itself, its size (identical to the hero's "00" and every part
+   label's own index -- one numbering system, three places it shows up), and
+   the space it keeps above the heading text it precedes. */
 .section:not([data-section='hero']) h2::before {
   counter-increment: section-index;
   content: counter(section-index, decimal-leading-zero) ' / ';
   display: block;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  color: var(--ink-dim);
+  font-size: var(--mono-xs);
   margin-bottom: 0.85em;
 }
 
@@ -159,7 +215,7 @@
 .socials a {
   font-family: var(--font-mono);
   text-transform: uppercase;
-  font-size: 0.78rem;
+  font-size: var(--mono-xs);
   letter-spacing: 0.12em;
 }
 
@@ -222,7 +278,7 @@
 .board-position {
   font-family: var(--font-mono);
   text-transform: uppercase;
-  font-size: 0.72rem;
+  font-size: var(--mono-2xs);
   letter-spacing: 0.14em;
   color: var(--ink-dim);
   max-width: none;
@@ -261,7 +317,7 @@
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-size: 0.8rem;
+  font-size: var(--mono-xs);
   cursor: pointer;
   transition: border-color 0.2s ease;
   /* CSS-only chevron: two triangular gradients meeting in a V, no image asset. */
@@ -402,12 +458,14 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-size: 0.85rem;
+  font-size: var(--mono-sm);
   color: var(--ink-dim);
   max-width: none;
 }
 
-/* The one place --cyan is allowed to fill a shape. */
+/* The one place --cyan is allowed to fill a shape: a call-to-action button is
+   the clearest "interactive join" on the page short of :focus-visible itself
+   (base.css), so it fits the same rule that colour is reserved for. */
 .form-card button {
   background: var(--cyan);
   color: var(--stage);
@@ -417,7 +475,7 @@
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.78rem;
+  font-size: var(--mono-xs);
   font-weight: 700;
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease;
@@ -435,11 +493,11 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Footer -- the reassembly beat (src/scroll/choreography.js REASSEMBLE_AT) plays
- * out here: every part returns to HOME, so the page resolves fully assembled
- * rather than ending in pieces (spec §5). Not a `.section` -- there is no part
- * flying to an empty column here, so it skips the two-column grid entirely.
- * min-height gives that beat real scroll distance to complete in.
+ * Footer -- not a `.section`: there is no part flying to an empty column here, so
+ * it skips the two-column grid entirely. The choreography (src/scroll/
+ * choreography.js) is one continuous animation that finishes exploded and in
+ * profile; it does not reassemble. min-height simply gives the page enough scroll
+ * distance for that full scrub to complete before the footer is reached.
  * ------------------------------------------------------------------------- */
 
 .section-footer {
@@ -455,7 +513,7 @@
 .footer-line {
   font-family: var(--font-mono);
   text-transform: uppercase;
-  font-size: 0.78rem;
+  font-size: var(--mono-xs);
   letter-spacing: 0.16em;
   color: var(--ink-dim);
   text-align: center;
@@ -482,13 +540,24 @@
     display: none;
   }
 
+  /* Same plate as the hero (base.css --plate-bg) -- not a separate, weaker
+     scrim. Below tablet width the two-column trick is gone, so every
+     heading and paragraph needs the same measured-contrast guarantee the
+     hero always carries, not just a lighter approximation of it. Hero's own
+     h1/h2/h3/p are already plated unconditionally above; repeating the
+     selector here costs nothing (identical declarations, so nothing visibly
+     changes for it) and means every section gets the same treatment once
+     the grid collapses. */
   [data-section] h1,
   [data-section] h2,
   [data-section] h3,
   [data-section] p {
     width: fit-content;
     max-width: 100%;
-    background: rgba(8, 6, 13, 0.55);
+    background: var(--plate-bg);
+    backdrop-filter: blur(var(--plate-blur));
+    -webkit-backdrop-filter: blur(var(--plate-blur));
+    border: 1px solid var(--rule);
     padding: 0.85rem 1rem;
     border-radius: var(--radius);
   }
