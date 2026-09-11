@@ -23,8 +23,13 @@ export function createSpill({ container, tilt, camera }) {
       tilt.getWorldPosition(projected);
       projected.project(camera);
       // NDC is -1..1 with +Y up; CSS percentages are 0..100 with +Y down.
-      element.style.setProperty('--spill-x', `${(projected.x * 0.5 + 0.5) * 100}%`);
-      element.style.setProperty('--spill-y', `${(-projected.y * 0.5 + 0.5) * 100}%`);
+      // Vector3.project does not clamp: an object outside the frustum projects to NDC
+      // beyond ±1, which would otherwise place the bloom outside the page. Clamp both
+      // axes to the visible 0-100 range before writing them.
+      const x = Math.min(100, Math.max(0, (projected.x * 0.5 + 0.5) * 100));
+      const y = Math.min(100, Math.max(0, (-projected.y * 0.5 + 0.5) * 100));
+      element.style.setProperty('--spill-x', `${x}%`);
+      element.style.setProperty('--spill-y', `${y}%`);
     },
     setSize() {},
     dispose() {

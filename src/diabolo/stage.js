@@ -71,6 +71,17 @@ export function aimCamera(camera, target) {
   camera.lookAt(target);
 }
 
+/**
+ * The camera always looks at the world origin, never at the object.
+ *
+ * Aiming at the object would re-centre it every frame: its lateral offset would stop
+ * moving it on screen (so it could never clear the reading column) and anything
+ * projecting its position through this camera would read dead centre forever. The
+ * object's offset is a compositional shift away from the subject point, not a
+ * relocation of it.
+ */
+const AIM_TARGET = new Vector3(0, 0, 0);
+
 export function createStage({ canvas, tier }) {
   const settings = TIER_SETTINGS[tier];
 
@@ -96,14 +107,11 @@ export function createStage({ canvas, tier }) {
   // returned object) so the only way to add one is the seam meant for it.
   const overlays = [];
 
-  const aimTarget = new Vector3();
-
   function render(deltaSeconds) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
     spinner.rotation.y += spin.spinner;
     spinMesh.rotation.y += spin.bearing;
-    tilt.getWorldPosition(aimTarget);
-    aimCamera(camera, aimTarget);
+    aimCamera(camera, AIM_TARGET);
     renderer.render(scene, camera);
     for (const overlay of overlays) overlay.render(scene, camera);
   }

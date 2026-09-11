@@ -144,3 +144,23 @@ describe('aimCamera', () => {
     expect(camera.position.toArray()).toEqual([4.5, 0, 5.362]);
   });
 });
+
+describe('camera aim target', () => {
+  it('does not re-centre the object, which would cancel its lateral offset', () => {
+    // Aiming at the object puts it on the optical axis, so a lateral offset moves it in
+    // world space but not on screen — and anything projecting it reads dead centre.
+    const camera = new PerspectiveCamera(CAMERA_FOV, 1.6, 0.1, 100);
+    camera.position.set(0, 0.15, 7);
+    const object = new Vector3(1.6, 0, 0);
+
+    aimCamera(camera, object);
+    camera.updateMatrixWorld(true);
+    const centred = object.clone().project(camera);
+    expect(Math.abs(centred.x), 'aiming at the object pins it to centre').toBeLessThan(1e-6);
+
+    aimCamera(camera, new Vector3(0, 0, 0));
+    camera.updateMatrixWorld(true);
+    const offset = object.clone().project(camera);
+    expect(Math.abs(offset.x), 'aiming at the origin lets the offset show').toBeGreaterThan(0.2);
+  });
+});

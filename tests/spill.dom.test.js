@@ -1,4 +1,10 @@
 // @vitest-environment jsdom
+//
+// This file's setup() calls camera.lookAt() once, at construction, and never re-aims —
+// it deliberately fixes the camera so these tests can unit-test the projection maths in
+// isolation. That does not model stage.js's real render loop, which re-aims the camera
+// every frame; tests/stage-spill.dom.test.js composes aimCamera() with createSpill() the
+// way render() actually does, and is what covers the real composition.
 import { describe, it, expect } from 'vitest';
 import { PerspectiveCamera, Group, Vector3 } from 'three';
 import { createSpill } from '../src/diabolo/spill.js';
