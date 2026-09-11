@@ -1,3 +1,4 @@
+import { Group } from 'three';
 import { CSS3DRenderer, CSS3DSprite } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import { PART_IDS } from './profiles.js';
 
@@ -23,9 +24,18 @@ export const LABEL_SCALE = 0.006;
 /**
  * A CSS3DRenderer layer sharing the WebGL camera.
  *
- * Sprites are parented to the part groups, so they travel with the explosion. CSS3DSprite
- * billboards toward the camera, so they stay readable through the face-on-to-profile turn
- * — a plain CSS3DObject would turn edge-on and vanish.
+ * Sprites are parented to a dedicated `labelRoot` group attached to `tilt` — never to
+ * the part groups, and never to `spinner`. CSS3DSprite billboards *orientation* only;
+ * position still comes from matrixWorld. A sprite parented under the continuously-
+ * spinning `spinner` group would therefore orbit the object with it, sweeping every
+ * label onto the axis (and the sides collapsing into each other) four times per
+ * revolution. Under `tilt` the labels inherit the face-on-to-profile turn — they are
+ * annotating that diagram — but never the idle spin. Because the sprite no longer
+ * lives inside the part group that actually explodes outward, render() below copies
+ * each part's current Y offset onto its sprite every frame.
+ *
+ * CSS3DSprite billboards toward the camera, so they stay readable through the
+ * face-on-to-profile turn — a plain CSS3DObject would turn edge-on and vanish.
  *
  * The elements are real DOM: selectable, focusable, translatable, screen-readable. That is
  * what makes going full spectacle cost nothing in accessibility.
@@ -37,12 +47,22 @@ export const LABEL_SCALE = 0.006;
  * screen point — not a scale or offset problem, a projection one — so labels stay hidden
  * until the choreography has turned and opened the object enough for them to mean anything.
  */
-export function createLabels({ parts, container, state }) {
+export function createLabels({ parts, tilt, container, state }) {
   const renderer = new CSS3DRenderer();
   renderer.domElement.className = 'label-layer';
   container.append(renderer.domElement);
 
+  // Attached to `tilt`, never to `spinner`. CSS3DSprite billboards orientation but not
+  // position, so a sprite parented under the continuously-spinning group orbits the
+  // object and every label collapses onto the axis four times per revolution.
+  // Under `tilt` the labels inherit the face-on-to-profile turn and nothing else.
+  const labelRoot = new Group();
+  labelRoot.name = 'labelRoot';
+  tilt.add(labelRoot);
+
   const elements = {};
+  const sprites = {};
+  const sides = {};
 
   PART_IDS.forEach((id, order) => {
     const meta = PART_LABELS[id];
@@ -68,26 +88,30 @@ export function createLabels({ parts, container, state }) {
     el.style.userSelect = 'text';
     sprite.scale.setScalar(LABEL_SCALE);
     // Alternate sides so stacked labels never collide once the object is exploded.
-    sprite.position.set(LABEL_OFFSET_X * (order % 2 === 0 ? 1 : -1), 0, 0);
+    // Recorded in `sides`, not re-derived from `order`, since render() needs it every
+    // frame and the part/sprite pairing is otherwise the only place order is known.
+    const side = order % 2 === 0 ? 1 : -1;
+    sides[id] = side;
+    sprite.position.set(LABEL_OFFSET_X * side, parts[id].position.y, 0);
 
-    parts[id].add(sprite);
+    labelRoot.add(sprite);
     elements[id] = el;
+    sprites[id] = sprite;
   });
 
   return {
     elements,
+    sprites,
     render(scene, camera) {
-      // anime.js owns state.labelOpacity; this only reads it (see the module doc comment
-      // above). Labels annotate the exploded diagram, so they stay hidden while the object
-      // is face-on and stacked, and fade in as scroll/choreography.js turns and opens it.
+      // Track each part's explosion offset. parts[id].position.y is in spinner-local
+      // space and spinner only rotates, so it is directly usable in tilt-local space.
+      for (const id of PART_IDS) {
+        sprites[id].position.set(LABEL_OFFSET_X * sides[id], parts[id].position.y, 0);
+      }
       const opacity = String(state.labelOpacity);
-      // Below a small threshold, also drop pointer/find-in-page hits on the now-invisible
-      // text. Not display:none, which would pull the label out of the accessibility tree —
-      // that would lose the very property (real, screen-readable DOM) this layer exists for.
-      const visibility = state.labelOpacity < 0.02 ? 'hidden' : 'visible';
       for (const id of PART_IDS) {
         elements[id].style.opacity = opacity;
-        elements[id].style.visibility = visibility;
+        elements[id].style.pointerEvents = state.labelOpacity < 0.02 ? 'none' : 'auto';
       }
       renderer.render(scene, camera);
     },
@@ -95,10 +119,7 @@ export function createLabels({ parts, container, state }) {
       renderer.setSize(width, height);
     },
     dispose() {
-      for (const id of PART_IDS) {
-        const sprite = parts[id].children.find((c) => c.element);
-        if (sprite) parts[id].remove(sprite);
-      }
+      tilt.remove(labelRoot);
       renderer.domElement.remove();
     },
   };

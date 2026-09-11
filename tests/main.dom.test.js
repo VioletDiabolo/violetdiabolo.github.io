@@ -18,7 +18,10 @@ function stubStage() {
   for (const id of Object.keys(HOME)) parts[id] = { position: { y: 0 }, add: vi.fn() };
   return {
     parts,
-    tilt: { rotation: { x: 0 } },
+    // createLabels() (real, not mocked, in this test) attaches a labelRoot group to
+    // `tilt` via tilt.add() -- see diabolo/labels.js. A plain object without `add`
+    // would throw the moment boot() wires the labels up.
+    tilt: { rotation: { x: 0 }, add: vi.fn() },
     state: { spinRate: 1 },
     camera: { position: { z: 0 } },
     render: vi.fn(),

@@ -31,6 +31,7 @@ function boot() {
   // circular. See stage.js's addOverlay for the seam this uses.
   const labels = createLabels({
     parts: stage.parts,
+    tilt: stage.tilt,
     container: document.getElementById('label-layer'),
     state: stage.state,
   });
