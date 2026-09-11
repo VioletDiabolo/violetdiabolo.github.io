@@ -2,6 +2,7 @@ import { renderSections } from './ui/sections.js';
 import { initReveal } from './ui/reveal.js';
 import { createStage, resolveQualityTier, readSignals } from './diabolo/stage.js';
 import { createLabels } from './diabolo/labels.js';
+import { createSpill } from './diabolo/spill.js';
 import { createLifecycle } from './diabolo/lifecycle.js';
 import { createChoreography, PROFILE_X } from './scroll/choreography.js';
 import { createEntrance } from './scroll/entrance.js';
@@ -36,6 +37,12 @@ function boot() {
     state: stage.state,
   });
   stage.addOverlay(labels);
+  const spill = createSpill({
+    container: document.getElementById('spill-layer'),
+    tilt: stage.tilt,
+    camera: stage.camera,
+  });
+  stage.addOverlay(spill);
   window.addEventListener('resize', stage.resize);
 
   const reducedMotion = prefersReducedMotion();

@@ -61,7 +61,7 @@ describe('reduced motion boot path', () => {
     }));
 
     document.body.innerHTML =
-      '<div id="stage"><canvas id="renderer"></canvas><div id="label-layer"></div></div>' +
+      '<div id="stage"><canvas id="renderer"></canvas><div id="spill-layer"></div><div id="label-layer"></div></div>' +
       '<main id="content"></main>';
 
     await import('../src/main.js');
@@ -98,7 +98,7 @@ describe('reduced motion boot path', () => {
     }));
 
     document.body.innerHTML =
-      '<div id="stage"><canvas id="renderer"></canvas><div id="label-layer"></div></div>' +
+      '<div id="stage"><canvas id="renderer"></canvas><div id="spill-layer"></div><div id="label-layer"></div></div>' +
       '<main id="content"></main>';
 
     await import('../src/main.js');

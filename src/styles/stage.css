@@ -145,3 +145,24 @@ html[data-stage='unsupported'] .stage-fallback {
     linear-gradient(var(--rule), var(--rule)),
     radial-gradient(circle, var(--violet-lift) 0 2px, transparent 2.5px);
 }
+
+/* ---------------------------------------------------------------------------
+ * The light spill (see src/diabolo/spill.js): a soft bloom tracking the object's
+ * projected screen position every frame. This is the page's connective tissue in
+ * place of a grid or hairline rules -- light emitted by the subject, not decoration
+ * applied to the page.
+ * ------------------------------------------------------------------------- */
+#spill-layer { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+
+.light-spill {
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(
+    circle at var(--spill-x, 50%) var(--spill-y, 50%),
+    color-mix(in oklab, var(--violet) 26%, transparent) 0%,
+    color-mix(in oklab, var(--violet-deep) 12%, transparent) 28%,
+    transparent 62%
+  );
+  /* No transition here: the position is driven per frame, and a CSS transition would be a
+     second animation driver fighting the render loop. */
+}
