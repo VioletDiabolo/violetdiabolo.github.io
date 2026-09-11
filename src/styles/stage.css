@@ -12,8 +12,11 @@
   width: 100%;
   z-index: 0;
   overflow: hidden;
-  /* Purely decorative (aria-hidden in the markup) -- never let it steal a click,
-     hover, or scroll gesture meant for the content column stacked on top of it. */
+  /* Never let the stage steal a click, hover, or scroll gesture meant for the content
+     column stacked on top of it. The canvas and the fallback SVG are each aria-hidden
+     individually (index.html) since they're decorative; #label-layer, the third child,
+     is deliberately NOT -- its part labels are genuine content -- so this can't live as
+     one blanket aria-hidden on #stage itself the way it used to. */
   pointer-events: none;
 }
 
@@ -61,4 +64,50 @@ html[data-stage='unsupported'] .stage-fallback {
   #stage {
     opacity: 0.3;
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * CSS3D label layer (see src/diabolo/labels.js): real DOM, transformed in 3D by a
+ * CSS3DRenderer sharing the WebGL camera. #label-layer (the mount point, in
+ * index.html) is a plain sibling of the canvas; .label-layer is the renderer's own
+ * domElement, which is what actually needs the overlay positioning below.
+ * ------------------------------------------------------------------------- */
+.label-layer {
+  position: absolute;
+  inset: 0;
+  /* Decorative overlay wrapper -- never steal a click meant for #content. Individual
+     labels opt back into pointer-events (CSS3DObject sets it on each element inline),
+     which is what keeps their text mouse-selectable despite this. */
+  pointer-events: none;
+}
+
+.part-label {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  padding-left: 1.4em;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.part-label-index {
+  color: var(--violet-lift);
+}
+
+/* Hairline leader, echoing the same rule-toward-the-diagram motif as the section
+   headings (sections.css) -- a schematic pointer back at the part, not a literal
+   one: the object keeps spinning underneath it. */
+.part-label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1em;
+  height: 1px;
+  background: var(--rule);
 }

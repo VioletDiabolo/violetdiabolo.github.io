@@ -7,13 +7,15 @@ import { HOME } from '../src/diabolo/build.js';
 import { CAMERA_FOV, CAMERA_NEAR_Z, CAMERA_FAR_Z } from '../src/diabolo/stage.js';
 
 // A minimal stand-in for createStage()'s return value. Real HOME part ids/shape (plain
-// { position: { y } } is all entrance.js touches), but none of three.js: jsdom's canvas
-// has no real WebGL context, so the actual createStage would throw trying to build a
-// WebGLRenderer from it. Stubbing src/diabolo/stage.js sidesteps that entirely and lets
-// this test focus on main.js's own wiring instead of the renderer.
+// { position: { y }, add() } is all entrance.js and labels.js touch — add() is a no-op
+// since createLabels() calls parts[id].add(sprite) to mount its CSS3DSprite, but this
+// test only cares that boot() completes, not where the sprite ends up), but none of
+// three.js: jsdom's canvas has no real WebGL context, so the actual createStage would
+// throw trying to build a WebGLRenderer from it. Stubbing src/diabolo/stage.js sidesteps
+// that entirely and lets this test focus on main.js's own wiring instead of the renderer.
 function stubStage() {
   const parts = {};
-  for (const id of Object.keys(HOME)) parts[id] = { position: { y: 0 } };
+  for (const id of Object.keys(HOME)) parts[id] = { position: { y: 0 }, add: vi.fn() };
   return {
     parts,
     tilt: { rotation: { x: 0 } },
@@ -21,6 +23,10 @@ function stubStage() {
     camera: { position: { z: 0 } },
     render: vi.fn(),
     resize: vi.fn(),
+    // main.js calls this once, right after createStage, to register the CSS3D label
+    // overlay (see stage.js's addOverlay). A no-op here is enough: labels rendering is
+    // covered by tests/labels.dom.test.js, not this file.
+    addOverlay: vi.fn(),
   };
 }
 

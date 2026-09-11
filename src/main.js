@@ -1,6 +1,7 @@
 import { renderSections } from './ui/sections.js';
 import { initReveal } from './ui/reveal.js';
 import { createStage, resolveQualityTier, readSignals } from './diabolo/stage.js';
+import { createLabels } from './diabolo/labels.js';
 import { createLifecycle } from './diabolo/lifecycle.js';
 import { createChoreography } from './scroll/choreography.js';
 import { createEntrance } from './scroll/entrance.js';
@@ -25,6 +26,11 @@ function boot() {
 
   const tier = resolveQualityTier(readSignals());
   const stage = createStage({ canvas, tier });
+  // Registered after construction, not inside createStage: labels need stage.parts,
+  // and the stage needs the labels as an overlay — constructor-time wiring would be
+  // circular. See stage.js's addOverlay for the seam this uses.
+  const labels = createLabels({ parts: stage.parts, container: document.getElementById('label-layer') });
+  stage.addOverlay(labels);
   window.addEventListener('resize', stage.resize);
 
   const reducedMotion = prefersReducedMotion();

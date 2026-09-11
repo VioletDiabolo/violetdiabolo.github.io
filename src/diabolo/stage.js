@@ -83,11 +83,16 @@ export function createStage({ canvas, tier }) {
   const state = { spinRate: 1 };
   const spinMesh = parts.axleBearing.userData.spinMesh;
 
+  // Registered post-construction via addOverlay() — see below. Kept local (not on the
+  // returned object) so the only way to add one is the seam meant for it.
+  const overlays = [];
+
   function render(deltaSeconds) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
     spinner.rotation.y += spin.root;
     spinMesh.rotation.y += spin.bearing;
     renderer.render(scene, camera);
+    for (const overlay of overlays) overlay.render(scene, camera);
   }
 
   function resize() {
@@ -104,6 +109,7 @@ export function createStage({ canvas, tier }) {
     renderer.setSize(view.width, view.height, false);
     camera.aspect = view.aspect;
     camera.updateProjectionMatrix();
+    for (const overlay of overlays) overlay.setSize(view.width, view.height);
 
     // Repaint immediately. setSize() clears the drawing buffer, and on the
     // reduced-motion path no loop exists to redraw — the canvas would stay blank.
@@ -117,5 +123,17 @@ export function createStage({ canvas, tier }) {
   }
 
   resize();
-  return { renderer, scene, camera, tilt, spinner, parts, state, render, resize, dispose };
+  return {
+    renderer, scene, camera, tilt, spinner, parts, state, render, resize, dispose,
+    /**
+     * Registration seam for renderers that share this scene/camera but live outside
+     * WebGL (e.g. the CSS3D label layer in diabolo/labels.js). Called after construction,
+     * not wired in here directly: overlays need `parts` from this return value, so
+     * building them at construction time would be circular.
+     */
+    addOverlay(overlay) {
+      overlays.push(overlay);
+      overlay.setSize(canvas.clientWidth, canvas.clientHeight);
+    },
+  };
 }
