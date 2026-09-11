@@ -1,4 +1,5 @@
 import { renderSections } from './ui/sections.js';
+import { applySectionSides } from './ui/layout.js';
 import { initReveal } from './ui/reveal.js';
 import { createStage, resolveQualityTier, readSignals } from './diabolo/stage.js';
 import { createLabels } from './diabolo/labels.js';
@@ -13,6 +14,7 @@ export const APP_NAME = 'violet-diabolo';
 function boot() {
   const content = document.getElementById('content');
   renderSections(content);
+  applySectionSides(content);
   // Mounted unconditionally, before the WebGL branch below, so every section fades
   // into place the same way regardless of stage state (live, static, or unsupported).
   initReveal();

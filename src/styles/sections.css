@@ -35,16 +35,36 @@
   column-gap: clamp(2rem, 6vw, 6rem);
   row-gap: 1.25rem;
   align-content: center;
-  min-height: 100vh;
   padding-block: clamp(3rem, 8vh, 6rem);
   padding-inline: var(--gutter);
   max-width: var(--content-max);
   margin-inline: auto;
 }
 
+/*
+ * Scroll length: each section's height is proportional to the span of the act playing
+ * over it (src/scroll/choreography.js ACTS), not a uniform 100vh -- the six-act
+ * choreography needs ~20 screens of scroll to read as six distinct beats rather than a
+ * blur. 10 / 22 / 20 / 18 / 18 / 12 percent of 2000vh, plus the footer.
+ */
+[data-section='hero']    { min-height: 200vh; }
+[data-section='about']   { min-height: 440vh; }
+[data-section='events']  { min-height: 400vh; }
+[data-section='media']   { min-height: 360vh; }
+[data-section='board']   { min-height: 360vh; }
+[data-section='contact'] { min-height: 240vh; }
+
 .section > * {
   grid-column: 2; /* default: text right */
   min-width: 0; /* grid items default to min-width:auto, which can force overflow */
+  /* Each section is several screens tall (see the min-heights above) so the six acts
+     have room to register; without this, its text would only flash past once near
+     the section's vertical midpoint and the rest of the scroll would read as a wall
+     of whitespace. Sticky holds it at the middle of the viewport instead, for as long
+     as the section is in view. */
+  position: sticky;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 [data-section='events'] > *,
