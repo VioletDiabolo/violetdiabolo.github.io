@@ -28,6 +28,10 @@ describe('the technical-drawing language is gone', () => {
   it('draws no leader lines from the labels', () => {
     expect(read('../src/styles/stage.css')).not.toMatch(/\.part-label::before/);
   });
+
+  it('outlines no text — a stroke is a symptom of text laid over the object', () => {
+    expect(allCss()).not.toMatch(/-webkit-text-stroke/);
+  });
 });
 
 describe('the editorial pairing', () => {

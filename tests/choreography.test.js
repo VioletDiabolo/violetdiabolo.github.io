@@ -79,7 +79,8 @@ describe('ACTS', () => {
     for (const act of ACTS) {
       const halfExtent = act.explode === 1 ? explodedHalf : assembledHalf;
       const distance = Math.hypot(act.camX, act.camZ);
-      expect(visibleHalfHeight(distance), `${act.id} clips`).toBeGreaterThan(halfExtent * 1.1);
+      const reach = Math.abs(act.y) + halfExtent;
+      expect(visibleHalfHeight(distance), `${act.id} clips`).toBeGreaterThan(reach * 1.1);
     }
   });
 
@@ -132,6 +133,32 @@ describe('ACTS', () => {
       const visibleWidth = 2 * distance * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
       const nearEdgePct = 50 + (100 * (Math.abs(act.x) - DIMS.rimRadius)) / visibleWidth;
       expect(nearEdgePct, `${act.id} overlaps the reading column`).toBeGreaterThanOrEqual(42);
+    }
+  });
+
+  it('lifts the object in the centred acts, so the title is not laid over it', () => {
+    // The other acts avoid overlap by putting the object opposite the text. The centred
+    // acts have no opposite side, so they separate vertically instead.
+    for (const act of ACTS) {
+      if (act.textSide === 'center') {
+        expect(act.y, `${act.id} centres text on a centred object`).toBeGreaterThan(0.3);
+      } else {
+        expect(act.y, `${act.id} should not need a lift`).toBe(0);
+      }
+    }
+  });
+
+  it('leaves room beneath the object in the centred acts for the text to live', () => {
+    const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
+    const half = DIMS.cupHeight + DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness;
+    for (const act of ACTS.filter((a) => a.textSide === 'center')) {
+      const vh = visibleHalfHeight(Math.hypot(act.camX, act.camZ));
+      // Percentage of the viewport, measured from the very bottom, still clear once the
+      // object's own bottom edge (act.y - half, lifted by the act's y) is accounted for.
+      // (vh + act.y - half) is that bottom edge's distance up from the bottom of the
+      // frustum; dividing by the full 2*vh span and scaling to 100 turns it into a percent.
+      const clearBelowPct = 100 * ((vh + act.y - half) / (2 * vh));
+      expect(clearBelowPct, `${act.id} leaves no room for the title`).toBeGreaterThan(25);
     }
   });
 

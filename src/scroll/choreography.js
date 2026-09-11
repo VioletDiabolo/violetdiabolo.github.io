@@ -52,17 +52,23 @@ const ORBIT_ANGLE = 40 * (Math.PI / 180);
  * rather than timeline calls, so it can be tuned and tested without a browser.
  *
  * `explode` 0 = assembled, 1 = fully apart. `textSide` records where the reading column
- * sits, so a test can assert the object is always on the other side of it.
+ * sits, so a test can assert the object is always on the other side of it. `y` lifts the
+ * object vertically; every act leaves it at 0 -- x already keeps the object clear of the
+ * text -- except `arrival` and `settle`, whose text is `textSide: 'center'` and so has no
+ * opposite side to occupy. Those two lift the object instead (and pull the camera back to
+ * `camZ: 6.2` / `6.8` so it still fits the frustum -- see the frustum test below), clearing
+ * roughly the top 62-64% of the viewport so the title can sit in the lower third beneath
+ * it (sections.css) rather than directly on top of it.
  */
 export const ACTS = Object.freeze([
-  { id: 'arrival',   end: 0.10, explode: 0, tiltX: FACE_ON_X,        tiltZ: 0,    x: 0,               camX: 0, camZ: 5.4, spin: 1.0, labels: 0, textSide: 'center' },
-  { id: 'apart',     end: 0.32, explode: 1, tiltX: FACE_ON_X * 0.45, tiltZ: 0,    x:  LATERAL_OFFSET, camX: 0, camZ: 10,  spin: 0.4, labels: 1, textSide: 'left'   },
-  { id: 'recombine', end: 0.52, explode: 0, tiltX: PROFILE_X,        tiltZ: 0,    x: -LATERAL_OFFSET, camX: 0, camZ: 7,   spin: 1.2, labels: 0, textSide: 'right'  },
-  { id: 'spin',      end: 0.70, explode: 0, tiltX: PROFILE_X,        tiltZ: 0.14, x:  LATERAL_OFFSET, camX: 0, camZ: 7,   spin: 4.0, labels: 0, textSide: 'left'   },
-  { id: 'orbit',     end: 0.88, explode: 0, tiltX: PROFILE_X,        tiltZ: 0.14, x: -LATERAL_OFFSET,
+  { id: 'arrival',   end: 0.10, explode: 0, tiltX: FACE_ON_X,        tiltZ: 0,    x: 0,               y: 0.55, camX: 0, camZ: 6.2, spin: 1.0, labels: 0, textSide: 'center' },
+  { id: 'apart',     end: 0.32, explode: 1, tiltX: FACE_ON_X * 0.45, tiltZ: 0,    x:  LATERAL_OFFSET, y: 0,    camX: 0, camZ: 10,  spin: 0.4, labels: 1, textSide: 'left'   },
+  { id: 'recombine', end: 0.52, explode: 0, tiltX: PROFILE_X,        tiltZ: 0,    x: -LATERAL_OFFSET, y: 0,    camX: 0, camZ: 7,   spin: 1.2, labels: 0, textSide: 'right'  },
+  { id: 'spin',      end: 0.70, explode: 0, tiltX: PROFILE_X,        tiltZ: 0.14, x:  LATERAL_OFFSET, y: 0,    camX: 0, camZ: 7,   spin: 4.0, labels: 0, textSide: 'left'   },
+  { id: 'orbit',     end: 0.88, explode: 0, tiltX: PROFILE_X,        tiltZ: 0.14, x: -LATERAL_OFFSET, y: 0,
     camX: ORBIT_RADIUS * Math.sin(ORBIT_ANGLE), camZ: ORBIT_RADIUS * Math.cos(ORBIT_ANGLE),
     spin: 1.2, labels: 0, textSide: 'right' },
-  { id: 'settle',    end: 1.00, explode: 0, tiltX: FACE_ON_X,        tiltZ: 0,    x: 0,               camX: 0, camZ: 6,   spin: 0.5, labels: 0, textSide: 'center' },
+  { id: 'settle',    end: 1.00, explode: 0, tiltX: FACE_ON_X,        tiltZ: 0,    x: 0,               y: 0.6,  camX: 0, camZ: 6.8, spin: 0.5, labels: 0, textSide: 'center' },
 ]);
 
 /**
@@ -110,7 +116,7 @@ export function createChoreography({ parts, tilt, state, camera, scrollTarget })
       timeline.add(parts[partId].position, { y: partYAt(partId, act.explode), duration }, at);
     }
     timeline.add(tilt.rotation, { x: act.tiltX, z: act.tiltZ, duration }, at);
-    timeline.add(tilt.position, { x: act.x, duration }, at);
+    timeline.add(tilt.position, { x: act.x, y: act.y, duration }, at);
     timeline.add(camera.position, { x: act.camX, z: act.camZ, duration }, at);
     timeline.add(state, { spinRate: act.spin, labelOpacity: act.labels, duration }, at);
 

@@ -21,8 +21,10 @@ function stubStage() {
     parts,
     // createLabels() (real, not mocked, in this test) attaches a labelRoot group to
     // `tilt` via tilt.add() -- see diabolo/labels.js. A plain object without `add`
-    // would throw the moment boot() wires the labels up.
-    tilt: { rotation: { x: 0 }, add: vi.fn() },
+    // would throw the moment boot() wires the labels up. `position` is here because
+    // entrance.js seeds tilt.position.x/y (to the arrival act's target) alongside
+    // tilt.rotation.x -- a real Three.js Group always has both.
+    tilt: { rotation: { x: 0 }, position: { x: 0, y: 0 }, add: vi.fn() },
     state: { spinRate: 1 },
     camera: { position: { z: 0 } },
     render: vi.fn(),

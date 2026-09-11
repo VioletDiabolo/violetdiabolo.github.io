@@ -10,8 +10,12 @@ export const TIER_SETTINGS = Object.freeze({
 /** Camera framing. Exported because the scroll choreography dollies between these and
  *  its tests assert the exploded object actually fits the frustum. */
 export const CAMERA_FOV = 34;
-/** Face-on and assembled: frames the cup disc. */
-export const CAMERA_NEAR_Z = 5.4;
+/** Face-on and assembled: frames the cup disc. Kept equal to the arrival act's own
+ *  camZ (src/scroll/choreography.js ACTS) -- entrance.js seeds the camera to this
+ *  value synchronously, so the very first painted frame already matches arrival's
+ *  target instead of dollying in over the first few percent of scroll. If arrival's
+ *  camZ ever changes, this must move with it. */
+export const CAMERA_NEAR_Z = 6.2;
 /** Profile and fully exploded: the object spans ~5.02 units and needs the room. */
 export const CAMERA_FAR_Z = 10;
 

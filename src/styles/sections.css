@@ -148,27 +148,52 @@ body { overflow-x: hidden; }
 /* ---------------------------------------------------------------------------
  * Hero and Contact (data-side="center"): the two moments the object is centred
  * rather than offset (src/scroll/choreography.js's arrival and settle acts both
- * have x: 0), so text and object do share screen space here, unlike every other
- * section -- a glossy, moving 3D surface, not a flat colour, sits directly behind
- * the title. Measured against the live canvas (sampling actual rendered pixels
- * behind the hero h1, the same method that caught the hero tagline at 1.07:1 in an
- * earlier pass): a specular highlight on the bowl can read at 253,253,253 --
- * effectively the same luminance as --ink -- which a soft blurred text-shadow alone
- * does not fix, because a wide blur thins out near the glyph edge exactly where the
- * eye needs a hard boundary between letter and highlight. A stroke tight to each
- * glyph, backed by a near-solid (not diffuse) close shadow, is what actually holds
- * up: re-measured afterward at every sampled point, including directly on that
- * highlight, at 6.4:1 or higher. Outlining the letterform itself, not a panel
- * behind it -- see this file's own header for why that distinction matters here.
+ * have x: 0), so they have no "opposite side" to put the object on the way every
+ * left/right section does. An earlier pass solved that by keeping the object
+ * centred behind the text and outlining the letterforms instead: a specular
+ * highlight on the bowl could read at 253,253,253 (effectively --ink's own
+ * luminance) directly behind the title, so a hard glyph stroke plus a near-solid
+ * backing shadow was measured at 6.4:1 or better. It worked, but it read as a
+ * cheap outlined webfont, and it was the exact text-on-top-of-the-object overlap
+ * this revamp exists to remove -- a stroke treats the symptom, not the cause.
+ *
+ * The compositional fix: `arrival` and `settle` now lift the object (`y: 0.55` /
+ * `0.6`, and the camera pulls back to `camZ: 6.2` / `6.8` to keep it in frame --
+ * see choreography.js and its frustum test) so it clears roughly the top 62-64%
+ * of the viewport instead of spanning edge to edge. The centred text moves into
+ * the lower third to match (below), landing on the page's own near-black ground
+ * -- the same ground every left/right section's text already sits on -- so it
+ * needs nothing beyond the light defensive shadow every heading and paragraph
+ * already gets above, not a special case of its own.
  * ------------------------------------------------------------------------- */
 
+/*
+ * The general h1/h2/p sticky rule above holds every section's text at the vertical
+ * middle (top: 42vh / 58vh). That is exactly where the object used to sit centred,
+ * so the two centred acts override it down into the lower third instead: the object
+ * occupies roughly the top 62-64% of the viewport now (see the comment above), and
+ * this puts the held title and paragraph beneath that line rather than inside it.
+ *
+ * top is the box's actual rendered top edge here, not its centre: the general
+ * rule's `transform: translateY(-50%)` never actually applies to ANY heading on the
+ * page, centred or not. src/ui/reveal.js stamps every reveal target with
+ * `.reveal-pending.reveal-visible` (two classes -- specificity 0,2,0), whose own
+ * `transform: translateY(0)` outranks `.section > h1`'s one-class-one-element
+ * selector (0,1,1) regardless of which rule comes later in the file, so it always
+ * wins. Measured live: a heading's rendered top edge lands exactly at its `top`
+ * value, never shifted. (That is a pre-existing, page-wide dead declaration, not
+ * introduced here -- worth its own fix, out of scope for this one.) 66vh / 95vh
+ * are chosen against real rendered geometry at 1440px width (hero's two-line,
+ * 120px h1 is the tall case) with the reveal transform's absence accounted for,
+ * not against where a working translateY(-50%) would have centred them.
+ */
 [data-side='center'] h1,
+[data-side='center'] h2 {
+  top: 66vh;
+}
+
 [data-side='center'] p {
-  -webkit-text-stroke: 3px rgba(4, 2, 8, 0.95);
-  text-shadow:
-    0 0 2px rgba(4, 2, 8, 0.95),
-    0 0 5px rgba(4, 2, 8, 0.9),
-    0 2px 26px rgba(4, 2, 8, 0.65);
+  top: 95vh;
 }
 
 [data-section='hero'] {
@@ -205,14 +230,14 @@ body { overflow-x: hidden; }
 }
 
 /*
- * Overrides the ink-dim above for the two centred acts specifically: measured live,
- * the hero tagline and Contact's sign-off line -- both sitting directly over the
- * object, unlike every left/right section's paragraph -- came back at 2.82:1
- * worst-case with the dimmer tone, a real failure the stroke/shadow treatment above
- * cannot fully cover for a colour this close to the object's own mid-tones. Full
- * --ink measured at 4.2-4.35:1 worst-case instead (see this file's stroke comment
- * for the same method). The de-emphasis ink-dim gives every other paragraph is a
- * hierarchy choice that only holds up over the page's own near-black ground.
+ * Overrides the ink-dim above for the two centred acts specifically. Before the
+ * object lifted clear of the text (see the composition comment above), the hero
+ * tagline and Contact's sign-off line sat directly over it and measured 2.82:1
+ * worst-case with the dimmer tone -- a real failure. Now that both live in the
+ * lower third, over the page's own near-black ground like every other section's
+ * paragraph, ink-dim would likely clear that bar too -- but full --ink costs
+ * nothing here and stays safe if the framing ever moves again, so it is kept
+ * rather than re-introducing the de-emphasis for no real gain.
  */
 [data-side='center'] p {
   color: var(--ink);
@@ -540,18 +565,17 @@ body { overflow-x: hidden; }
   text-transform: uppercase;
   font-size: 0.78rem;
   letter-spacing: 0.16em;
-  /* Full --ink, and the same stroke/shadow as the centred acts, not the ink-dim
-     de-emphasis every other small label gets: the choreography timeline (bound to
-     the whole of #content, which includes the footer) is still settling the object
-     face-on and centred while the footer is on screen. Measured live at 1.00:1 with
-     ink-dim and no outline -- a complete failure, the same category as the hero
-     tagline's original 1.07:1. */
+  /* Full --ink, not the ink-dim de-emphasis every other small label gets: the
+     choreography timeline (bound to the whole of #content, which includes the
+     footer) holds the object at the settle act's final state -- centred and
+     lifted clear of the reading column (y: 0.6, src/scroll/choreography.js) --
+     while the footer is on screen. Unlike the sticky-held hero/contact text,
+     this line is normal in-flow content that scrolls through the object's own
+     band rather than living in the space that lift opens up, so it keeps a
+     shadow for edge definition -- just a single soft one now, no stroke (see
+     this file's own header for why one no longer belongs anywhere on the page). */
   color: var(--ink);
-  -webkit-text-stroke: 2px rgba(4, 2, 8, 0.95);
-  text-shadow:
-    0 0 2px rgba(4, 2, 8, 0.95),
-    0 0 5px rgba(4, 2, 8, 0.9),
-    0 2px 20px rgba(4, 2, 8, 0.6);
+  text-shadow: 0 2px 8px rgba(3, 2, 6, 0.75);
   text-align: center;
 }
 
@@ -583,22 +607,18 @@ body { overflow-x: hidden; }
     transform: none;
   }
 
-  /* The same measured-contrast guarantee the centred acts always carry (see the
-     stroke/shadow rule above -- a plain shadow alone measured as low as 1.13:1 on
-     this object's own specular highlights, which is why a stroke is there at all),
-     extended to every heading and lead paragraph here: below tablet width there is
-     no offset column keeping text off the object, so every section needs the same
-     protection center-aligned text needs everywhere. Full --ink too, not the
-     ink-dim every paragraph gets above -- that de-emphasis only holds up over the
-     page's own near-black ground, which nothing here is guaranteed any more. */
+  /* The same protection the centred acts carry above, extended to every heading
+     and lead paragraph here: below tablet width there is no offset column keeping
+     text off the object, so every section needs it, not just the centred ones.
+     Full --ink too, not the ink-dim every paragraph gets above -- that de-emphasis
+     only holds up over the page's own near-black ground, which nothing here is
+     guaranteed any more. No stroke, even here (see this file's own header) -- the
+     canvas is already dimmed to 30% opacity at this width (stage.css), which
+     carries most of the load; a single soft shadow is enough on top of that. */
   [data-section] h1,
   [data-section] h2,
   .section > p {
     color: var(--ink);
-    -webkit-text-stroke: 2.5px rgba(4, 2, 8, 0.95);
-    text-shadow:
-      0 0 2px rgba(4, 2, 8, 0.95),
-      0 0 5px rgba(4, 2, 8, 0.9),
-      0 2px 24px rgba(4, 2, 8, 0.65);
+    text-shadow: 0 2px 8px rgba(3, 2, 6, 0.75);
   }
 }
