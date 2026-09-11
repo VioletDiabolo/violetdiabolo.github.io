@@ -5,7 +5,7 @@ import {
 import { FACE_ON_X } from '../src/scroll/choreography.js';
 import { CAMERA_NEAR_Z } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
-import { PART_IDS } from '../src/diabolo/profiles.js';
+import { PART_IDS, DIMS } from '../src/diabolo/profiles.js';
 
 const scene = () => buildDiabolo({ materials: { cup: {}, gasket: {}, hub: {}, bearing: {} }, segments: 16 });
 // A plain stub, not a real Three.js camera: createEntrance only ever writes
@@ -29,6 +29,12 @@ describe('entranceStartY', () => {
 
   it('derives from ENTRANCE_SCATTER, so the spread is one number', () => {
     expect(entranceStartY('cupTop')).toBeCloseTo(HOME.cupTop.y + ENTRANCE_SCATTER, 10);
+  });
+
+  it('starts every part in front of the camera, not clipped through the near plane', () => {
+    // At face-on the scatter runs along world Z toward the camera.
+    const nearestApproach = CAMERA_NEAR_Z - (ENTRANCE_SCATTER + HOME.cupTop.y + DIMS.cupHeight);
+    expect(nearestApproach).toBeGreaterThan(0.5);
   });
 });
 

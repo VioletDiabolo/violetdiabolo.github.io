@@ -126,8 +126,10 @@ inline, which beats any stylesheet rule and would have silently destroyed the re
 is real DOM rather than a canvas overlay. Overridden after construction, with a guard test that
 fails if the override is removed (negative-controlled).
 
-Hidden labels use `visibility: hidden`, never `display: none`, so they stay in the accessibility
-tree.
+Hidden labels use `opacity: 0` with `pointer-events: none`, never `visibility: hidden` or
+`display: none` — per ARIA, `visibility: hidden` removes an element from the accessibility tree
+exactly as `display: none` does, so either would have quietly defeated the whole reason this
+layer is real DOM. `opacity: 0` is the one hiding mechanism that keeps an element exposed.
 
 ## 8. Appearance and content
 

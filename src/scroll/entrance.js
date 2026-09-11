@@ -3,8 +3,16 @@ import { HOME } from '../diabolo/build.js';
 import { FACE_ON_X } from './choreography.js';
 import { CAMERA_NEAR_Z } from '../diabolo/stage.js';
 
-/** How far out parts begin, comfortably beyond any exploded position. */
-export const ENTRANCE_SCATTER = 4.5;
+/**
+ * How far out parts begin, comfortably beyond any exploded position (1.65 units at
+ * most — see scroll/choreography.js's explodedY) but not so far that, at face-on, the
+ * scatter runs the part through the camera's near plane. At face-on the scatter runs
+ * along world Z toward the camera fixed at CAMERA_NEAR_Z; the old value of 4.5 put the
+ * lower cup's rim at world z =~ 5.6 against a camera at z 5.4 -- behind the camera
+ * itself, clipping the very first painted frames. See the frustum test in
+ * entrance.test.js, which pins a safety margin so this cannot regress silently.
+ */
+export const ENTRANCE_SCATTER = 2.2;
 export const ENTRANCE_DURATION = 1400;
 
 /**

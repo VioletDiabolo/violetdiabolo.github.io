@@ -59,9 +59,15 @@ html[data-stage='unsupported'] .stage-fallback {
  * so the diabolo no longer has a dedicated empty half to occupy. Dim it instead of
  * hiding it outright -- it stays present as atmosphere behind the text, at an
  * opacity low enough that body copy keeps full contrast on top of it.
+ *
+ * Scoped to the canvas itself, NOT #stage: opacity cascades to every descendant
+ * regardless of that descendant's own opacity, and #label-layer (the CSS3D part
+ * labels -- genuine content, not atmosphere) is also a child of #stage. Dimming
+ * #stage would have capped the labels at 30% too, for no reason connected to this
+ * rule's actual purpose.
  * ------------------------------------------------------------------------- */
 @media (max-width: 767px) {
-  #stage {
+  #stage > canvas {
     opacity: 0.3;
   }
 }

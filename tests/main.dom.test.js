@@ -5,6 +5,7 @@ import { HOME } from '../src/diabolo/build.js';
 // mock re-exports the same camera constants entrance.js and choreography.js import,
 // instead of a second, driftable copy of the numbers.
 import { CAMERA_FOV, CAMERA_NEAR_Z, CAMERA_FAR_Z } from '../src/diabolo/stage.js';
+import { PROFILE_X } from '../src/scroll/choreography.js';
 
 // A minimal stand-in for createStage()'s return value. Real HOME part ids/shape (plain
 // { position: { y }, add() } is all entrance.js and labels.js touch — add() is a no-op
@@ -75,5 +76,34 @@ describe('reduced motion boot path', () => {
     // redraws again, permanently diverging the scene data from the pixels on screen.
     expect(window.__vd.lifecycle).toBeNull();
     expect(window.__vd?.choreography ?? null).toBeNull();
+  });
+
+  it('shows the object in profile with labels visible, rather than face-on with labels hidden', async () => {
+    // A static face-on view stacks every part on the camera axis and hides every label:
+    // labelOpacity starts at 0, and reduced motion never attaches the scroll timeline that
+    // would ever raise it (see the previous test), so face-on would leave the labels
+    // permanently absent from the accessibility tree. Profile with labels visible is the
+    // readable still of the same diagram.
+    vi.doMock('../src/fallback/detect.js', () => ({
+      supportsWebGL: () => true,
+      prefersReducedMotion: () => true,
+    }));
+    vi.doMock('../src/diabolo/stage.js', () => ({
+      resolveQualityTier: () => 'base',
+      readSignals: () => ({}),
+      createStage: () => stubStage(),
+      CAMERA_FOV,
+      CAMERA_NEAR_Z,
+      CAMERA_FAR_Z,
+    }));
+
+    document.body.innerHTML =
+      '<div id="stage"><canvas id="renderer"></canvas><div id="label-layer"></div></div>' +
+      '<main id="content"></main>';
+
+    await import('../src/main.js');
+
+    expect(window.__vd.stage.state.labelOpacity).toBe(1);
+    expect(window.__vd.stage.tilt.rotation.x).toBe(PROFILE_X);
   });
 });

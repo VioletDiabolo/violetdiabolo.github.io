@@ -108,7 +108,15 @@ export function createLabels({ parts, tilt, container, state }) {
       for (const id of PART_IDS) {
         sprites[id].position.set(LABEL_OFFSET_X * sides[id], parts[id].position.y, 0);
       }
+      // anime.js owns state.labelOpacity; this only reads it (see the module doc comment
+      // above). Labels annotate the exploded diagram, so they stay faded out while the
+      // object is face-on and stacked, and fade in as scroll/choreography.js turns and
+      // opens it.
       const opacity = String(state.labelOpacity);
+      // Below a small threshold, also drop pointer/find-in-page hits on the now-invisible
+      // text. opacity:0 is what keeps it there: per ARIA, visibility:hidden removes an
+      // element from the accessibility tree exactly as display:none does, so neither may
+      // be used here — pointer-events only ever affects hit-testing, never a11y exposure.
       for (const id of PART_IDS) {
         elements[id].style.opacity = opacity;
         elements[id].style.pointerEvents = state.labelOpacity < 0.02 ? 'none' : 'auto';

@@ -3,7 +3,7 @@ import { initReveal } from './ui/reveal.js';
 import { createStage, resolveQualityTier, readSignals } from './diabolo/stage.js';
 import { createLabels } from './diabolo/labels.js';
 import { createLifecycle } from './diabolo/lifecycle.js';
-import { createChoreography } from './scroll/choreography.js';
+import { createChoreography, PROFILE_X } from './scroll/choreography.js';
 import { createEntrance } from './scroll/entrance.js';
 import { supportsWebGL, prefersReducedMotion } from './fallback/detect.js';
 
@@ -74,9 +74,12 @@ function boot() {
     // from elapsed time (diabolo/stage.js's rotationDeltas), with no user input driving
     // it. That is exactly the autoplaying motion reduced-motion users must not get.
     // entrance.skip() resolves the object to its assembled, face-on state with no scroll
-    // timeline attached (see onComplete above), so nothing ever mutates it again. A
-    // single manual render paints that resolved frame.
+    // timeline attached (see onComplete above), so nothing ever mutates it again.
     entrance.skip();
+    // A static face-on view hides the labels and shows the parts stacked inside each
+    // other. Profile with labels visible is the readable still of the same diagram.
+    stage.tilt.rotation.x = PROFILE_X;
+    stage.state.labelOpacity = 1;
     stage.render(0);
   } else {
     window.__vd.lifecycle = createLifecycle({ element: stageEl, onFrame: stage.render });
