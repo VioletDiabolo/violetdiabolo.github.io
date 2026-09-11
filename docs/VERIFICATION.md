@@ -1,204 +1,144 @@
-# Real-condition verification record — S-register build
+# Real-condition verification record — six-act build
 
-Recorded 2026-09-10 against `build/s-register`, `npm run build` → `vite preview`, driven in a
-real Chromium instance. **Only observed numbers appear here.** Where the environment could not
-produce a condition, that is stated rather than papered over.
+Recorded 2026-09-11 against `build/six-act`, `npm run build` → `vite preview`, driven in a real
+Chromium instance. **Only observed numbers appear here.** Where the environment could not produce
+a condition, that is stated rather than papered over.
 
 ## Summary
 
 | Claim | Status |
 |---|---|
-| Explosion is simultaneous, not sequential | **Verified** |
-| Parts separate along the axle axis, evenly spaced | **Verified** |
-| Object turns face-on → profile across the scrub | **Verified** |
-| Camera pulls back far enough to frame the exploded object | **Verified** |
-| Bearing stays fixed as the centre reference | **Verified** |
-| Entrance runs before the scroll timeline is attached | **Verified** |
-| Transform ownership holds | **Verified** |
-| CSS3D labels render, alternate sides, fade with the turn | **Verified at rest only — see §7** |
-| Label text is in the accessibility tree | **Verified** |
-| Label text is mouse-selectable | **No** — blocked by the content layer, see §7 |
-| Black axle proportion corrected | **Verified** |
-| Spin is visible rather than drift | **Constant checked, never observed running** |
+| Six distinct acts across the scrub | **Verified** |
+| ~20 screens of scroll | **Verified** — 20.6 |
+| Object traverses the screen rather than sitting centred | **Verified** — 26.6% → 73.4% |
+| Object stays out of the reading column | **Verified** — 6.1% of samples overlap, from 30.6% |
+| Scroll drives the spin | **Verified** — 0.4 → 4.0 across acts |
+| Camera orbits at constant radius | **Verified** — 7.00 at 40° |
+| Light spill tracks the object | **Verified** — 50 → 69.6 → 22.0 → 78.0 → 31.3 → 50% |
+| Grid, hairlines, plates, counters, stroked text all gone | **Verified** |
+| No background behind body text | **Verified**, property-level |
+| Hero title clear of the object | **Verified** — contrast 1.11:1 → 15.85:1 |
+| Ownership holds | **Verified**, now mutation-guarded |
 | Live scroll drives the timeline | **Not verified** — host fires no scroll events |
-| Render loop stops when scrolled offscreen | **Unreachable by design** — see §9 |
+| Mobile recipe from spec §4 | **Not implemented** — see §7 |
 
-## 1. Simultaneity — the thing that was wrong before
+## 1. The six acts
 
-The previous build detached parts one at a time, one per page section. Measured now at three
-points on the timeline (`duration 1000`):
+Sampled by seeking the real timeline. Every row differs:
 
-| part | t=0 | t=500 | t=1000 |
-|---|---|---|---|
-| `cupTop` | 0.235 | **0.943** | 1.650 |
-| `gasketTop` | 0.190 | **0.645** | 1.100 |
-| `hubConeTop` | 0.070 | **0.310** | 0.550 |
-| `axleBearing` | 0.000 | 0.000 | 0.000 |
-| `hubConeBottom` | −0.070 | **−0.310** | −0.550 |
-| `gasketBottom` | −0.190 | **−0.645** | −1.100 |
-| `cupBottom` | −0.235 | **−0.943** | −1.650 |
+| act | objX | camX | camZ | spill | spin | labels |
+|---|---|---|---|---|---|---|
+| arrival | 0.00 | 0.00 | 6.2 | 50% | 1.0 | 0 |
+| apart | +1.60 | 0.00 | 10.0 | 69.6% | 0.4 | 1 |
+| recombine | −1.60 | 0.00 | 7.0 | 22.0% | 1.2 | 0 |
+| spin | +1.60 | 0.00 | 7.0 | 78.0% | 4.0 | 0 |
+| orbit | −1.60 | 4.50 | 5.36 | 31.3% | 1.2 | 0 |
+| settle | 0.00 | 0.00 | 6.8 | 50% | 0.5 | 0 |
 
-At the halfway point **every** moving part is strictly between rest and exploded — none still at
-rest, none already finished. Programmatic check returned `SIMULTANEOUS: true`, `stillAtRest: []`,
-`alreadyDone: []`.
+Orbit distance `hypot(4.50, 5.36) = 7.00` — a swing at constant radius, not a dolly.
 
-Exploded gaps are exactly **0.550** between each adjacent pair. The bearing does not move; it is
-the reference part the diagram is measured from.
+## 2. The obstruction, measured
 
-## 2. The turn
+This is the defect the revamp existed to fix, and it survived into the branch in a form no
+endpoint test could see.
 
-```
-t=0     tilt.rotation.x = -1.5708   (face-on: looking down the axle)
-t=1000  tilt.rotation.x =  0.0000   (profile: the hourglass)
-```
+`textSide` flips instantly at an act boundary while `x` took the whole act to cross, so **four of
+six acts began with the object sitting on the incoming text's side**:
 
-Framebuffer readback at t=0 shows concentric rings — the cup rim, gasket and bearing seen down
-the axis. At t=1000 the silhouette is the familiar hourglass, separated.
-
-## 3. Camera framing
-
-The first attempt at this failed and the failure is worth recording. With the camera fixed at
-`z = 5.4` (`fov 34`, visible height **3.30** units) the fully exploded object spans **5.02**
-units — a **52% overflow**, with both cups off-screen and only slivers visible.
-
-Now dollied across the same scrub:
-
-```
-t=0     camera.position.z = 5.4    visible height 3.30  (frames the 2.00 cup disc)
-t=1000  camera.position.z = 10.0   visible height 6.11  (frames the 5.02 exploded extent)
-```
-
-`tests/choreography.test.js` pins this as a geometric invariant: the frustum at `CAMERA_FAR_Z`
-must contain `explodedY('cupTop') + DIMS.cupHeight` with 10% margin. Raising `SPACING` or
-lengthening the cups now fails the suite instead of being discovered by eye.
-
-## 4. Proportions
-
-| | before | after |
+| act | text side | object x at act start |
 |---|---|---|
-| `hubHeight` | 0.30 | 0.12 |
-| `bearingHeight` | 0.26 | 0.14 |
-| total height | 2.670 | 2.190 |
-| black axle share | **32.2%** | **17.4%** |
+| recombine | right | **+1.60** |
+| spin | left | **−1.60** |
+| orbit | right | **+1.60** |
+| settle | centre | **−1.60** |
 
-Seam continuity holds after the retune: hub-to-bearing 0.0135, hub-to-gasket-bore 0.0112,
-both inside the 0.02 tolerance.
+Dense sampling of the real timeline: **30.6% of samples overlapped** the reading column, each act
+spending 41–67% of its span with the object over the text — peaking exactly where that section's
+heading is held, with no plate behind it.
 
-## 5. Ownership
+The clearance test that claimed to guard this iterated `ACTS`, i.e. the six act **endpoints**,
+which are clean by construction. The tween between them was never sampled.
 
-```
-anime.js writes tilt.rotation.x, part .position, state.spinRate, state.labelOpacity, camera.position.z
-render loop writes spinner.rotation.y and the bearing mesh; reads state.spinRate only
-```
+Fixed by giving the lateral tween its own duration (`LATERAL_SETTLE = 0.22`): the object crosses in
+the first fifth of an act, then holds clear. Re-measured independently: **6.1%** of samples overlap.
+A dense-sampling test now guards it, negative-controlled against the full-duration crossing.
 
-Checked directly: seeking the timeline to 70% left `spinner.rotation.y` **bit-identical**.
-`tests/lifecycle.test.js` greps all of `src/` and fails on any `engine` import or
-`engine.pause(` call — negative-controlled in both directions.
-
-## 6. Entrance ordering
-
-`window.__vd.choreography` is `null` while the entrance runs and becomes non-null only in its
-completion callback. The entrance and the scroll timeline both write part positions, so they are
-never live at once.
-
-A bug was found and fixed here: under `prefers-reduced-motion` the entrance's `skip()` was still
-firing that callback, attaching a scroll timeline while **no render loop existed** — part
-positions would mutate against a canvas that never repainted. Reduced motion now attaches no
-scrub at all. The regression test was validated by stashing the fix and watching it fail with the
-real bug's stack trace.
-
-## 7. CSS3D labels
-
-All seven render, with even ~88 px vertical spacing and alternating sides:
+## 3. Composition and scroll
 
 ```
-01 UPPER CUP    x=479    05 HUB CONE     x=483
-02 GASKET       x=116    06 GASKET       x=117
-03 HUB CONE     x=483    07 LOWER CUP    x=479
-04 AXLE BEARING x= 92
+scroll length        20.6 screens (2060vh)          was 9
+section sides        center / left / right / left / right / center
+object screen x      26.6% - 73.4% across the acts
+plates behind text   none (checked property-level, not by substring)
+stroked text         none
 ```
 
-Faded via `state.labelOpacity`, 30% → 85% of the scrub. They are hidden face-on deliberately:
-at `tilt = -π/2` the parts' local Y collapses into camera depth and all seven would project onto
-one point. Labels annotate the exploded diagram, which does not exist yet at that angle.
+## 4. The visual language
 
-**A defect these measurements could never have caught.** The x-values above are a single
-frozen-state snapshot at `spinner.rotation.y === 0`, which is the only state this host can
-produce. The sprites were originally parented into the part groups, which live under the
-continuously-spinning `spinner`. `CSS3DSprite` billboards *orientation* but not *position*, so
-the side offset orbited:
+Deleted and confirmed absent from `src/styles/` and `index.html`: the graph-paper grid, the
+`--rule` hairline token, `backdrop-filter`, CSS counters for section indices, label leader lines,
+every `-webkit-text-stroke`, and Space Grotesk.
 
-```
-spin   0deg -> label world x  1.150
-spin  90deg -> label world x  0.000   all seven collapse onto the axis
-spin 180deg -> label world x -1.150   sides inverted
-```
+Fonts now Instrument Serif (display) + Inter (body), with Space Mono surviving only on the 3D part
+labels.
 
-A full revolution every 8.98 s and a collapse every **2.24 s** — permanent, in the headline
-feature, and invisible to every number in this record. Found by reading the transform chain, not
-by measuring. Fixed by attaching the labels to `tilt` instead: they inherit the face-on-to-profile
-turn and nothing else. Verified **0 sprites under `spinner`, 7 under `tilt`**, with a
-negative-controlled regression test.
+Hero contrast, measured **against live canvas pixels** rather than the CSS background: **1.11:1 →
+15.85:1** desktop, 7.24:1 mobile. The 1.11:1 reading is what had forced a 3px text stroke onto the
+title; the real cause was that the arrival act centred the text on a centred object. Fixed
+compositionally — the object lifts clear (`y 0.55`, `camZ 6.2`) and occupies the top ~65%, with the
+title beneath it on near-black. No stroke needed.
 
-**Selectability:** three's `CSS3DObject` constructor sets `element.style.userSelect = 'none'`
-inline, which beats any stylesheet rule. Overridden after construction, with a guard test that
-fails if the override is removed (negative-controlled).
+## 5. Bugs this record exists to remember
 
-**But mouse selection still does not work, and claiming otherwise was wrong.** `#content` sits at
-`z-index: 1` over `#stage` at `z-index: 0`, so a drag across a label selects section text instead.
-The override is necessary but not sufficient. The labels are in the accessibility tree and
-screen-readable; they are not selectable with a cursor.
+Three defects passed a green suite on this branch and were caught by reading or by mutation, not by
+measurement:
 
-Hidden labels use `opacity: 0` with `pointer-events: none`, never `visibility: hidden` or
-`display: none` — per ARIA, `visibility: hidden` removes an element from the accessibility tree
-exactly as `display: none` does, so either would have quietly defeated the whole reason this
-layer is real DOM. `opacity: 0` is the one hiding mechanism that keeps an element exposed.
+1. **The camera aimed at the object.** It then projected that same point through that same camera,
+   so the light spill read exactly 50% forever — and worse, the object was pinned to screen centre
+   in every act, so the lateral offset moved it in world space but never on screen. Fixed by aiming
+   at a fixed world origin.
+2. **The orbit-radius test was tautological.** `hypot(R·sinθ, R·cosθ) ≡ R` for any θ, so the orbit
+   angle had no coverage at all.
+3. **The clearance test sampled only act endpoints**, which are clean by construction. See §2.
 
-## 8. Appearance and content
+Each now has a guard that was confirmed to fail under the exact mutation.
+
+## 6. Ownership
 
 ```
-mean lit RGB     (175, 137, 208)      clearly violet: 82.3%
-one frame        9 draw calls, 30,624 triangles
-idle spin        0.700 rad/s          source constant, raised from 0.22; NOT observed running
-sections         hero about events media board contact footer
-media            10 facades, 0 live iframes before activation
-board            3 cards, 1 placeholder without an <img>
-images           4 <picture> elements, 0 <img> missing alt
-links            6 outbound, all resolving
-horizontal overflow  none
+anime.js     tilt.rotation.{x,z}, tilt.position.{x,y}, part .position,
+             camera.position.{x,z}, state.spinRate, state.labelOpacity
+render loop  spinner.rotation.y, spinMesh.rotation.y, camera.quaternion
+             reads state.spinRate only
 ```
 
-Contrast was **measured against live canvas pixels**, not assumed. The hero tagline read
-**1.07:1** over the bloom — a real failure — and was fixed to **6.6:1** with a backing plate. The
-same check disproved an assumption that the two-column grid protected section headings; it fails
-at 768 px specifically, and the plate was extended there.
+Mutating the aim target back to the object now fails a source-inspection guard. `tests/lifecycle.test.js`
+greps all of `src/` and fails on any `engine` import or `engine.pause(` call.
 
-## 9. What is NOT verified, and why
+## 7. Not verified, and not implemented
 
-**Live scroll-driven scrubbing.** This host fires **zero** `scroll` events and **zero** animation
-frames — measured directly: a bare scroll listener received 0 events across a real 3000 px
-scroll, and a bare `requestAnimationFrame` loop received 0 ticks in 900 ms, with
-`document.hidden === true`. Every timeline measurement above was taken by seeking the timeline
-directly or by calling the app's own `entrance.skip()`. **That is a synthetic stand-in and is
-labelled as such.** The wiring is verified; tick delivery is not.
+**Live scroll-driven scrubbing is unverified.** This host fires zero `scroll` events and zero
+animation frames — measured directly on an earlier build: a bare scroll listener received 0 events
+across a real 3000 px scroll, and a bare `requestAnimationFrame` loop 0 ticks in 900 ms, with
+`document.hidden === true`. Every timeline figure above was taken by seeking the timeline directly
+or by calling the app's own `entrance.skip()`. **That is a synthetic stand-in and is labelled as
+such.** The wiring is verified; tick delivery is not.
 
-Note for anyone repeating this: calling `.seek()` on an `onScroll`-autoplay timeline detaches it
-from further scroll-driven updates. Reload between a seek-based check and a scroll-based one.
+The preview pane also will not recomposite after a scroll jump, so screenshots below the hero could
+not be taken. Those sections were verified through the DOM and through framebuffer readback instead.
 
-**The scrolled-offscreen render pause is unreachable by design.** `#stage` is
-`position: sticky; top: 0; height: 100dvh` and a sibling of `#content`, so it is pinned to the
-viewport for the whole document. Its `IntersectionObserver` reports `isIntersecting: true` from
-first paint and cannot flip in any browser. `document.hidden` is therefore the only live gate;
-the observer is defensive depth. The 13 lifecycle tests exercise that branch through an injected
-observer, which is not the real condition.
-
-Confirmed working under the real condition: with `document.hidden === true`, the lifecycle
-refused to start — `isRunning() === false`, `frameCount() === 0` after 1200 ms.
+**Spec §4's mobile recipe is not implemented.** The spec says the object should hold the upper band
+with text flowing beneath at narrow widths. Instead the canvas is dimmed to 30% opacity and text
+shadows are re-added under 768px — text over a dimmed object, which is the pattern the client
+rejected, mitigated rather than composed away. Contrast there measures ~7.4:1 so it is not an
+accessibility failure, but it is a spec gap and should be treated as outstanding work.
 
 ## Outstanding for a human on a real machine
 
-1. Watch the entrance play, then the scrub, end to end.
-2. Confirm the labels stay legible while the object turns, at a real frame rate.
-3. Toggle OS reduced-motion: the object should sit assembled and face-on, with no scrub.
+1. Watch the entrance, then scrub all six acts end to end at a real frame rate.
+2. Confirm the object never visibly crosses the text — 6.1% of samples still overlap, all of them
+   mid-crossing at act boundaries.
+3. Toggle OS reduced-motion: the object should sit assembled, in profile, labels visible, no scrub.
 4. Disable WebGL: `data-stage="unsupported"` should show the static SVG diabolo.
-5. Select a label's text with the cursor to confirm the `userSelect` override holds in practice.
+5. Tab through every interactive element and confirm `:focus-visible` is legible over the object.
+6. Decide whether §7's mobile gap is worth closing before this goes live.
