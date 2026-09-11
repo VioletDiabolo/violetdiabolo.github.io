@@ -36,7 +36,7 @@ describe('scroll target validation', () => {
     el.style.position = position;
     document.body.append(el);
     const { tilt, parts } = buildScene();
-    const state = { spinRate: 1 };
+    const state = { spinRate: 1, labelOpacity: 0 };
     return () => createChoreography({ parts, tilt, state, scrollTarget: el });
   };
 
@@ -66,7 +66,7 @@ describe('simultaneous explosion', () => {
     // timeline is ever created. buildDiabolo alone leaves it at Three.js's Group default of
     // 0, so this test establishes the same precondition entrance.js will own in production.
     tilt.rotation.x = FACE_ON_X;
-    const state = { spinRate: 1 };
+    const state = { spinRate: 1, labelOpacity: 0 };
     // A plain stub, not a real Three.js camera: createChoreography only ever tweens
     // camera.position.z, so this is all the shape it needs (same approach as
     // tests/entrance.test.js's stubCamera()).
@@ -78,11 +78,22 @@ describe('simultaneous explosion', () => {
   it('has every part in motion at the same time, rather than one after another', () => {
     const { timeline, parts } = setup();
     timeline.seek(SCRUB_DURATION * 0.5);
-    for (const id of Object.keys(PART_RANK)) {
-      if (id === 'axleBearing') continue;
-      const y = parts[id].position.y;
-      expect(Math.abs(y - HOME[id].y), `${id} has not started`).toBeGreaterThan(1e-6);
-      expect(Math.abs(y - explodedY(id)), `${id} has already finished`).toBeGreaterThan(1e-6);
+    // Every tween is added at timeline position 0 with one shared duration, so at the
+    // midpoint every moving part must sit at the *same* normalized progress between its
+    // rest and exploded position. A merely-not-at-rest-and-not-finished check (the old
+    // body of this test) cannot distinguish that from a staggered cascade: it passes at
+    // 40ms/part and 60ms/part stagger and only fails at 100ms/part, which is inside the
+    // band the build this replaced actually used (BEAT_STAGGER = 68).
+    const progress = (id) => {
+      const rest = HOME[id].y, done = explodedY(id);
+      return (parts[id].position.y - rest) / (done - rest);
+    };
+    const moving = Object.keys(PART_RANK).filter((id) => id !== 'axleBearing');
+    const first = progress(moving[0]);
+    expect(first).toBeGreaterThan(0.05);
+    expect(first).toBeLessThan(0.95);
+    for (const id of moving) {
+      expect(progress(id), `${id} is out of step`).toBeCloseTo(first, 6);
     }
   });
 
@@ -116,5 +127,13 @@ describe('simultaneous explosion', () => {
     expect(camera.position.z).toBeCloseTo(CAMERA_NEAR_Z, 6);
     timeline.seek(SCRUB_DURATION);
     expect(camera.position.z).toBeCloseTo(CAMERA_FAR_Z, 4);
+  });
+
+  it('raises labelOpacity from 0 to 1 across the scrub, so labels.js has something to read', () => {
+    const { timeline, state } = setup();
+    timeline.seek(0);
+    expect(state.labelOpacity).toBeCloseTo(0, 6);
+    timeline.seek(SCRUB_DURATION);
+    expect(state.labelOpacity).toBe(1);
   });
 });

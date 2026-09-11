@@ -113,11 +113,8 @@ describe('scene graph nesting', () => {
     expect(tilt.children).toEqual([spinner]);
   });
 
-  it('parents every part to the spinner', () => {
-    const { spinner, parts } = build();
-    expect(spinner.children).toHaveLength(PART_IDS.length);
-    for (const id of PART_IDS) expect(parts[id].parent).toBe(spinner);
-  });
+  // 'parents every part to spinner', identical in body to this one, already covers this
+  // in the `buildDiabolo` describe block above -- not duplicated here.
 
   it('names both groups, so a debugger shows which owns what', () => {
     const { tilt, spinner } = build();

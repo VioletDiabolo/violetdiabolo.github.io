@@ -50,31 +50,31 @@ describe('resolveQualityTier', () => {
 describe('rotationDeltas', () => {
   it('advances both rotations in the same direction', () => {
     const d = rotationDeltas(0.016, 1);
-    expect(d.root).toBeGreaterThan(0);
+    expect(d.spinner).toBeGreaterThan(0);
     expect(d.bearing).toBeGreaterThan(0);
   });
 
   it('spins the bearing faster than the body', () => {
     const d = rotationDeltas(0.016, 1);
-    expect(d.bearing).toBeGreaterThan(d.root);
+    expect(d.bearing).toBeGreaterThan(d.spinner);
   });
 
   it('scales only the bearing with spinRate', () => {
     const slow = rotationDeltas(0.016, 1);
     const fast = rotationDeltas(0.016, 4);
-    expect(fast.root).toBeCloseTo(slow.root, 10);
+    expect(fast.spinner).toBeCloseTo(slow.spinner, 10);
     expect(fast.bearing).toBeCloseTo(slow.bearing * 4, 10);
   });
 
   it('produces no rotation for a zero delta', () => {
     const d = rotationDeltas(0, 1);
-    expect(d.root).toBe(0);
+    expect(d.spinner).toBe(0);
     expect(d.bearing).toBe(0);
   });
 
   it('spins fast enough to read as motion rather than drift', () => {
     // At least one visible revolution every ~10 seconds.
-    expect(rotationDeltas(1, 1).root).toBeGreaterThan(0.6);
+    expect(rotationDeltas(1, 1).spinner).toBeGreaterThan(0.6);
   });
 });
 

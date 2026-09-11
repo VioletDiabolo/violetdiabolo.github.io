@@ -47,7 +47,7 @@ const BEARING_SPIN_MULTIPLIER = 6; // the bearing spins faster than the body
  */
 export function rotationDeltas(deltaSeconds, spinRate) {
   return {
-    root: IDLE_SPIN * deltaSeconds,
+    spinner: IDLE_SPIN * deltaSeconds,
     bearing: IDLE_SPIN * BEARING_SPIN_MULTIPLIER * spinRate * deltaSeconds,
   };
 }
@@ -89,7 +89,7 @@ export function createStage({ canvas, tier }) {
 
   function render(deltaSeconds) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
-    spinner.rotation.y += spin.root;
+    spinner.rotation.y += spin.spinner;
     spinMesh.rotation.y += spin.bearing;
     renderer.render(scene, camera);
     for (const overlay of overlays) overlay.render(scene, camera);

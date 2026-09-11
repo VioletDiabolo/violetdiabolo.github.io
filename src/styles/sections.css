@@ -3,12 +3,11 @@
  *
  * The core idea: each [data-section] is a two-column grid. The text block occupies
  * ONE column; the other column is left empty on purpose, so the sticky 3D stage
- * (painted behind #content, see the z-index note below) shows through it -- that
- * empty column is where the diabolo's part flies to for that beat. Which side the
- * text sits on is chosen to sit opposite SCROLL_BEATS' offset[0] for that section
- * (see src/scroll/choreography.js): about/media/contact fly their part left, so text
- * sits right; events/board fly right, so text sits left. That is the "callout sits
- * opposite its subject" grammar the whole page is built on.
+ * (painted behind #content, see the z-index note below) shows through it. The
+ * choreography (src/scroll/choreography.js) is one continuous explosion-and-turn
+ * bound to the whole page's scroll, not a per-section beat, so which side the text
+ * sits on is simply alternated for visual variety: events/board sit text-left,
+ * everything else sits text-right.
  */
 
 #content {
@@ -50,7 +49,7 @@
 
 [data-section='events'] > *,
 [data-section='board'] > * {
-  grid-column: 1; /* text left -- these two sections fly their part right */
+  grid-column: 1; /* text left -- alternates against the rest of the page (see the file header) */
 }
 
 /* ---------------------------------------------------------------------------
@@ -494,11 +493,11 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Footer -- the reassembly beat (src/scroll/choreography.js REASSEMBLE_AT) plays
- * out here: every part returns to HOME, so the page resolves fully assembled
- * rather than ending in pieces (spec §5). Not a `.section` -- there is no part
- * flying to an empty column here, so it skips the two-column grid entirely.
- * min-height gives that beat real scroll distance to complete in.
+ * Footer -- not a `.section`: there is no part flying to an empty column here, so
+ * it skips the two-column grid entirely. The choreography (src/scroll/
+ * choreography.js) is one continuous animation that finishes exploded and in
+ * profile; it does not reassemble. min-height simply gives the page enough scroll
+ * distance for that full scrub to complete before the footer is reached.
  * ------------------------------------------------------------------------- */
 
 .section-footer {
