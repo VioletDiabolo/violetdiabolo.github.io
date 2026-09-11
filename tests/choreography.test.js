@@ -70,20 +70,16 @@ describe('ACTS', () => {
     expect(a.apart.spin).toBeLessThan(a.spin.spin);
   });
 
-  it('shows labels only while the object is apart', () => {
-    const a = byId();
-    expect(a.apart.labels).toBe(1);
-    expect(a.arrival.labels).toBe(0);
-    expect(a.settle.labels).toBe(0);
-  });
-
   it('keeps every act inside the camera frustum', () => {
+    // Distance from the object, not raw camZ: see "keeps the camera between its near and
+    // far distances" below for why the orbit act needs hypot(camX, camZ) here.
     const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
     const assembledHalf = DIMS.cupHeight + DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness;
     const explodedHalf = 3 * SPACING + DIMS.cupHeight;
     for (const act of ACTS) {
       const halfExtent = act.explode === 1 ? explodedHalf : assembledHalf;
-      expect(visibleHalfHeight(act.camZ), `${act.id} clips`).toBeGreaterThan(halfExtent * 1.1);
+      const distance = Math.hypot(act.camX, act.camZ);
+      expect(visibleHalfHeight(distance), `${act.id} clips`).toBeGreaterThan(halfExtent * 1.1);
     }
   });
 
@@ -109,6 +105,15 @@ describe('ACTS', () => {
     ).toBeCloseTo(7, 1);
   });
 
+  it('swings the camera far enough to read as an orbit, without passing the object', () => {
+    // hypot(R·sinθ, R·cosθ) is R for any θ, so the radius test above says nothing about
+    // the angle. This is the only assertion that does.
+    const orbit = ACTS.find((a) => a.id === 'orbit');
+    const degrees = Math.atan2(orbit.camX, orbit.camZ) * (180 / Math.PI);
+    expect(degrees).toBeGreaterThan(25);
+    expect(degrees).toBeLessThan(55);
+  });
+
   it('puts the object on the opposite side from the reading column', () => {
     for (const act of ACTS) {
       if (act.textSide === 'left') expect(act.x, act.id).toBeGreaterThan(0);
@@ -118,13 +123,75 @@ describe('ACTS', () => {
   });
 
   it('moves the object far enough aside to clear a 38% reading column', () => {
+    // Distance from the object, not raw camZ: see "keeps the camera between its near and
+    // far distances" above for why the orbit act needs hypot(camX, camZ) here.
     const offset = ACTS.filter((a) => a.x !== 0);
     expect(offset.length).toBeGreaterThan(0);
     for (const act of offset) {
-      const visibleWidth = 2 * act.camZ * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
+      const distance = Math.hypot(act.camX, act.camZ);
+      const visibleWidth = 2 * distance * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
       const nearEdgePct = 50 + (100 * (Math.abs(act.x) - DIMS.rimRadius)) / visibleWidth;
       expect(nearEdgePct, `${act.id} overlaps the reading column`).toBeGreaterThanOrEqual(42);
     }
+  });
+
+  it('pins every act state, so no field can drift unnoticed', () => {
+    // The structural tests above say what must be true of any valid table. This says what
+    // this particular table is. Both matter: invariants document intent, this catches drift.
+    const actual = ACTS.map((a) => [a.id, a.end, a.explode, +a.tiltZ.toFixed(2), a.spin, a.labels, a.textSide]);
+    expect(actual).toEqual([
+      ['arrival',   0.10, 0, 0,    1.0, 0, 'center'],
+      ['apart',     0.32, 1, 0,    0.4, 1, 'left'],
+      ['recombine', 0.52, 0, 0,    1.2, 0, 'right'],
+      ['spin',      0.70, 0, 0.14, 4.0, 0, 'left'],
+      ['orbit',     0.88, 0, 0.14, 1.2, 0, 'right'],
+      ['settle',    1.00, 0, 0,    0.5, 0, 'center'],
+    ]);
+  });
+
+  it('pins each act orientation and lateral offset', () => {
+    const byId = Object.fromEntries(ACTS.map((a) => [a.id, a]));
+    expect(byId.arrival.tiltX).toBeCloseTo(FACE_ON_X, 10);
+    expect(byId.apart.tiltX).toBeCloseTo(FACE_ON_X * 0.45, 10);
+    expect(byId.recombine.tiltX).toBeCloseTo(PROFILE_X, 10);
+    expect(byId.spin.tiltX).toBeCloseTo(PROFILE_X, 10);
+    expect(byId.orbit.tiltX).toBeCloseTo(PROFILE_X, 10);
+    expect(byId.settle.tiltX).toBeCloseTo(FACE_ON_X, 10);
+    for (const id of ['apart', 'spin']) expect(byId[id].x).toBeCloseTo(LATERAL_OFFSET, 10);
+    for (const id of ['recombine', 'orbit']) expect(byId[id].x).toBeCloseTo(-LATERAL_OFFSET, 10);
+    for (const id of ['arrival', 'settle']) expect(byId[id].x).toBe(0);
+  });
+});
+
+describe('explodedY', () => {
+  it('leaves the centre bearing exactly where it rests, as the reference part', () => {
+    expect(explodedY('axleBearing')).toBe(0);
+  });
+
+  it('orders the top half outward by rank', () => {
+    const order = ['axleBearing', 'hubConeTop', 'gasketTop', 'cupTop'];
+    for (let i = 1; i < order.length; i++) {
+      expect(explodedY(order[i])).toBeGreaterThan(explodedY(order[i - 1]));
+    }
+  });
+
+  it('stays symmetric about the centre', () => {
+    expect(explodedY('cupTop')).toBeCloseTo(-explodedY('cupBottom'), 10);
+    expect(explodedY('gasketTop')).toBeCloseTo(-explodedY('gasketBottom'), 10);
+    expect(explodedY('hubConeTop')).toBeCloseTo(-explodedY('hubConeBottom'), 10);
+  });
+
+  it('spaces parts exactly evenly, which is what makes it read as a measured diagram', () => {
+    const ladder = ['cupTop', 'gasketTop', 'hubConeTop', 'axleBearing'].map(explodedY);
+    for (let i = 1; i < ladder.length; i++) {
+      expect(ladder[i - 1] - ladder[i]).toBeCloseTo(SPACING, 10);
+    }
+  });
+
+  it('derives from rank and SPACING alone, so retuning the spread needs one number', () => {
+    expect(explodedY('cupTop')).toBeCloseTo(3 * SPACING, 10);
+    expect(explodedY('gasketTop')).toBeCloseTo(2 * SPACING, 10);
+    expect(explodedY('hubConeTop')).toBeCloseTo(1 * SPACING, 10);
   });
 });
 

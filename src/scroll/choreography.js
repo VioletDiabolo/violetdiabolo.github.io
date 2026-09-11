@@ -89,7 +89,7 @@ export function createChoreography({ parts, tilt, state, camera, scrollTarget })
   }
 
   const timeline = createTimeline({
-    defaults: { ease: 'inOutSine', duration: SCRUB_DURATION },
+    defaults: { ease: 'inOutSine' },
     autoplay: onScroll({
       target: scrollTarget,
       sync: 0.2,
