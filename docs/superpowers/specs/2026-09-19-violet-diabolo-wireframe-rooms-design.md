@@ -65,6 +65,38 @@ read. One accent only, following on.energy's discipline:
 The gasket moves from cyan to red. Cyan was chosen for a glossy object lit by an environment map; red
 is what the reference uses and it holds better against violet.
 
+### How animejs.com actually does it — and why we deliberately differ
+
+Verified by parsing `module-engine-01.glb` and their app bundle, not assumed.
+
+**They use no wireframe geometry at all.** Their meshes are triangles only — primitive modes came
+back `{"4": 1}`, no `LINES` or `LINE_STRIP` — with 3,890 triangles, baked `COLOR_0` vertex colours,
+normals, and zero textures. The `.glb`'s own material is an exporter default (`metallic 0.5`,
+`roughness 0.5`, no base colour), so the app overrides it at runtime.
+
+What produces the look in ref 2 is a **custom rim/contour shader plus post-processing**:
+
+```
+outlineThickness: 1, outlineBlend: 0.4, contourBlend: 0.65,
+rimIntensity: 1, rimThreshold, verticesNormalMix
+
+outlineMaterial = new …({ vertexColors: true })
+outlineMaterial.onBeforeCompile = …          // shader injection
+
+passes: outlinePass · luminancePass · mipmapBlurPass · effectPass
+```
+
+The "edges" are shader-detected silhouettes and rim light, not drawn lines. At 3,890 triangles the
+model is also not low-poly.
+
+**We are not copying this, and that is the decision.** The brief's ref 1 is a flat illustration with
+no shading; on an unlit object, drawn edges are the only thing that makes form read. Matching ref 2
+would mean a custom shader, a post-processing library as a new dependency, and a second render chain
+to tune. The approach specced here will read as a *crisper, more explicit* wireframe than animejs —
+which is closer to what was actually asked for, since they never built a wireframe at all.
+
+Recorded so that a future reader does not mistake this for a failed attempt at the reference.
+
 ### What this deletes
 
 An unlit material needs no lighting, so the following go entirely:
