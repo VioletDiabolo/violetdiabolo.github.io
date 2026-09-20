@@ -1,3 +1,4 @@
+import { buildNav } from './ui/nav.js';
 import { renderSections } from './ui/sections.js';
 import { applySectionSides } from './ui/layout.js';
 import { initReveal } from './ui/reveal.js';
@@ -12,6 +13,7 @@ export const APP_NAME = 'violet-diabolo';
 
 function boot() {
   const content = document.getElementById('content');
+  document.body.prepend(buildNav());
   renderSections(content);
   applySectionSides(content);
   // Mounted unconditionally, before the WebGL branch below, so every section fades

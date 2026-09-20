@@ -155,5 +155,14 @@ describe('reduced motion boot path', () => {
     // default path happening to agree.
     expect(document.querySelector('[data-section="media"]').dataset.side)
       .not.toBe(ROOMS.at(-1).textSide);
+    // board and contact are outside SECTION_FOR_ROOM entirely -- media is the grid
+    // room's one canonical section -- but src/ui/sections.js stamps them data-room=
+    // "grid" too, and applySectionSides' fallback pass (src/ui/layout.js) gives any
+    // such leftover section the held room's side just like the mapped ones above.
+    // Real renderSections + real applySectionSides, not the synthetic fixture
+    // tests/sections-layout.dom.test.js uses -- this is the regression actually fixed.
+    for (const id of ['board', 'contact']) {
+      expect(document.querySelector(`[data-section="${id}"]`).dataset.side, id).toBe(hero.textSide);
+    }
   });
 });

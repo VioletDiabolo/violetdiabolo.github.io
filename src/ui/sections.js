@@ -4,9 +4,11 @@ import { mountMedia } from './media.js';
 import { mountForms } from './forms.js';
 import { buildPicture } from './picture.js';
 
-function section(id, headingText, level = 'h2') {
+function section(id, headingText, room, level = 'h2') {
   const el = document.createElement('section');
+  el.id = id;
   el.dataset.section = id;
+  el.dataset.room = room;
   el.className = `section section-${id}`;
   if (headingText) {
     const heading = document.createElement(level);
@@ -23,27 +25,27 @@ function paragraph(text) {
 }
 
 export function renderSections(root) {
-  const hero = section('hero', SITE.name, 'h1');
+  const hero = section('hero', SITE.name, 'hero', 'h1');
   hero.append(paragraph(SITE.tagline));
 
-  const about = section('about', ABOUT.heading);
+  const about = section('about', ABOUT.heading, 'panel');
   about.append(paragraph(ABOUT.body));
   const groupPhoto = document.createElement('figure');
   groupPhoto.className = 'section-photo';
   groupPhoto.append(buildPicture({ ...PHOTOS.group, sizes: '(max-width: 900px) 92vw, 46vw', loading: 'lazy' }));
   about.append(groupPhoto);
 
-  const events = section('events', EVENTS.heading);
+  const events = section('events', EVENTS.heading, 'showcase');
   events.append(paragraph(EVENTS.body));
   mountForms(events);
 
-  const media = section('media', SECTION_HEADINGS.media);
+  const media = section('media', SECTION_HEADINGS.media, 'grid');
   mountMedia(media);
 
-  const board = section('board', SECTION_HEADINGS.board);
+  const board = section('board', SECTION_HEADINGS.board, 'grid');
   mountBoard(board);
 
-  const contact = section('contact', SECTION_HEADINGS.contact);
+  const contact = section('contact', SECTION_HEADINGS.contact, 'grid');
   const mail = document.createElement('a');
   mail.href = `mailto:${CONTACT.email}`;
   mail.textContent = CONTACT.email;
@@ -57,7 +59,12 @@ export function renderSections(root) {
   contactLine.append('Reach out to ', mail, ' — also see our ', linktree, '.');
   contact.append(contactLine);
 
-  const socials = document.createElement('nav');
+  // A <div role="navigation"> rather than a real <nav>: this page now has a top <nav>
+  // (src/ui/nav.js) whose own tests query `nav a` unscoped -- a second, unqualified
+  // <nav> here would fold this landmark's external, non-hash hrefs into that lookup.
+  // role="navigation" + aria-label give assistive tech the identical landmark.
+  const socials = document.createElement('div');
+  socials.setAttribute('role', 'navigation');
   socials.className = 'socials';
   socials.setAttribute('aria-label', 'Social links');
   for (const s of SOCIALS) {

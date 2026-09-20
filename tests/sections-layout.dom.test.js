@@ -6,11 +6,19 @@ import path from 'node:path';
 import { ROOMS, HERO_ID } from '../src/scroll/choreography.js';
 import { SECTION_FOR_ROOM, applySectionSides } from '../src/ui/layout.js';
 
+// Mirrors the data-room src/ui/sections.js stamps on the real page: footer alone
+// carries no room. Kept here rather than imported so this file can build a section
+// fixture without pulling in the real renderSections and everything it mounts.
+const ROOM_FOR_SECTION = {
+  hero: 'hero', about: 'panel', events: 'showcase', media: 'grid', board: 'grid', contact: 'grid',
+};
+
 const build = () => {
   const root = document.createElement('main');
   for (const id of ['hero', 'about', 'events', 'media', 'board', 'contact', 'footer']) {
     const s = document.createElement('section');
     s.dataset.section = id;
+    if (ROOM_FOR_SECTION[id]) s.dataset.room = ROOM_FOR_SECTION[id];
     root.append(s);
   }
   document.body.replaceChildren(root);
@@ -77,25 +85,35 @@ describe('applySectionSides', () => {
     expect(() => applySectionSides(root, { staticAt: 'showcase-room' })).toThrow(/no room named/);
   });
 
-  it('leaves sections with no room alone on the static path too', () => {
-    // board and contact getting no side is a known gap (see the test below); the static
-    // path must not widen it by stamping them either.
+  it('gives board and contact the held room\'s side too, on the static path', () => {
+    // board and contact are not the hero room's canonical section, but they carry a
+    // data-room like every other section (src/ui/sections.js), so the static path's
+    // fallback pairs them with the held room the same as it does everywhere else.
+    // footer alone carries no data-room, so it alone stays unstamped.
     const root = build();
     applySectionSides(root, { staticAt: HERO_ID });
-    for (const id of ['board', 'contact', 'footer']) {
-      expect(root.querySelector(`[data-section="${id}"]`).dataset.side, id).toBeUndefined();
+    const hero = ROOMS.find((r) => r.id === HERO_ID);
+    for (const id of ['board', 'contact']) {
+      expect(root.querySelector(`[data-section="${id}"]`).dataset.side, id).toBe(hero.textSide);
     }
+    expect(root.querySelector('[data-section="footer"]').dataset.side, 'footer').toBeUndefined();
   });
 
-  it('leaves sections with no room alone', () => {
-    // board and contact are deliberately unmapped here: the four rooms cover hero,
-    // about, events and media, and the page layout that pairs the remaining sections
-    // with the grid room is a later task's work.
+  it('gives board and contact the grid room\'s side too, since they share its pattern', () => {
+    // board and contact are deliberately absent from SECTION_FOR_ROOM -- media stays
+    // the grid room's one canonical section, keeping the bijection above intact -- but
+    // sections.js stamps all three data-room="grid", because the page layout pairs
+    // them with the grid room's look even though the choreography never singles them
+    // out. Without applySectionSides' fallback pass they would hug the left edge
+    // unstamped instead of reading as one visual unit with media. footer carries no
+    // data-room at all, so it alone stays unstamped.
     const root = build();
     applySectionSides(root);
-    for (const id of ['board', 'contact', 'footer']) {
-      expect(root.querySelector(`[data-section="${id}"]`).dataset.side, id).toBeUndefined();
+    const grid = ROOMS.find((r) => r.id === 'grid');
+    for (const id of ['board', 'contact']) {
+      expect(root.querySelector(`[data-section="${id}"]`).dataset.side, id).toBe(grid.textSide);
     }
+    expect(root.querySelector('[data-section="footer"]').dataset.side, 'footer').toBeUndefined();
   });
 });
 
