@@ -35,8 +35,14 @@ export const ACCENT = 'gasket';
  * needed two separate fixes for.
  */
 export function createMaterials() {
+  // `transparent: true` on every fill AND every edge: the scroll choreography fades the
+  // whole object out in the grid room by animating state.objectOpacity, which stage.js's
+  // render loop assigns to material.opacity. Three ignores opacity outright on an opaque
+  // material, so without this flag that fade is a silent no-op -- nothing throws, the
+  // object simply never disappears. It is not a lighting property; the object stays
+  // flat and unlit (see this module's own doc comment and its tests).
   const fill = (key, extra = {}) =>
-    new MeshBasicMaterial({ color: new Color(PART_COLORS[key]), ...extra });
+    new MeshBasicMaterial({ color: new Color(PART_COLORS[key]), transparent: true, ...extra });
 
   return {
     cup: fill('cup', { side: DoubleSide }),
@@ -46,7 +52,7 @@ export function createMaterials() {
     edge: Object.fromEntries(
       Object.keys(PART_COLORS).map((key) => [
         key,
-        new LineBasicMaterial({ color: new Color(EDGE_COLORS[key]) }),
+        new LineBasicMaterial({ color: new Color(EDGE_COLORS[key]), transparent: true }),
       ]),
     ),
   };

@@ -205,3 +205,19 @@ describe('overlay disposal', () => {
     expect(source).toMatch(/for\s*\(const overlay of overlays\)\s*overlay\.dispose\(\);/);
   });
 });
+
+describe('object opacity bridge', () => {
+  it('reads state.objectOpacity onto every material in the render loop, never a second owner', () => {
+    // createStage() needs a real WebGL context, so it never runs under jsdom/vitest --
+    // same constraint as the aimCamera, tone-mapping and overlay-disposal guards above,
+    // so source inspection is again the only route available. anime.js owns
+    // state.objectOpacity (scroll/choreography.js writes it); the render loop only reads
+    // it, exactly the bridge state.spinRate already uses. A seam built but never wired --
+    // the edge materials created and then not handed to the geometry -- shipped on this
+    // branch once already, so this pins the read rather than trusting it.
+    const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
+    expect(source, 'state never declares objectOpacity').toMatch(/objectOpacity:\s*1/);
+    expect(source, 'the render loop never applies state.objectOpacity')
+      .toMatch(/for \(const material of materialList\) material\.opacity = state\.objectOpacity;/);
+  });
+});

@@ -10,18 +10,18 @@ export const TIER_SETTINGS = Object.freeze({
 /** Camera framing. Exported because the scroll choreography dollies between these and
  *  its tests assert the exploded object actually fits the frustum. */
 export const CAMERA_FOV = 34;
-/** Face-on and assembled: frames the cup disc. Kept equal to the arrival act's own
- *  camZ (src/scroll/choreography.js ACTS) -- entrance.js seeds the camera to this
- *  value synchronously, so the very first painted frame already matches arrival's
- *  target instead of dollying in over the first few percent of scroll. If arrival's
+/** Assembled and close: frames the whole object. Kept equal to the hero room's own
+ *  camZ (src/scroll/choreography.js ROOMS) -- entrance.js seeds the camera to this
+ *  value synchronously, so the very first painted frame already matches the hero's
+ *  target instead of dollying in over the first few percent of scroll. If the hero's
  *  camZ ever changes, this must move with it. */
 export const CAMERA_NEAR_Z = 6.2;
 /** Profile and fully exploded: the object spans ~5.02 units and needs the room. Like
- *  CAMERA_NEAR_Z, kept equal to an ACTS camZ (`apart`'s) by convention rather than by
- *  import -- the table hardcodes its own literal so it stays plain data (see ACTS's own
- *  doc comment in choreography.js). No production code reads this constant itself any
- *  more; it now exists purely as the far bound the "keeps the camera between its near
- *  and far distances" test (choreography.test.js) checks every act's distance against. */
+ *  CAMERA_NEAR_Z, kept equal to a ROOMS camZ (the showcase room's) by convention rather
+ *  than by import -- the table hardcodes its own literal so it stays plain data (see
+ *  ROOMS's own doc comment in choreography.js). No production code reads this constant
+ *  itself any more; it now exists purely as the far bound the "keeps the camera between
+ *  its near and far distances" test (choreography.test.js) checks every room against. */
 export const CAMERA_FAR_Z = 10;
 
 /**
@@ -108,11 +108,19 @@ export function createStage({ canvas, tier }) {
   camera.lookAt(0, 0, 0);
 
   const materials = createMaterials();
+  // Flattened once, at construction. Materials are SHARED across parts (one cup material
+  // for both cups, and so on), so fading the object is eight writes per frame rather than
+  // one per mesh. `isMaterial` skips the `edge` container object itself, and picks up any
+  // fill added later without this list needing to be kept in step by hand.
+  const materialList = [
+    ...Object.values(materials).filter((m) => m?.isMaterial),
+    ...Object.values(materials.edge),
+  ];
   const { tilt, spinner, parts } = buildDiabolo({ materials });
   scene.add(tilt);
 
   /** anime.js writes these scalars; the render loop and overlays only read them. */
-  const state = { spinRate: 1, labelOpacity: 0 };
+  const state = { spinRate: 1, labelOpacity: 0, objectOpacity: 1 };
   const spinMesh = parts.axleBearing.userData.spinMesh;
 
   // Registered post-construction via addOverlay() — see below. Kept local (not on the
@@ -123,6 +131,9 @@ export function createStage({ canvas, tier }) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
     spinner.rotation.y += spin.spinner;
     spinMesh.rotation.y += spin.bearing;
+    // anime.js owns state.objectOpacity; this only reads it. Materials are shared across
+    // parts, so this is one write per material per frame, not one per mesh.
+    for (const material of materialList) material.opacity = state.objectOpacity;
     aimCamera(camera, AIM_TARGET);
     renderer.render(scene, camera);
     for (const overlay of overlays) overlay.render(scene, camera);

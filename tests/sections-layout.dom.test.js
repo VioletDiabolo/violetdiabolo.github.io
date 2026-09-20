@@ -3,8 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { ACTS } from '../src/scroll/choreography.js';
-import { SECTION_FOR_ACT, applySectionSides } from '../src/ui/layout.js';
+import { ROOMS } from '../src/scroll/choreography.js';
+import { SECTION_FOR_ROOM, applySectionSides } from '../src/ui/layout.js';
 
 const build = () => {
   const root = document.createElement('main');
@@ -17,56 +17,54 @@ const build = () => {
   return root;
 };
 
-describe('act to section mapping', () => {
-  it('maps every act to exactly one section', () => {
-    const sections = ACTS.map((a) => SECTION_FOR_ACT[a.id]);
-    expect(sections.every(Boolean), 'an act has no section').toBe(true);
-    expect(new Set(sections).size).toBe(ACTS.length);
+describe('room to section mapping', () => {
+  it('maps every room to exactly one section', () => {
+    const sections = ROOMS.map((r) => SECTION_FOR_ROOM[r.id]);
+    expect(sections.every(Boolean), 'a room has no section').toBe(true);
+    expect(new Set(sections).size).toBe(ROOMS.length);
   });
 
   it('follows the reading order of the page', () => {
-    expect(ACTS.map((a) => SECTION_FOR_ACT[a.id])).toEqual(
-      ['hero', 'about', 'events', 'media', 'board', 'contact'],
+    expect(ROOMS.map((r) => SECTION_FOR_ROOM[r.id])).toEqual(
+      ['hero', 'about', 'events', 'media'],
     );
   });
 });
 
 describe('applySectionSides', () => {
-  it('gives every mapped section the side its act says', () => {
+  it('gives every mapped section the side its room says', () => {
     const root = build();
     applySectionSides(root);
-    for (const act of ACTS) {
-      const el = root.querySelector(`[data-section="${SECTION_FOR_ACT[act.id]}"]`);
-      expect(el.dataset.side, SECTION_FOR_ACT[act.id]).toBe(act.textSide);
+    for (const room of ROOMS) {
+      const el = root.querySelector(`[data-section="${SECTION_FOR_ROOM[room.id]}"]`);
+      expect(el.dataset.side, SECTION_FOR_ROOM[room.id]).toBe(room.textSide);
     }
   });
 
   it('puts the text opposite the object every time', () => {
     const root = build();
     applySectionSides(root);
-    for (const act of ACTS) {
-      const side = root.querySelector(`[data-section="${SECTION_FOR_ACT[act.id]}"]`).dataset.side;
-      if (side === 'left') expect(act.x).toBeGreaterThan(0);
-      if (side === 'right') expect(act.x).toBeLessThan(0);
+    for (const room of ROOMS) {
+      const side = root.querySelector(`[data-section="${SECTION_FOR_ROOM[room.id]}"]`).dataset.side;
+      if (side === 'left') expect(room.x).toBeGreaterThan(0);
+      if (side === 'right') expect(room.x).toBeLessThan(0);
     }
   });
 
-  it('alternates sides rather than stacking every section on one edge', () => {
-    const sides = ACTS.map((a) => a.textSide).filter((s) => s !== 'center');
-    for (let i = 1; i < sides.length; i++) {
-      expect(sides[i], 'two consecutive sections share a side').not.toBe(sides[i - 1]);
-    }
-  });
-
-  it('leaves sections with no act alone', () => {
+  it('leaves sections with no room alone', () => {
+    // board and contact are deliberately unmapped here: the four rooms cover hero,
+    // about, events and media, and the page layout that pairs the remaining sections
+    // with the grid room is a later task's work.
     const root = build();
     applySectionSides(root);
-    expect(root.querySelector('[data-section="footer"]').dataset.side).toBeUndefined();
+    for (const id of ['board', 'contact', 'footer']) {
+      expect(root.querySelector(`[data-section="${id}"]`).dataset.side, id).toBeUndefined();
+    }
   });
 });
 
 describe('scroll length', () => {
-  it('gives the six acts enough page to play over', () => {
+  it('gives the four rooms enough page to play over', () => {
     // A plain path, not `new URL(..., import.meta.url)`: under this file's jsdom
     // environment, Vitest's global URL shim resolves relative file: URLs against
     // http://localhost:3000 instead of the filesystem, which breaks fs.readFileSync(url)
@@ -76,6 +74,6 @@ describe('scroll length', () => {
     const total = [...css.matchAll(/min-height:\s*(\d+)vh/g)]
       .map((m) => Number(m[1]))
       .reduce((a, b) => a + b, 0);
-    expect(total, 'the page is too short for six acts to register').toBeGreaterThanOrEqual(1800);
+    expect(total, 'the page is too short for the rooms to register').toBeGreaterThanOrEqual(1800);
   });
 });

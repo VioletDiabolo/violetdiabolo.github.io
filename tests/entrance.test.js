@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   ENTRANCE_SCATTER, entranceStartY, createEntrance,
 } from '../src/scroll/entrance.js';
-import { FACE_ON_X, ACTS } from '../src/scroll/choreography.js';
+import { FACE_ON_X, ROOMS } from '../src/scroll/choreography.js';
 import { CAMERA_NEAR_Z } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
 import { PART_IDS, DIMS } from '../src/diabolo/profiles.js';
@@ -62,27 +62,27 @@ describe('createEntrance', () => {
     expect(camera.position.z).toBe(CAMERA_NEAR_Z);
   });
 
-  it('seeds tilt.position to the arrival act\'s target synchronously, so the hero title clears the object from the very first frame', () => {
+  it('seeds tilt.position to the hero room\'s target synchronously, so the hero title clears the object from the very first frame', () => {
     // Without this, tilt.position sits at the Three.js Group default (0, 0) and the
-    // scroll choreography only tweens the lift in gradually across the first 10% of
+    // scroll choreography only tweens the object aside gradually across the first 12% of
     // scroll — the hero (and, since skip() shares this seeding, the reduced-motion
     // still) would land the title on top of the object instead of clear of it.
-    const arrival = ACTS.find((a) => a.id === 'arrival');
+    const hero = ROOMS.find((r) => r.id === 'hero');
     const { tilt, parts } = scene();
     const camera = stubCamera();
     createEntrance({ parts, tilt, camera, onComplete: () => {} });
-    expect(tilt.position.x).toBe(arrival.x);
-    expect(tilt.position.y).toBe(arrival.y);
+    expect(tilt.position.x).toBe(hero.x);
+    expect(tilt.position.y).toBe(hero.y);
   });
 
-  it('skip() leaves tilt.position at the same arrival target', () => {
-    const arrival = ACTS.find((a) => a.id === 'arrival');
+  it('skip() leaves tilt.position at the same hero target', () => {
+    const hero = ROOMS.find((r) => r.id === 'hero');
     const { tilt, parts } = scene();
     const camera = stubCamera();
     const { skip } = createEntrance({ parts, tilt, camera, onComplete: () => {} });
     skip();
-    expect(tilt.position.x).toBe(arrival.x);
-    expect(tilt.position.y).toBe(arrival.y);
+    expect(tilt.position.x).toBe(hero.x);
+    expect(tilt.position.y).toBe(hero.y);
   });
 
   it('converges every part onto its rest position by the end', () => {

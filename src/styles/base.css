@@ -43,12 +43,14 @@
   --mono-xs:  0.75rem; /* part-label index */
 
   /* ---- The reading column. Sized and measured against the object's own drift:
-   *      across the six acts (src/scroll/choreography.js ACTS) it travels roughly
-   *      26.6%-73.4% of the viewport, so a column at or under 38% wide, pinned to
-   *      whichever edge its act's textSide names (src/ui/layout.js writes
-   *      data-side), never shares screen space with it. Hero and the closing act
-   *      are the two acts with the object centred instead of offset, so they get
-   *      the wider, centred measure. See sections.css for where these are used. ---- */
+   *      across the four rooms (src/scroll/choreography.js ROOMS) it occupies
+   *      roughly 48%-81% of the viewport, so a column at or under 38% wide, pinned
+   *      to whichever edge its room's textSide names (src/ui/layout.js writes
+   *      data-side), never shares screen space with it. The grid room is the one
+   *      room with the object centred instead of offset -- and it has faded the
+   *      object out entirely (opacity: 0) by then, so its section gets the wider,
+   *      centred measure with nothing behind it to compete. See sections.css for
+   *      where these are used. ---- */
   --column:      min(38%, 30rem);
   --column-wide: min(64%, 44rem);
 

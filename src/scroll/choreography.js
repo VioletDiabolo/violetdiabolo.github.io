@@ -43,62 +43,42 @@ export function explodedY(partId) {
 export const LATERAL_OFFSET = 1.6;
 
 /**
- * Fraction of an act the object spends crossing to its new side. The rest of the act it
- * holds still, clear of the reading column. Tweening `x` across the whole act means the
- * object sits on the incoming text's side for most of it — which is the obstruction this
- * composition exists to remove.
+ * Fraction of a room the object spends crossing to its new position. The rest of the
+ * room it holds still, clear of the reading column. Tweening `x` across the whole room
+ * means the object sits on the incoming text's side for most of it — which is the
+ * obstruction this composition exists to remove.
  */
 export const LATERAL_SETTLE = 0.22;
 
-/**
- * Fraction of an act the object spends lifting to its vertical target in the centred
- * acts (arrival, settle). A separate, smaller fraction than LATERAL_SETTLE: this guards
- * clearance against a fixed CSS position (`[data-side='center'] h1`/`h2`'s `top: 66vh`,
- * sections.css), not the reading column, and the two acts that use it behave
- * differently against LATERAL_SETTLE's own fraction. arrival never shows a problem --
- * entrance.js seeds tilt.position.y before the scroll timeline exists, so arrival's own
- * y tween runs from that seeded value to the same value, a no-op regardless of duration
- * (see entrance.test.js). settle has no such seeding: its y tween genuinely ramps from
- * the previous act's 0 up to 0.6, and measured against LATERAL_SETTLE's 0.22 that left
- * the object's bottom edge below the title's 66vh line for ~14% of the act's span.
- * Tightening just this fraction closes that without re-tuning the lateral crossing the
- * other four acts already rely on LATERAL_SETTLE for.
- */
-export const VERTICAL_SETTLE = 0.10;
+/** The one room the explosion plays in. Everywhere else the object is whole. */
+export const SHOWCASE_ID = 'showcase';
 
-/** The orbit swings the camera around the object at a constant radius; it does not dolly. */
-const ORBIT_RADIUS = 7;
-const ORBIT_ANGLE = 40 * (Math.PI / 180);
+/** Lifted off profile so the hero reads as an object rather than a diagram. */
+const HERO_TILT = -0.42;
 
 /**
- * The six acts, as target states reached at the END of each `end` fraction. The timeline
- * tweens from one act's state to the next, so this table is the whole choreography — data
- * rather than timeline calls, so it can be tuned and tested without a browser.
+ * Four rooms, as target states reached at the END of each `end` fraction. Rooms have
+ * edges: the explosion is contained in one of them rather than smeared across the page,
+ * which is the substantive change from the six-act version this replaces.
  *
- * `explode` 0 = assembled, 1 = fully apart. `textSide` records where the reading column
- * sits, so a test can assert the object is always on the other side of it. `y` lifts the
- * object vertically; every act leaves it at 0 -- x already keeps the object clear of the
- * text -- except `arrival` and `settle`, whose text is `textSide: 'center'` and so has no
- * opposite side to occupy. Those two lift the object instead (and pull the camera back to
- * `camZ: 6.2` / `6.8` so it still fits the frustum -- see the frustum test below), clearing
- * roughly the top 62-64% of the viewport so the title can sit in the lower third beneath
- * it (sections.css) rather than directly on top of it.
+ * `explode` 0 = assembled, 1 = fully apart. `opacity` fades the whole object out (the
+ * render loop reads it off `state`, see diabolo/stage.js). `textSide` records where the
+ * reading column sits, so a test can assert the object is always on the other side of
+ * it; `y` would lift the object clear of a centred column, but no room needs that now --
+ * the three rooms with a column beside them separate horizontally instead, and the one
+ * centred room has faded the object out entirely by the time its text arrives.
  */
-export const ACTS = Object.freeze([
-  { id: 'arrival',   end: 0.10, explode: 0, tiltX: FACE_ON_X,        tiltZ: 0,    x: 0,               y: 0.55, camX: 0, camZ: 6.2, spin: 1.0, labels: 0, textSide: 'center' },
-  { id: 'apart',     end: 0.32, explode: 1, tiltX: FACE_ON_X * 0.45, tiltZ: 0,    x:  LATERAL_OFFSET, y: 0,    camX: 0, camZ: 10,  spin: 0.4, labels: 1, textSide: 'left'   },
-  { id: 'recombine', end: 0.52, explode: 0, tiltX: PROFILE_X,        tiltZ: 0,    x: -LATERAL_OFFSET, y: 0,    camX: 0, camZ: 7,   spin: 1.2, labels: 0, textSide: 'right'  },
-  { id: 'spin',      end: 0.70, explode: 0, tiltX: PROFILE_X,        tiltZ: 0.14, x:  LATERAL_OFFSET, y: 0,    camX: 0, camZ: 7,   spin: 4.0, labels: 0, textSide: 'left'   },
-  { id: 'orbit',     end: 0.88, explode: 0, tiltX: PROFILE_X,        tiltZ: 0.14, x: -LATERAL_OFFSET, y: 0,
-    camX: ORBIT_RADIUS * Math.sin(ORBIT_ANGLE), camZ: ORBIT_RADIUS * Math.cos(ORBIT_ANGLE),
-    spin: 1.2, labels: 0, textSide: 'right' },
-  { id: 'settle',    end: 1.00, explode: 0, tiltX: FACE_ON_X,        tiltZ: 0,    x: 0,               y: 0.6,  camX: 0, camZ: 6.8, spin: 0.5, labels: 0, textSide: 'center' },
+export const ROOMS = Object.freeze([
+  { id: 'hero',     end: 0.12, explode: 0, tiltX: HERO_TILT, x: LATERAL_OFFSET * 0.55, y: 0, camZ: 6.2, spin: 1.0, labels: 0, opacity: 1, textSide: 'left'   },
+  { id: 'panel',    end: 0.30, explode: 0, tiltX: HERO_TILT, x: LATERAL_OFFSET * 0.55, y: 0, camZ: 6.2, spin: 1.0, labels: 0, opacity: 1, textSide: 'left'   },
+  { id: 'showcase', end: 0.55, explode: 1, tiltX: PROFILE_X, x: LATERAL_OFFSET * 0.50, y: 0, camZ: 10,  spin: 0.5, labels: 1, opacity: 1, textSide: 'left'   },
+  { id: 'grid',     end: 1.00, explode: 0, tiltX: PROFILE_X, x: 0,                     y: 0, camZ: 7,   spin: 1.6, labels: 0, opacity: 0, textSide: 'center' },
 ]);
 
 /**
  * Pure: a part's Y at a given explode fraction. anime.js writes part positions directly
- * (never a scalar the render loop reads back), so the timeline needs a concrete Y per act
- * rather than one shared scalar.
+ * (never a scalar the render loop reads back), so the timeline needs a concrete Y per
+ * room rather than one shared scalar.
  */
 export function partYAt(partId, explode) {
   const rest = HOME[partId].y;
@@ -128,27 +108,27 @@ export function createChoreography({ parts, tilt, state, camera, scrollTarget })
     }),
   });
 
-  // Generated from ACTS rather than hand-written. Each act tweens from wherever the
+  // Generated from ROOMS rather than hand-written. Each room tweens from wherever the
   // previous one left off, so transitions carry state forward instead of resetting.
   let previousEnd = 0;
-  for (const act of ACTS) {
+  for (const room of ROOMS) {
     const at = previousEnd * SCRUB_DURATION;
-    const duration = (act.end - previousEnd) * SCRUB_DURATION;
+    const duration = (room.end - previousEnd) * SCRUB_DURATION;
     if (duration <= 0) continue;
 
     for (const partId of Object.keys(PART_RANK)) {
-      timeline.add(parts[partId].position, { y: partYAt(partId, act.explode), duration }, at);
+      timeline.add(parts[partId].position, { y: partYAt(partId, room.explode), duration }, at);
     }
-    timeline.add(tilt.rotation, { x: act.tiltX, z: act.tiltZ, duration }, at);
-    // Split, not one shared tween: x settles against the reading column (LATERAL_SETTLE),
-    // y settles against the centred acts' fixed title position (VERTICAL_SETTLE) — see
-    // both constants' doc comments for why they need different fractions.
-    timeline.add(tilt.position, { x: act.x, duration: duration * LATERAL_SETTLE }, at);
-    timeline.add(tilt.position, { y: act.y, duration: duration * VERTICAL_SETTLE }, at);
-    timeline.add(camera.position, { x: act.camX, z: act.camZ, duration }, at);
-    timeline.add(state, { spinRate: act.spin, labelOpacity: act.labels, duration }, at);
+    timeline.add(tilt.rotation, { x: room.tiltX, duration }, at);
+    // Settled over a fraction of the room, not the whole of it: see LATERAL_SETTLE.
+    timeline.add(tilt.position, { x: room.x, y: room.y, duration: duration * LATERAL_SETTLE }, at);
+    // camera.position.x is never animated -- there is no orbit room. It stays at 0.
+    timeline.add(camera.position, { z: room.camZ, duration }, at);
+    timeline.add(state, {
+      spinRate: room.spin, labelOpacity: room.labels, objectOpacity: room.opacity, duration,
+    }, at);
 
-    previousEnd = act.end;
+    previousEnd = room.end;
   }
 
   return {

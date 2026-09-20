@@ -119,6 +119,18 @@ describe('createMaterials', () => {
     }
   });
 
+  it('marks every material transparent, so the object can be faded out at all', () => {
+    // scroll/choreography.js animates state.objectOpacity and diabolo/stage.js's render
+    // loop assigns it to material.opacity every frame. Three ignores opacity entirely on
+    // an opaque material, so without this flag the grid room's fade-out is a silent
+    // no-op: nothing throws, nothing fails, the object simply never disappears.
+    const m = createMaterials();
+    const all = [...Object.keys(PART_COLORS).map((k) => m[k]), ...Object.values(m.edge)];
+    for (const mat of all) {
+      expect(mat.transparent, `${mat.type} ignores state.objectOpacity`).toBe(true);
+    }
+  });
+
   it('disposes fills and edges alike', () => {
     const m = createMaterials();
     const disposed = [];
