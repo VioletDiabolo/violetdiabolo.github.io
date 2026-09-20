@@ -5,13 +5,31 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { ROOMS, HERO_ID } from '../src/scroll/choreography.js';
 import { SECTION_FOR_ROOM, applySectionSides } from '../src/ui/layout.js';
+import { renderSections } from '../src/ui/sections.js';
 
 // Mirrors the data-room src/ui/sections.js stamps on the real page: footer alone
-// carries no room. Kept here rather than imported so this file can build a section
-// fixture without pulling in the real renderSections and everything it mounts.
+// carries no room. Kept here rather than imported so the fixture below can build its
+// sections without pulling in the real renderSections and everything it mounts -- the
+// 'stays true to renderSections' test just below is what keeps this copy honest.
 const ROOM_FOR_SECTION = {
   hero: 'hero', about: 'panel', events: 'showcase', media: 'grid', board: 'grid', contact: 'grid',
 };
+
+describe('ROOM_FOR_SECTION', () => {
+  it('stays true to what renderSections really stamps', () => {
+    // This file's own fixture (build(), below) hardcodes a copy of the data-room table
+    // so it doesn't need to pull renderSections' real dependencies (mountBoard,
+    // mountMedia, mountForms, buildPicture) into every other test in this file. That
+    // copy could silently drift from reality -- this is the one test that would catch it.
+    const root = document.createElement('main');
+    renderSections(root);
+    const real = {};
+    for (const el of root.querySelectorAll('[data-section]')) {
+      if (el.dataset.room) real[el.dataset.section] = el.dataset.room;
+    }
+    expect(ROOM_FOR_SECTION).toEqual(real);
+  });
+});
 
 const build = () => {
   const root = document.createElement('main');

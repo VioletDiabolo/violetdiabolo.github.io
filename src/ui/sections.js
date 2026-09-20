@@ -8,7 +8,7 @@ function section(id, headingText, room, level = 'h2') {
   const el = document.createElement('section');
   el.id = id;
   el.dataset.section = id;
-  el.dataset.room = room;
+  if (room) el.dataset.room = room;
   el.className = `section section-${id}`;
   if (headingText) {
     const heading = document.createElement(level);
@@ -59,12 +59,7 @@ export function renderSections(root) {
   contactLine.append('Reach out to ', mail, ' — also see our ', linktree, '.');
   contact.append(contactLine);
 
-  // A <div role="navigation"> rather than a real <nav>: this page now has a top <nav>
-  // (src/ui/nav.js) whose own tests query `nav a` unscoped -- a second, unqualified
-  // <nav> here would fold this landmark's external, non-hash hrefs into that lookup.
-  // role="navigation" + aria-label give assistive tech the identical landmark.
-  const socials = document.createElement('div');
-  socials.setAttribute('role', 'navigation');
+  const socials = document.createElement('nav');
   socials.className = 'socials';
   socials.setAttribute('aria-label', 'Social links');
   for (const s of SOCIALS) {
