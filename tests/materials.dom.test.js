@@ -13,13 +13,20 @@ import {
 // merely null -- on both, so toBeUndefined() still means something for them.
 const PBR = ['transmission', 'clearcoat', 'roughness', 'metalness', 'thickness', 'ior'];
 
-const saturation = (hex) => {
+/**
+ * Chroma: max channel minus min, un-normalised by lightness. The spec's words are "no
+ * other saturated HUE", and chroma is what measures that. HSL saturation, which this
+ * replaces, divides by lightness, so it reports a pale near-white tint as violently
+ * saturated (#efeaf8 measures 0.50 there and 0.05 here) and inflates dark tints the
+ * same way. That inflation is what forced two hand-fitted thresholds -- 0.6 for the
+ * fills, a separate 0.7 for the edges -- and what made one palette value get nudged
+ * from #b9a6dc to #baa9d9 purely to squeeze 2.7% under a number. One measure, one
+ * multiplier, and the palette now clears it by 5x-20x instead of by a hair.
+ */
+const chroma = (hex) => {
   const n = parseInt(hex.slice(1), 16);
-  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  if (max === min) return 0;
-  const l = (max + min) / 2;
-  return l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
 };
 
 const luminance = (hex) => {
@@ -43,25 +50,20 @@ describe('flat palette', () => {
     expect(PART_COLORS[ACCENT]).toBeDefined();
   });
 
-  it('keeps the accent the only saturated colour', () => {
-    const accent = saturation(PART_COLORS[ACCENT]);
+  it('keeps the accent the only saturated hue', () => {
+    // One multiplier for both palettes now, because chroma treats a pale edge tint and a
+    // dark fill tint on the same footing -- see the helper above for why two were needed
+    // when this measured HSL saturation instead.
+    const accent = chroma(PART_COLORS[ACCENT]);
     for (const [key, hex] of Object.entries(PART_COLORS)) {
       if (key === ACCENT) continue;
-      expect(saturation(hex), `${key} competes with the accent`).toBeLessThan(accent * 0.6);
+      expect(chroma(hex), `${key} competes with the accent`).toBeLessThan(accent * 0.6);
     }
 
-    // Same guard for the edge palette, so a future edit can't introduce a second saturated
-    // edge hue -- EDGE_COLORS was previously unchecked here. Edge tints are pale, which
-    // inflates HSL saturation relative to the fills at the same perceptual chroma, so this
-    // reuses the accent-ratio pattern above but with its own threshold rather than the
-    // fills' 0.6. Measured: accent edge (gasket) saturation 0.816; the next highest (cup) is
-    // 0.522, a ratio of 0.640; hub and bearing sit far lower, at 0.111 and 0.190. 0.7 clears
-    // cup with an ~8.6% margin while still catching an intruder anywhere near the accent
-    // edge's own saturation.
-    const accentEdge = saturation(EDGE_COLORS[ACCENT]);
+    const accentEdge = chroma(EDGE_COLORS[ACCENT]);
     for (const [key, hex] of Object.entries(EDGE_COLORS)) {
       if (key === ACCENT) continue;
-      expect(saturation(hex), `${key} edge competes with the accent edge`).toBeLessThan(accentEdge * 0.7);
+      expect(chroma(hex), `${key} edge competes with the accent edge`).toBeLessThan(accentEdge * 0.6);
     }
   });
 
@@ -69,6 +71,22 @@ describe('flat palette', () => {
     for (const key of Object.keys(PART_COLORS)) {
       expect(luminance(EDGE_COLORS[key]), `${key} edges vanish into the fill`)
         .toBeGreaterThan(luminance(PART_COLORS[key]));
+    }
+  });
+
+  it('draws a dark body in bright line, which is the whole of the client\'s reference', () => {
+    // "Dark body, bright edges": the fills drop to near-black so they read as mass that
+    // hides the lines behind it, and the edges go bright so the object reads as a glowing
+    // line drawing rather than a lavender solid. The previous palette failed both halves
+    // -- a #baa9d9 cup fill against #e4dcf4 edges is a pale solid with edges nobody can
+    // see -- and nothing in this file noticed, because "edges lighter than their fill"
+    // above is satisfied by any two values a few percent apart.
+    for (const key of Object.keys(PART_COLORS)) {
+      if (key === ACCENT) continue; // the gasket is the one part that is colour, not mass
+      expect(luminance(PART_COLORS[key]), `${key} fill does not read as dark mass`)
+        .toBeLessThan(40);
+      expect(luminance(EDGE_COLORS[key]), `${key} edge is not a bright line`)
+        .toBeGreaterThan(150);
     }
   });
 });

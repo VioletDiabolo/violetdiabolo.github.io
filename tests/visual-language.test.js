@@ -42,9 +42,15 @@ function leafRules(css) {
  * True for a single (already comma-split, trimmed) selector that targets a held
  * heading or paragraph — `.section > h1`, `[data-section] p`, `[data-side='center'] h2`
  * and the like — regardless of combinator or attached pseudo-classes.
+ *
+ * `[data-room` and `.room` joined the prefix list when the four room patterns landed:
+ * every heading and paragraph on the page is now addressed through one of those two, so
+ * a guard that still knew only the three older prefixes would have gone quietly vacuous
+ * the moment the stylesheet was rewritten around rooms. The rule being enforced is about
+ * WHERE a background may be declared, so its reach has to follow the text selectors.
  */
 function targetsHeadingOrParagraph(selector) {
-  if (!/^(\.section\b|\[data-section\b|\[data-side\b)/.test(selector)) return false;
+  if (!/^(\.section\b|\[data-section\b|\[data-side\b|\[data-room\b|\.room\b)/.test(selector)) return false;
   const lastToken = selector.split(/[\s>+~]+/).filter(Boolean).pop() ?? '';
   const bareTag = lastToken.replace(/::?[\w-]+(\([^)]*\))?/g, '').replace(/\[[^\]]*\]/g, '');
   return bareTag === 'h1' || bareTag === 'h2' || bareTag === 'p';
@@ -145,5 +151,69 @@ describe('the reading column', () => {
     const css = read('../src/styles/sections.css');
     expect(css).toMatch(/\[data-side=["']?left["']?\]/);
     expect(css).toMatch(/\[data-side=["']?right["']?\]/);
+  });
+});
+
+describe('the four room patterns', () => {
+  it('styles every room pattern', () => {
+    const css = read('../src/styles/sections.css');
+    for (const room of ['hero', 'panel', 'showcase', 'grid']) {
+      expect(css, `${room} has no styling`).toMatch(new RegExp(`\\[data-room=["']?${room}["']?\\]`));
+    }
+  });
+
+  it('gives the panel an opaque background, which is what makes it cover the object', () => {
+    // The slide-up is free: #stage is sticky and #content scrolls over it. A transparent
+    // panel would simply fail to cover anything.
+    const css = read('../src/styles/sections.css');
+    const panel = css.slice(css.search(/\[data-room=['"]?panel/));
+    expect(panel.slice(0, 600)).toMatch(/background/);
+  });
+});
+
+describe('the nav', () => {
+  it('is styled', () => {
+    expect(read('../src/styles/base.css') + read('../src/styles/sections.css'))
+      .toMatch(/\.site-nav/);
+  });
+
+  it('marks the call to action apart from the pills', () => {
+    expect(read('../src/styles/base.css') + read('../src/styles/sections.css'))
+      .toMatch(/\.site-nav-cta/);
+  });
+});
+
+describe('accent discipline', () => {
+  it('keeps the page accent as a named token', () => {
+    // The object's accent is the red gasket, set in materials.js; the page's is violet.
+    // They live at different scopes and must not be collapsed into one value.
+    expect(read('../src/styles/base.css')).toMatch(/--accent/);
+  });
+
+  it('never takes a focus ring away', () => {
+    // :focus-visible is a global rule in base.css, but a single `outline: none` on a
+    // restyled control silently undoes it for that control alone, and nothing else on
+    // the page would look any different. Cheap to assert, impossible to notice by eye.
+    expect(allCss()).not.toMatch(/outline:\s*(none|0)\b/);
+  });
+});
+
+describe('the narrow-screen composition', () => {
+  it('dims no canvas — the object holds a band of its own instead of hiding under text', () => {
+    // The rejected mitigation: fade the object to 30% and run text straight over it.
+    // The composition below replaces it, and this is what stops it coming back.
+    const offenders = leafRules(read('../src/styles/stage.css'))
+      .filter(({ selector, body }) => /canvas|#stage\b/.test(selector))
+      .filter(({ body }) => /(^|[;\s])opacity\s*:\s*0?\.\d/.test(body));
+    expect(offenders.map((r) => r.selector), 'the canvas is dimmed again').toEqual([]);
+  });
+
+  it('gives the object its own band, short enough to read beneath', () => {
+    const css = read('../src/styles/stage.css');
+    const at = css.search(/@media\s*\(max-width:\s*767px\)/);
+    expect(at, 'no narrow-screen block at all').toBeGreaterThan(-1);
+    const band = css.slice(at).match(/#stage\s*\{[^}]*height:\s*(\d+)dvh/);
+    expect(band, 'the stage still spans the whole viewport on a phone').not.toBeNull();
+    expect(Number(band[1]), 'the band leaves no room to read beneath it').toBeLessThan(60);
   });
 });

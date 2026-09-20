@@ -109,18 +109,32 @@ export function createLabels({ parts, tilt, container, state }) {
       for (const id of PART_IDS) {
         sprites[id].position.set(LABEL_OFFSET_X * sides[id], parts[id].position.y, 0);
       }
-      // anime.js owns state.labelOpacity; this only reads it (see the module doc comment
-      // above). Labels annotate the exploded diagram, so they stay faded out while the
-      // object is face-on and stacked, and fade in as scroll/choreography.js turns and
-      // opens it.
-      const opacity = String(state.labelOpacity);
+      // anime.js owns state.labelOpacity and state.objectOpacity; this only reads them
+      // (see the module doc comment above). Labels annotate the exploded diagram, so they
+      // stay faded out while the object is face-on and stacked, and fade in as
+      // scroll/choreography.js turns and opens it.
+      //
+      // The product, not labelOpacity alone: an annotation must never outlive the thing it
+      // annotates. The grid room fades the object across OPACITY_SETTLE (a tenth of the
+      // room) but ramps labelOpacity across the whole of it, so between those two points
+      // the labels were floating, legibly, over nothing -- and, measured live at 1440x900,
+      // straight across the media section's card captions, which arrive in the same half
+      // of the screen. The choreography's own note that labelOpacity is "not a thing the
+      // reading column can collide with" was simply wrong. Reading the scalar the render
+      // loop already writes fixes it here rather than retuning a timeline the composition
+      // tests pin.
+      //
+      // `?? 1` so a caller supplying only labelOpacity still gets the old behaviour rather
+      // than NaN, which would silently reach the DOM as opacity:"NaN" and hide nothing.
+      const visible = state.labelOpacity * (state.objectOpacity ?? 1);
+      const opacity = String(visible);
       // Below a small threshold, also drop pointer/find-in-page hits on the now-invisible
       // text. opacity:0 is what keeps it there: per ARIA, visibility:hidden removes an
       // element from the accessibility tree exactly as display:none does, so neither may
       // be used here — pointer-events only ever affects hit-testing, never a11y exposure.
       for (const id of PART_IDS) {
         elements[id].style.opacity = opacity;
-        elements[id].style.pointerEvents = state.labelOpacity < 0.02 ? 'none' : 'auto';
+        elements[id].style.pointerEvents = visible < 0.02 ? 'none' : 'auto';
       }
       renderer.render(scene, camera);
     },

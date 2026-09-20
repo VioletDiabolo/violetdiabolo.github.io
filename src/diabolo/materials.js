@@ -3,25 +3,40 @@ import { Color, DoubleSide, LineBasicMaterial, MeshBasicMaterial } from 'three';
 /**
  * Flat fills, one per part kind. The object is unlit, so nothing shades it — colour and
  * the edge overlay carry the whole of its form.
+ *
+ * Dark body, bright edges. Every fill but the gasket drops to a near-black a shade or
+ * two off the page's own ground (--stage, #08060d), so a fill is no longer something you
+ * see: it is the mass that hides the lines behind it. What you see is EDGE_COLORS. That
+ * is the animejs.com reading the client asked for, and it is the opposite of the pale
+ * lavender solid they rejected — #baa9d9 at luminance 176 with #e4dcf4 edges at 232 is a
+ * solid whose wireframe cannot be made out at all.
+ *
+ * The three non-accent fills are deliberately not the same black: cup, hub and bearing
+ * sit at luminance 11.0 / 7.6 / 19.7, which is enough for one mass to read in front of
+ * another where they overlap, while none of them reads as a colour.
  */
 export const PART_COLORS = Object.freeze({
-  // #b9a6dc (the brief's literal value) measures saturation 0.435 against this same
-  // module's own accent test, whose threshold (accent 0.663 x 0.6 = 0.398) it exceeds --
-  // it would fail 'keeps the accent the only saturated colour' outright. This value holds
-  // the identical hue (261.1 deg) and lightness (0.757) and only trims saturation to
-  // 0.387, comfortably under threshold.
-  cup: '#baa9d9',
-  hub: '#15111b',
-  bearing: '#9aa0ab',
+  cup: '#0c0a12',
+  hub: '#08070c',
+  bearing: '#14131a',
+  // The one part that is colour rather than mass, and the only colour in the object at
+  // all. The PAGE's accent is violet and lives on the page furniture (src/styles/base.css
+  // --accent); the two are separate scopes and must not be collapsed, or the red ring
+  // that makes this object read as a diabolo goes with them.
   gasket: '#cf2f2a',
 });
 
-/** Edges sit lighter than their fill so the wireframe reads against it. */
+/**
+ * Edges sit lighter than their fill so the wireframe reads against it — here, far
+ * lighter: these lines are the object. Cup and bearing carry the faintest violet and
+ * cool casts so the parts stay distinguishable as line alone; measured chroma is 0.055
+ * and 0.024 against the accent edge's 0.616, so neither is a second hue.
+ */
 export const EDGE_COLORS = Object.freeze({
-  cup: '#e4dcf4',
-  hub: '#6b6478',
-  bearing: '#d6dae1',
-  gasket: '#f2857f',
+  cup: '#efeaf8',
+  hub: '#b9b4c6',
+  bearing: '#f2f4f8',
+  gasket: '#ff6a62',
 });
 
 /** The single accent. Every other part stays low-chroma; a test enforces that. */

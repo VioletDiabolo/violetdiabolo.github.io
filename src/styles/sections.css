@@ -1,18 +1,25 @@
 /*
- * Section layout and component treatment -- the editorial composition.
+ * The four room patterns.
  *
- * Each [data-section] IS its reading column: ~38% of the viewport wide (--column,
- * base.css), pinned to whichever edge its data-side names. data-side is stamped by
- * src/ui/layout.js from the room playing over that section (src/scroll/
- * choreography.js ROOMS) -- the object holds the *other* side throughout, so the
- * column and the object never share screen space and neither ever needs a
- * background behind it. The grid room (data-side="center") is the one moment the
- * object is centred instead of offset, and it has faded out to opacity 0 by then;
- * that section gets a wider, centred measure (see below).
+ * Every section is one room, and every room is the same two boxes arranged differently
+ * (src/ui/sections.js builds them):
  *
- * There is no drawn structure anywhere in this file: no grid, no hairline rule, no
- * solid backdrop behind a heading or paragraph, no counter. Space alone is the
- * only separator.
+ *   <section data-room data-side> <div class="room"> <div class="room-head">  reading text
+ *                                                    <div class="room-body">  everything else
+ *
+ *   hero      full-bleed, object cropped large. Head bottom-left, teaser card bottom-right.
+ *   panel     a solid violet sheet that slides up and covers the object. Serif, near-black.
+ *   showcase  head top-left, body bottom-left, object right. The explosion plays here.
+ *   grid      a sticky title column left, cards right. Media, board and contact.
+ *
+ * `data-side` (stamped by src/ui/layout.js from the room's textSide) says which half the
+ * reading column takes and which half the object holds; --rc / --oc below turn that into
+ * grid columns, so the same three pinned patterns mirror without being written twice.
+ *
+ * There is still no drawn structure in this file: no grid overlay, no hairline rule, no
+ * counter, and no plate behind a heading or a paragraph. The two filled boxes that exist
+ * -- the hero's teaser card and the controls -- are objects you press or read as a unit,
+ * placed where the object is not, never a backing put behind running text to rescue it.
  */
 
 #content {
@@ -35,13 +42,13 @@
      horizontally: setting overflow-x alone, with overflow-y left at its initial
      value, makes the UA compute overflow-y as auto instead of visible (the CSS
      Overflow spec's mismatched-axis rule) -- which makes #content its own
-     scroll container and breaks position: sticky for every heading and lead
-     paragraph inside it (they stop tracking the page's real scroll and just sit at
-     their static flow position instead). Confirmed by toggling this live: with
-     overflow-x: hidden, a section's heading rendered off-screen at its natural
-     position no matter how far the page scrolled; clearing it snapped the heading
-     straight to its intended, held position. See body's own overflow-x below,
-     which gets the same clipping duty without this side effect.
+     scroll container and breaks position: sticky for every room inside it (they
+     stop tracking the page's real scroll and just sit at their static flow position).
+     Confirmed by toggling this live: with overflow-x: hidden, a section's heading
+     rendered off-screen at its natural position no matter how far the page scrolled;
+     clearing it snapped the heading straight to its intended, held position. See
+     body's own overflow-x below, which gets the same clipping duty without the
+     side effect.
   */
 }
 
@@ -49,21 +56,25 @@
 body { overflow-x: hidden; }
 
 .section {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: clamp(1.25rem, 3vh, 2rem);
-  width: var(--column);
-  padding-block: clamp(3rem, 10vh, 7rem);
   padding-inline: var(--gutter);
+  /* Defaults so `grid-column: var(--rc)` is never an invalid value on a section whose
+     side has not been stamped yet (src/ui/layout.js runs after render, and the footer
+     is never stamped at all). */
+  --rc: 1;
+  --oc: 2;
 }
+
+.room-head,
+.room-body { min-width: 0; }
 
 /*
  * Scroll length: each section's height is proportional to the span of the room playing
  * over it (src/scroll/choreography.js ROOMS), not a uniform 100vh -- the choreography
  * needs ~20 screens of scroll to read as distinct beats rather than a blur. These
- * heights still carry the six-act split they were tuned for; re-proportioning them
- * against the four rooms' spans belongs with the page layout those rooms pair with.
+ * heights also decide WHICH section is on screen when each room's tween lands: measured
+ * against the timeline, about's top reaches the viewport at progress 0.102 (the hero
+ * room ends at 0.12), events at 0.327 (the panel ends at 0.30) and media at 0.531 (the
+ * showcase ends at 0.55). Change one and the rooms stop matching what is being read.
  */
 [data-section='hero']    { min-height: 200vh; }
 [data-section='about']   { min-height: 440vh; }
@@ -73,200 +84,389 @@ body { overflow-x: hidden; }
 [data-section='contact'] { min-height: 240vh; }
 
 /*
- * Which edge the column hugs. margin-inline (not position/left/right) so the
- * column stays a normal, height-contributing block in a flex/auto-margin layout
- * rather than needing to be taken out of flow.
+ * Which half the reading column takes. Two custom properties rather than two copies of
+ * every placement rule: --rc is the reading column's track, --oc the object's.
  */
-[data-side='left']   { margin-inline-end: auto; }
-[data-side='right']  { margin-inline-start: auto; }
-[data-side='center'] {
-  width: var(--column-wide);
-  margin-inline: auto;
-  align-items: center;
-  text-align: center;
-}
+[data-side='left']  { --rc: 1; --oc: 2; }
+[data-side='right'] { --rc: 2; --oc: 1; }
 
-/*
- * The held beat: each section is several screens tall (see the min-heights above) so
- * the rooms have room to register; without this, the heading would only flash
- * past once near the section's vertical midpoint and the rest of the scroll would
- * read as a wall of whitespace. Sticky holds the heading (and, below it, the lead
- * paragraph) at the middle of the viewport instead, for as long as the section is in
- * view. Interactive content further down a section -- the media grid, the board
- * roster, the forms, the socials nav -- is deliberately left in normal flow: holding
- * a whole card grid in place with a transform would clip or overlap it, and it is
- * content people scroll through and click, not a beat to sit and watch.
+/* ---------------------------------------------------------------------------
+ * The panel's surface, declared before any layout because it is not layout: it is the
+ * one filled area on the page and the single most load-bearing declaration in this file.
  *
- * z-index: 2, not left at auto: a sticky element with no explicit z-index paints in
- * DOM order among its "positioned" siblings, and .media-facade below is itself
- * position: relative (for its own play-icon ::before/::after). Once the media grid
- * scrolls up to where the heading is held, .media-facade's own z-index: auto ties
- * with the heading's and DOM order (the grid comes after the heading) decided the
- * tie the wrong way -- the grid painted over "MEDIA" and hid it completely. An
- * explicit z-index here wins outright, regardless of DOM order.
- */
-.section > h1,
-.section > h2 {
-  position: sticky;
-  z-index: 2;
-  /* vh, not %: a sticky element's percentage inset resolves against its containing
-     block's height, and neither .section (sized by min-height, not an explicit
-     height) nor any ancestor above it up to #content has a definite one -- measured
-     in a live render, top: 42% here resolved against the *entire page's* scroll
-     height (thousands of px down), not 42% of the viewport, and the heading simply
-     never appeared on screen. vh is always relative to the viewport regardless of
-     the containing block's own sizing, which is what "42% down the screen" means. */
-  top: 42vh;
-  transform: translateY(-50%);
-}
-
-.section > p {
-  position: sticky;
-  z-index: 2; /* see the heading rule above -- the same paint-order tie applies here */
-  top: 58vh;
-  /* No translateY here: About's lead paragraph runs long enough, wrapped inside a
-     ~38%-wide column, that centring it the same way would spill it back up into the
-     heading above. Anchoring only its top edge lets it extend downward, never up. */
-}
-
-/*
- * A light defensive shadow on every held heading and paragraph, not just the centred
- * acts: the heading stays "stuck" at a fixed point in the viewport for most of a
- * section's height while that section's OWN content -- the media grid, the board
- * roster's photos, About's own group photo -- scrolls past underneath it in normal
- * flow. Whatever a section is showing eventually passes behind its held heading, the
- * same way the object passes behind centred text, just with lower stakes (a card
- * thumbnail, not a full-bleed render). Much lighter than the centred treatment below,
- * because the usual background here is the page's own near-black atmosphere, where
- * contrast is already high and a heavy shadow would only look muddy.
- */
-.section > h1,
-.section > h2,
-.section > p {
-  text-shadow: 0 1px 3px rgba(3, 2, 6, 0.75), 0 2px 18px rgba(3, 2, 6, 0.45);
+ * The slide-up is free, and this is the whole of it. #stage is position: sticky and
+ * #content scrolls over it (stage.css), so an opaque section simply rises and covers the
+ * object -- no scroll listener, no second animation engine, nothing to keep in sync. A
+ * transparent panel would fail to cover anything at all, and the room would be four
+ * screens of violet-less nothing with the diabolo still showing through it.
+ *
+ * It is also the page's single PRINTED surface (see base.css's header): the one place
+ * the accent is spent on an area rather than a mark, and the only warm ground in the
+ * scroll. --accent-ink on --accent measures 7.05:1, so this is a AAA reading surface --
+ * which is the whole reason the accent sits at this lightness and not at the crest's
+ * #57068c, where near-black text would measure 1.66:1 and be unreadable.
+ * ------------------------------------------------------------------------- */
+[data-room='panel'] {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 /* ---------------------------------------------------------------------------
- * data-side="center": the one moment the object is centred rather than offset
- * (src/scroll/choreography.js's grid room has x: 0), so the section has no
- * "opposite side" to put the object on the way every left/right section does.
- * Under the four rooms that is Media alone; Hero is now an offset composition. An earlier pass solved that by keeping the object
- * centred behind the text and outlining the letterforms instead: a specular
- * highlight on the bowl could read at 253,253,253 (effectively --ink's own
- * luminance) directly behind the title, so a hard glyph stroke plus a near-solid
- * backing shadow was measured at 6.4:1 or better. It worked, but it read as a
- * cheap outlined webfont, and it was the exact text-on-top-of-the-object overlap
- * this revamp exists to remove -- a stroke treats the symptom, not the cause.
+ * The three pinned rooms.
  *
- * The compositional fix under the six acts was to lift the object clear of the
- * centred text. The four rooms do not need it: the one centred room fades the
- * object out entirely (`opacity: 0`, see ROOMS), so there is nothing left behind
- * the text to clear. The centred text still sits in the lower third (below),
- * landing on the page's own near-black ground -- the same ground every left/right
- * section's text already sits on -- so it needs nothing beyond the light defensive
- * shadow every heading and paragraph already gets above.
+ * One sticky box per section, held for the section's whole height, with the composition
+ * laid out inside it. Pinning the room rather than each heading and paragraph separately
+ * is what keeps a composition a composition: three separately stuck elements, each at
+ * its own guessed vh offset, drift apart the moment a heading rewraps at a width nobody
+ * tested. It is also why the object never needs anything behind the text -- the reading
+ * column is one box on one side, and the object holds the other for the whole room.
  * ------------------------------------------------------------------------- */
 
+[data-room='hero'] .room,
+[data-room='panel'] .room,
+[data-room='showcase'] .room {
+  position: sticky;
+  top: 0;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
+  column-gap: var(--gutter);
+}
+
+[data-side='right'] .room {
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--text-col));
+}
+
+/* ---------------------------------------------------------------------------
+ * Hero
+ * ------------------------------------------------------------------------- */
+
+[data-room='hero'] .room {
+  align-content: end;
+  align-items: end;
+  padding-block: var(--nav-h) clamp(2rem, 7vh, 4.5rem);
+}
+
+[data-room='hero'] .room-head { grid-column: var(--rc); }
+
 /*
- * The general h1/h2/p sticky rule above holds every section's text at the vertical
- * middle (top: 42vh / 58vh). That is exactly where the object used to sit centred,
- * so the two centred acts override it down into the lower third instead: the object
- * occupies roughly the top 62-64% of the viewport now (see the comment above), and
- * this puts the held title and paragraph beneath that line rather than inside it.
- *
- * top is the box's actual rendered top edge here, not its centre: the general
- * rule's `transform: translateY(-50%)` never actually applies to ANY heading on the
- * page, centred or not. src/ui/reveal.js stamps every reveal target with
- * `.reveal-pending.reveal-visible` (two classes -- specificity 0,2,0), whose own
- * `transform: translateY(0)` outranks `.section > h1`'s one-class-one-element
- * selector (0,1,1) regardless of which rule comes later in the file, so it always
- * wins. Measured live: a heading's rendered top edge lands exactly at its `top`
- * value, never shifted. (That is a pre-existing, page-wide dead declaration, not
- * introduced here -- worth its own fix, out of scope for this one.) 66vh / 95vh
- * are chosen against real rendered geometry at 1440px width (hero's two-line,
- * 120px h1 is the tall case) with the reveal transform's absence accounted for,
- * not against where a working translateY(-50%) would have centred them.
+ * flex + justify-content, not `justify-self: end` on the item. The item shrink-to-fit
+ * that justify-self relies on is circular here -- .teaser sizes itself with a percentage
+ * against this very box -- so the browser resolved it back to the full track and the card
+ * sat at the LEFT edge of the object's column, measured 339px in at 768. That put it
+ * against the headline's overflow instead of out at the margin. Stretching the box and
+ * pushing the card inside it has no such cycle.
  */
-[data-side='center'] h1,
-[data-side='center'] h2 {
-  top: 66vh;
+[data-room='hero'] .room-body {
+  grid-column: var(--oc);
+  display: flex;
+  justify-content: flex-end;
 }
 
-[data-side='center'] p {
-  top: 95vh;
+/* The hairline grotesque, run as large as the viewport allows. 9ch breaks the club's
+   two words onto two lines at every width, which is the shape the composition wants --
+   a tall block of thin line in the bottom-left corner, not a single long rule of text. */
+/*
+ * --type-hero is 9.6vw rather than the 10.5vw it started at, and this is why. A single
+ * long word cannot wrap, so `max-width` does
+ * not contain it -- the h1's BOX stays inside its column while the ink runs out the side,
+ * silently, and no layout rule anywhere notices. Measured at 768: "DIABOLO" set 80.6px
+ * painted 322px of ink out of a 263px column and crossed 21px into the teaser card. At
+ * 9.6vw the ink ends 92px clear of the card at 768, which is the narrowest width this
+ * side-by-side composition is ever used at -- at 767 and below the room stacks (see the
+ * bottom of this file) and the card sits under the headline at full width. Desktop is
+ * untouched in practice: 9.6vw reaches the 9rem ceiling at 1500px.
+ */
+[data-room='hero'] h1 {
+  font-size: var(--type-hero);
+  font-weight: 200;
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  max-width: 9ch;
 }
 
-[data-section='hero'] {
-  gap: 1.1rem;
-}
-
-[data-section='hero'] h1 {
-  font-size: clamp(3.25rem, 9vw, 7.5rem);
-  max-width: 14ch;
-}
-
-[data-section='hero'] p {
-  font-family: var(--font-body);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: clamp(0.85rem, 1.4vw, 1rem);
+[data-room='hero'] .room-head p {
+  margin-top: clamp(0.9rem, 2.2vh, 1.5rem);
+  font-size: var(--type-micro);
+  font-weight: 400;
+  /* The club's own copy is already capitals (content/index.js SITE.tagline); capitals
+     set solid are unreadable, so this is the tracking caps need, not a label style
+     applied to lowercase text. */
+  letter-spacing: 0.14em;
   color: var(--ink-dim);
   max-width: 34ch;
 }
 
-/* ---------------------------------------------------------------------------
- * Section headings: large serif, real size, no index, no callout rule. See
- * base.css for why h2 is on --font-display at all and h3 (card headings below)
- * deliberately is not.
- * ------------------------------------------------------------------------- */
-
-.section:not([data-section='hero']) h2 {
-  font-size: clamp(2.25rem, 4.4vw, 4rem);
+/*
+ * The teaser card: when and where to turn up, before anyone has scrolled. Filled, and
+ * deliberately so -- it is a discrete object in the composition, sitting in the bottom
+ * band the object does not reach (at the hero room's camZ 6.2 the object spans roughly
+ * 29%-71% of the viewport's height), and an opaque fill makes its contrast a fixed
+ * number instead of a function of whatever the canvas is drawing. That is the opposite
+ * of a plate slid under running text to rescue it.
+ */
+.teaser {
+  width: min(19rem, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 1.15rem 1.25rem 1.1rem;
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
-.section > p {
+.teaser-when {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  max-width: none;
+}
+
+.teaser-where {
+  font-size: 0.86rem;
+  line-height: 1.5;
   color: var(--ink-dim);
+  max-width: none;
+}
+
+.teaser-link {
+  margin-top: 0.5rem;
+  font-size: var(--type-micro);
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
+ * Panel
+ * ------------------------------------------------------------------------- */
+
+[data-room='panel'] .room {
+  /* Both tracks fluid here, unlike the other two pinned rooms: the object is covered,
+     so there is no half to keep clear and the text can have real width. */
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  column-gap: clamp(1.5rem, 5vw, 5rem);
+  align-content: center;
+  align-items: center;
+  padding-block: calc(var(--nav-h) + clamp(1rem, 3vh, 2rem)) clamp(2rem, 6vh, 4rem);
+}
+
+[data-room='panel'] .room-head { grid-column: var(--rc); }
+[data-room='panel'] .room-body { grid-column: var(--oc); }
+
+/* Instrument Serif's one job on the page. Set at real size, on the one surface that is
+   printed rather than drawn, it makes the panel a change of MATERIAL rather than just a
+   change of colour -- which is what stops a 4.4-screen violet block reading as a gap. */
+[data-room='panel'] h2 {
+  font-family: var(--font-panel);
+  font-weight: 400;
+  font-size: var(--type-panel);
+  line-height: 0.96;
+  letter-spacing: -0.005em;
+  color: var(--accent-ink);
+}
+
+[data-room='panel'] p {
+  margin-top: clamp(1rem, 2.6vh, 1.9rem);
+  font-family: var(--font-panel);
+  font-size: clamp(1.15rem, 1.6vw, 1.7rem);
+  /* A serif wants a little more leading than the sans default, and a little more
+     measure: 48ch of Instrument Serif is about the same line length as 62ch of Inter. */
+  line-height: 1.45;
+  max-width: 48ch;
+  color: var(--accent-ink);
+}
+
+/* ---------------------------------------------------------------------------
+ * Showcase -- the one room the explosion plays in (src/scroll/choreography.js
+ * SHOWCASE_ID). Title at the top of the reading column, copy and the two form pills at
+ * the bottom of it, and the whole right-hand half left to the object coming apart.
+ * ------------------------------------------------------------------------- */
+
+[data-room='showcase'] .room {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding-block: calc(var(--nav-h) + clamp(1rem, 4vh, 2.5rem)) clamp(2rem, 7vh, 4.5rem);
+}
+
+[data-room='showcase'] .room-head {
+  grid-column: var(--rc);
+  grid-row: 1;
+}
+
+[data-room='showcase'] .room-body {
+  grid-column: var(--rc);
+  grid-row: 3;
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.1rem, 2.6vh, 1.75rem);
+}
+
+/* ---------------------------------------------------------------------------
+ * Grid
+ *
+ * Default (a side is stamped, so the object is somewhere on screen): keep to the reading
+ * column like every other room. This is the path a reduced-motion visitor gets -- the
+ * object is parked at the hero room's position at full opacity and never moves, so
+ * src/ui/layout.js stamps these three sections 'left' and the cards must not stray into
+ * the half it is sitting in.
+ * ------------------------------------------------------------------------- */
+
+/*
+ * The section itself becomes a one-cell grid purely so .room STRETCHES to fill it. A
+ * grid room's content is a fraction of its section's height -- board's roster is about
+ * 60vh inside 360vh -- so a plain block .room ends where its content does, and the
+ * sticky title below has only that 60vh of containing block to travel through. Measured
+ * live: "BOARD" held for a fifth of its section and then scrolled away, leaving three
+ * screens of nothing. The pinned rooms deliberately do NOT get this: their .room is
+ * sticky at 100dvh and needs the section to be TALLER than it, not equal to it.
+ */
+[data-room='grid'] { display: grid; }
+
+[data-room='grid'] .room {
+  display: grid;
+  grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
+  column-gap: var(--gutter);
+  padding-block: clamp(3rem, 9vh, 6rem);
+  /* Head and body stack in one column on this path, so the rows must size to content --
+     stretched, they would each take half the section and tear the heading off its copy. */
+  align-content: start;
+}
+
+[data-room='grid'] .room-head,
+[data-room='grid'] .room-body { grid-column: var(--rc); }
+
+[data-room='grid'] .room-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(1.25rem, 3vh, 2rem);
+  margin-top: clamp(1.25rem, 3vh, 2rem);
 }
 
 /*
- * Overrides the ink-dim above for the two centred acts specifically. Before the
- * object lifted clear of the text (see the composition comment above), the hero
- * tagline and Contact's sign-off line sat directly over it and measured 2.82:1
- * worst-case with the dimmer tone -- a real failure. Now that both live in the
- * lower third, over the page's own near-black ground like every other section's
- * paragraph, ink-dim would likely clear that bar too -- but full --ink costs
- * nothing here and stays safe if the framing ever moves again, so it is kept
- * rather than re-introducing the de-emphasis for no real gain.
+ * data-side="center" is the grid room's own, and the choreography means something
+ * precise by it: the object finishes centred AND faded to opacity 0 (ROOMS -- x: 0,
+ * opacity: 0), so for the only time on the page there is no object-half to keep clear.
+ * The layout spends that: full width, a sticky title column on the left and the cards on
+ * the right, which is the pattern the client's last reference shows. Nothing here
+ * contradicts textSide -- 'center' says the object has nowhere left to be, and this is
+ * what the page does with a section that has the screen to itself.
  */
-[data-side='center'] p {
-  color: var(--ink);
+[data-room='grid'][data-side='center'] .room {
+  grid-template-columns: minmax(0, var(--label-col)) minmax(0, 1fr);
+  column-gap: clamp(1.5rem, 5vw, 4.5rem);
+  /* One row, two columns, so stretching it is exactly right: the row becomes the whole
+     section and the sticky title column has the full height to be held through.
+     align-items keeps the two boxes at the top of that tall row. */
+  align-content: stretch;
+  align-items: start;
+}
+
+/*
+ * Held at 18vh for the length of the section while its cards scroll past. Pinned by the
+ * .room-head box, not the h2 inside it, so contact's sign-off line travels with its
+ * title instead of being separately stuck at a second guessed offset.
+ * tests/choreography.dom.test.js samples this number: the object must be gone before a
+ * title held this high could be laid over.
+ */
+[data-room='grid'][data-side='center'] .room-head {
+  grid-column: 1;
+  position: sticky;
+  top: 18vh;
+}
+
+[data-room='grid'][data-side='center'] .room-body {
+  grid-column: 2;
+  margin-top: 0;
+}
+
+/*
+ * Contact's text column carries a sentence and a row of links, not a single word, so it
+ * gets a real measure instead of the label width media and board need. At --label-col
+ * the sign-off broke after every two or three words and the email took a line of its own.
+ */
+[data-section='contact'][data-side='center'] .room {
+  grid-template-columns: minmax(0, min(40%, 26rem)) minmax(0, 1fr);
+}
+
+[data-section='contact'] .room-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(0.9rem, 2.2vh, 1.4rem);
+}
+
+/*
+ * Media is the one grid section that opens while the object is still on screen, and this
+ * offset is what keeps the two apart.
+ *
+ * Measured, not guessed. The object is not fully faded until progress 0.595 (the grid
+ * room starts at the showcase's end, 0.55, and OPACITY_SETTLE spends 0.10 of the room on
+ * the fade), which is 1166vh into the page's 1960vh of scroll. Media's own top edge
+ * crosses the viewport's BOTTOM at 940vh -- progress 0.48 -- so without this its first
+ * row of cards shares the right-hand half with a fully visible, fully exploded object
+ * for about a fifth of a screen's worth of scroll. Sampled against live canvas pixels at
+ * 61 scroll positions, the card captions measured 1.02:1 there, where a bright wireframe
+ * edge crosses a glyph: invisible text, not dim text.
+ *
+ * 240vh moves the first card past the fade rather than putting anything behind the
+ * captions, and it buys the grid room the opening beat it wanted anyway -- the title held
+ * at the left while the object reassembles, spins up and goes. Board and contact need
+ * nothing: their cards arrive at progress 0.67 and 0.85, long after the object is gone.
+ *
+ * Scoped to data-side="center" deliberately. Under reduced motion src/ui/layout.js stamps
+ * these sections 'left' instead, the whole section keeps to the reading column, and the
+ * parked object is never behind the cards at all -- so there is nothing to hold back and
+ * 230vh of blank column would be pure damage. tests/sections-layout.dom.test.js
+ * recomputes the requirement from ROOMS and the section heights, so this number cannot
+ * quietly stop being enough.
+ */
+[data-section='media'][data-side='center'] .room-body {
+  margin-top: 240vh;
 }
 
 /* ---------------------------------------------------------------------------
- * Contact: the sign-off line + socials nav.
+ * Section titles and body copy, shared across the rooms that do not override them.
+ * ------------------------------------------------------------------------- */
+
+.section:not([data-section='hero']):not([data-room='panel']) h2 {
+  font-size: var(--type-title);
+}
+
+[data-room='grid'] h2 {
+  font-size: clamp(1.45rem, 2.4vw, 2.3rem);
+  letter-spacing: -0.02em;
+}
+
+[data-room='showcase'] .room-body p,
+[data-room='grid'] .room-head p {
+  margin-top: 0.9rem;
+  font-size: var(--type-lead);
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+
+/* ---------------------------------------------------------------------------
+ * Contact: the socials nav.
  * ------------------------------------------------------------------------- */
 
 .socials {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.75rem 1.75rem;
+  gap: 0.6rem 1.6rem;
 }
 
 .socials a {
-  font-family: var(--font-body);
+  font-size: 0.82rem;
   font-weight: 500;
-  text-transform: uppercase;
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
   color: var(--ink-dim);
   text-decoration: none;
 }
 
 .socials a:hover,
 .socials a:focus-visible {
-  color: var(--violet-lift);
+  color: var(--ink);
 }
 
 /* ---------------------------------------------------------------------------
@@ -287,23 +487,23 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Board cards
+ * Board cards -- no fill and no border. A photograph is already a shape; putting a box
+ * round it as well is the card kit this page is not.
  * ------------------------------------------------------------------------- */
 
 .board-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 1.5rem;
+  /* 240px, not the 190px this started at: at 190 a wide screen fits five tracks and each
+     bio wraps at about 25 characters, which is a column of confetti rather than prose. */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: clamp(1.25rem, 2.5vw, 2.25rem);
   width: 100%;
 }
 
 .board-card {
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  background: var(--stage-raised);
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.45rem;
 }
 
 .board-card img {
@@ -313,76 +513,70 @@ body { overflow-x: hidden; }
      so there is no competing definite dimension here -- `aspect-ratio` alone forces
      the square box, and `height: auto` lets it compute from the rendered width. */
   height: auto;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 5;
   object-fit: cover;
-  border-radius: calc(var(--radius) - 4px);
+  border-radius: var(--radius);
+  margin-bottom: 0.45rem;
 }
 
-.board-card h3 {
-  font-size: 1.05rem;
-}
+.board-card h3 { font-size: 1rem; }
 
 .board-position {
-  font-family: var(--font-body);
+  font-size: 0.76rem;
   font-weight: 500;
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  color: var(--ink-dim);
+  color: var(--accent);
   max-width: none;
 }
 
 .board-card p:not(.board-position) {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   line-height: 1.55;
+  color: var(--ink-dim);
   max-width: none;
 }
 
-/* The open slot: no image, so it reads as a deliberate gap in the roster rather
-   than a card that failed to load one. A dim tone instead of a dashed border --
-   still a distinct treatment, without a drawn line. */
+/* The open slot: no image, so it reads as a deliberate gap in the roster rather than a
+   card that failed to load one. Space and a dim tone, never a dashed box. Aligned to the
+   top like every other card -- floated to the bottom of a stretched cell it just looked
+   mis-set. */
 .board-card[data-placeholder='true'] {
-  background: transparent;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding-block: 2.5rem;
+  align-self: start;
 }
 
+.board-card[data-placeholder='true'] h3 { color: var(--ink-dim); }
+
 /* ---------------------------------------------------------------------------
- * Semester select
+ * Semester select -- a control, so it is a filled pill (base.css --radius-pill).
  * ------------------------------------------------------------------------- */
 
 .semester-select {
   appearance: none;
   -webkit-appearance: none;
-  background-color: var(--stage-raised);
+  background-color: var(--surface);
   color: var(--ink);
   border: none;
-  border-radius: var(--radius);
-  padding: 0.75rem 2.4rem 0.75rem 1.1rem;
-  margin-bottom: 0.5rem;
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 2.3rem 0.55rem 1.1rem;
   font-family: var(--font-body);
   font-weight: 500;
-  letter-spacing: 0.02em;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: background-color 0.2s ease;
   /* CSS-only chevron: two triangular gradients meeting in a V, no image asset. */
   background-image:
     linear-gradient(45deg, transparent 50%, var(--ink-dim) 50%),
     linear-gradient(135deg, var(--ink-dim) 50%, transparent 50%);
-  background-position: calc(100% - 22px) center, calc(100% - 17px) center;
+  background-position: calc(100% - 21px) center, calc(100% - 16px) center;
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
 }
 
 .semester-select:hover {
-  background-color: color-mix(in oklab, var(--stage-raised) 70%, var(--violet-deep));
+  background-color: color-mix(in oklab, var(--surface) 60%, var(--accent));
 }
 
 .semester-select option {
-  background-color: var(--stage-raised);
+  background-color: var(--surface);
   color: var(--ink);
 }
 
@@ -393,16 +587,18 @@ body { overflow-x: hidden; }
 .media-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 1.75rem;
+  gap: clamp(1.25rem, 2.5vw, 2rem);
   width: 100%;
 }
 
 .media-card {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.7rem;
 }
 
+/* --surface here is a placeholder for the thumbnail that loads on top of it, not a
+   plate: every one of these is covered by its own background-image. */
 .media-facade {
   position: relative;
   display: block;
@@ -411,16 +607,19 @@ body { overflow-x: hidden; }
   padding: 0;
   border: none;
   border-radius: var(--radius);
-  background-color: var(--stage-raised);
+  background-color: var(--surface);
   background-size: cover;
   background-position: center;
   cursor: pointer;
   transition: transform 0.25s ease;
 }
 
-/* Play affordance: a triangle in a circle, built entirely from CSS. Cyan is the
-   one accent reserved for an interactive join (base.css); this is the clearest
-   one on the page short of :focus-visible itself. */
+/*
+ * Play affordance: a triangle in a circle, drawn in line like everything else on the
+ * bench. White, not the accent -- the accent marks the three things that ask a visitor
+ * to commit (the nav's call to action and the two forms). Pressing play commits to
+ * nothing, so it is not coloured.
+ */
 .media-facade::before {
   content: '';
   position: absolute;
@@ -428,8 +627,8 @@ body { overflow-x: hidden; }
   left: calc(50% + 3px);
   transform: translate(-50%, -50%);
   border-style: solid;
-  border-width: 10px 0 10px 16px;
-  border-color: transparent transparent transparent var(--cyan);
+  border-width: 9px 0 9px 15px;
+  border-color: transparent transparent transparent var(--ink);
   transition: border-color 0.25s ease;
 }
 
@@ -439,39 +638,36 @@ body { overflow-x: hidden; }
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  border: 1.5px solid var(--cyan);
-  background: rgba(8, 6, 13, 0.35);
+  border: 1.5px solid var(--ink);
+  background: rgba(var(--stage-rgb), 0.45);
   transition: border-color 0.25s ease;
 }
 
 .media-facade:hover,
 .media-facade:focus-visible {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
 }
 
 .media-facade:hover::after,
-.media-facade:focus-visible::after,
-.media-facade:hover::before,
-.media-facade:focus-visible::before {
-  border-color: var(--violet-lift);
+.media-facade:focus-visible::after {
+  border-color: var(--accent);
 }
 
 .media-facade:hover::before,
 .media-facade:focus-visible::before {
-  border-color: transparent transparent transparent var(--violet-lift);
+  border-color: transparent transparent transparent var(--accent);
 }
 
-.media-facade:focus-visible {
-  outline-offset: 4px;
-}
+.media-facade:focus-visible { outline-offset: 4px; }
 
 .media-card h3 {
-  font-weight: 500;
-  font-size: 0.95rem;
-  line-height: 1.4;
+  font-weight: 400;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--ink-dim);
 }
 
 .media-card iframe {
@@ -482,14 +678,14 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Form facades
+ * Form facades -- the showcase's pill buttons, and the second and third places the
+ * accent is spent. Both of these ask a visitor to actually do something.
  * ------------------------------------------------------------------------- */
 
 .form-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
-  margin-top: 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   width: 100%;
 }
 
@@ -497,38 +693,40 @@ body { overflow-x: hidden; }
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1.25rem;
-  background: var(--stage-raised);
-  border-radius: var(--radius);
-  padding: 1.5rem;
+  gap: 0.5rem;
 }
 
+/* The button's label already carries the form's title ("Open <title>"), so this heading
+   does repeat it -- but only until the button is pressed: src/ui/forms.js REPLACES the
+   button with the embedded form, and after that this heading is the only thing naming
+   what the iframe is. Set small and dim so it reads as the card's title rather than as a
+   second call to action. */
 .form-card h3 {
-  font-size: 1rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   color: var(--ink-dim);
   max-width: none;
 }
 
-/* The one place --cyan is allowed to fill a shape: a call-to-action button is
-   the clearest "interactive join" on the page short of :focus-visible itself
-   (base.css), so it fits the same rule that colour is reserved for. */
 .form-card button {
-  background: var(--cyan);
-  color: var(--stage);
+  background: var(--accent);
+  color: var(--accent-ink);
   border: none;
-  border-radius: var(--radius);
-  padding: 0.8rem 1.4rem;
+  border-radius: var(--radius-pill);
+  padding: 0.7rem 1.35rem;
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .form-card button:hover {
-  background: var(--violet-lift);
-  color: var(--ink);
+  background: color-mix(in oklab, var(--accent) 72%, white);
 }
+
+.form-card:has(iframe) { width: 100%; }
 
 .form-card iframe {
   width: 100%;
@@ -537,82 +735,123 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Footer -- not a `.section`: there is no reading column here, so it skips the
- * edge-anchored layout entirely. The choreography (src/scroll/choreography.js)
- * finishes with the object reassembled, in profile and faded out (the `grid`
- * room). min-height simply gives the page enough scroll distance for that full
- * scrub to complete before the footer is reached.
+ * Footer -- not a `.section`: there is no room here, so it skips the pattern layout
+ * entirely. The choreography (src/scroll/choreography.js) finishes with the object
+ * reassembled, in profile and faded out (the `grid` room). min-height gives the page
+ * enough scroll distance for that full scrub to complete before the footer is reached.
  * Separated from Contact by space alone, not a rule.
  * ------------------------------------------------------------------------- */
 
 .section-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
+  /*
+   * Left, not centred. Under normal motion this line has nothing behind it -- the object
+   * is at opacity 0 for the whole grid room -- but under REDUCED motion nothing ever
+   * fades: main.js parks the object at the hero room's position, at full opacity, and
+   * attaches no scroll timeline, so it is still sitting in the right-hand half when the
+   * footer arrives. Measured against live canvas pixels on that path, a centred line read
+   * 1.71:1 where it crossed the wireframe. Left-aligned it is in the same column every
+   * other room's text occupies, which is the half the object never holds -- the same
+   * reasoning as data-side, applied to the one element that has no data-side. It also
+   * simply matches the rest of the page, which is left-aligned throughout.
+   */
+  justify-content: flex-start;
   min-height: 60vh;
   padding-block: clamp(4rem, 10vh, 7rem);
   padding-inline: var(--gutter);
 }
 
 .footer-line {
-  font-family: var(--font-body);
+  font-size: var(--type-micro);
   font-weight: 500;
-  text-transform: uppercase;
-  font-size: 0.78rem;
-  letter-spacing: 0.16em;
-  /* Full --ink, not the ink-dim de-emphasis every other small label gets: the
-     choreography timeline (bound to the whole of #content, which includes the
-     footer) holds the object at the grid room's final state -- centred and faded
-     out to opacity 0 (src/scroll/choreography.js) -- while the footer is on
-     screen. The shadow is kept regardless: this line is normal in-flow content
-     sitting where the object's own band is, and the fade is the choreography's to
-     change. A single soft shadow, no stroke (see this file's own header for why
-     one no longer belongs anywhere on the page). */
-  color: var(--ink);
-  text-shadow: 0 2px 8px rgba(3, 2, 6, 0.75);
-  text-align: center;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim);
 }
 
 /* ---------------------------------------------------------------------------
- * Narrow screens: the object holds the upper band (dimmed to 30% opacity,
- * stage.css) and text simply flows beneath it -- there is no room for an
- * edge-anchored column at this width, and side-crossing is not the point below
- * tablet width, it is the desktop-only recipe. Every section becomes a plain,
- * full-width, top-to-bottom flow; the sticky "held beat" and the edge anchoring
- * both apply only when there is a second column for the object to occupy.
+ * Narrow screens.
+ *
+ * The overlap is composed away, not mitigated: the object takes a band of its own at
+ * the top of the viewport and the text flows beneath it (stage.css). Nothing here is
+ * ever laid over the canvas, so nothing here needs a shadow, a plate or a dimmed object
+ * behind it -- which is the treatment the client rejected. Every room collapses to one
+ * full-width column in reading order; the side anchoring and the pinned compositions
+ * both only mean anything when there is a second half for the object to hold.
  * ------------------------------------------------------------------------- */
 
 @media (max-width: 767px) {
-  .section {
-    width: auto;
-    margin-inline: 0;
-    align-items: flex-start;
-    text-align: left;
+  /*
+   * The stage is a 40dvh band at this width, not a full viewport (stage.css), so the
+   * pull-up that makes #content overlap it on desktop has to go -- left in place it
+   * hauls the hero up underneath an opaque band and the first two thirds of a screen of
+   * content is simply invisible. This lives here rather than beside the band itself
+   * because this file loads last and would override it there; see stage.css's own
+   * narrow-screen comment.
+   */
+  #content {
+    margin-top: 0;
   }
 
-  [data-side='center'] {
-    width: auto;
-  }
-
-  .section > h1,
-  .section > h2,
-  .section > p {
+  [data-room] .room {
     position: static;
-    transform: none;
+    display: block;
+    min-height: 0;
+    padding-block: clamp(2.5rem, 7vh, 4rem);
   }
 
-  /* The same protection the centred acts carry above, extended to every heading
-     and lead paragraph here: below tablet width there is no offset column keeping
-     text off the object, so every section needs it, not just the centred ones.
-     Full --ink too, not the ink-dim every paragraph gets above -- that de-emphasis
-     only holds up over the page's own near-black ground, which nothing here is
-     guaranteed any more. No stroke, even here (see this file's own header) -- the
-     canvas is already dimmed to 30% opacity at this width (stage.css), which
-     carries most of the load; a single soft shadow is enough on top of that. */
-  [data-section] h1,
-  [data-section] h2,
-  .section > p {
-    color: var(--ink);
-    text-shadow: 0 2px 8px rgba(3, 2, 6, 0.75);
+  /*
+   * Hero and showcase keep their pinned composition, below the band rather than behind
+   * it. Their sections run 200vh and 400vh while their content is 405px and 449px on a
+   * 375x812 phone -- measured -- so without this you read the room in the first half
+   * screen and then scroll through two to four screens of nothing while the object
+   * carries on alone. Pinned, the composition is on screen for the whole room, which is
+   * what it is on desktop.
+   *
+   * The panel is deliberately NOT in this list: its content measures 746px against the
+   * 487px this leaves below the band, so pinning it would strand a third of the club's
+   * own story off the bottom of the screen where no scroll could reach it. It flows
+   * instead, and the violet sheet it leaves behind is at least the effect the room is
+   * for. The grid rooms are not here either, for the obvious reason that their cards
+   * have to scroll.
+   */
+  [data-room='hero'] .room,
+  [data-room='showcase'] .room {
+    position: sticky;
+    top: 40dvh;
+    min-height: 60dvh;
   }
+
+  [data-room='hero'] .room {
+    /* The hero is the one room that still needs its own vertical rhythm: it sits
+       directly under the object's band, so it opens the page rather than filling it. */
+    padding-block: clamp(1.5rem, 4vh, 2.5rem) clamp(2.5rem, 7vh, 4rem);
+  }
+
+  [data-room] .room-head,
+  [data-room] .room-body {
+    display: block;
+    margin-top: 0;
+  }
+
+  [data-room] .room-body { margin-top: clamp(1.5rem, 4vh, 2.25rem); }
+
+  /* The object holds a band of its own here (stage.css) and nothing is ever laid over
+     it, so the desktop hold-back above has nothing left to protect. */
+  [data-section='media'][data-side='center'] .room-body {
+    margin-top: clamp(1.5rem, 4vh, 2.25rem);
+  }
+
+  [data-room='hero'] h1 {
+    font-size: clamp(2.9rem, 15vw, 4.5rem);
+    max-width: none;
+  }
+
+  [data-room='panel'] p { font-size: 1.15rem; }
+
+  .teaser { width: 100%; }
+
+  .form-list { flex-direction: column; align-items: flex-start; }
+
+  .board-list { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }

@@ -141,6 +141,32 @@ describe('label opacity', () => {
     expect(labels.elements.cupTop.style.pointerEvents).toBe('auto');
   });
 
+  it('never outlives the object it annotates', () => {
+    // The grid room fades the object out over a tenth of the room but ramps labelOpacity
+    // down across the whole of it, so for most of that room the table says "labels 0.7,
+    // object 0". A label floating over an object that is not there is a caption for
+    // nothing -- and it lands squarely on the media section's card captions, which occupy
+    // the same half of the screen by then. Measured live before this existed: four
+    // separate part labels overlapping media/h3 boxes at scroll progress 0.64-0.65.
+    const { tilt, parts } = scene();
+    const state = { spinRate: 1, labelOpacity: 0.7, objectOpacity: 0 };
+    const labels = createLabels({ parts, tilt, container: document.createElement('div'), state });
+    labels.render({}, {});
+    expect(labels.elements.cupTop.style.opacity, 'a label survived the object').toBe('0');
+    expect(labels.elements.cupTop.style.pointerEvents).toBe('none');
+  });
+
+  it('still shows a label when only labelOpacity is supplied, rather than writing NaN', () => {
+    // Every other caller passes the full state, but a partial one must degrade to the old
+    // behaviour: `undefined` reaching the multiply would put opacity:"NaN" in the DOM,
+    // which browsers ignore -- the labels would stay fully visible and nothing would throw.
+    const { tilt, parts } = scene();
+    const state = { spinRate: 1, labelOpacity: 1 };
+    const labels = createLabels({ parts, tilt, container: document.createElement('div'), state });
+    labels.render({}, {});
+    expect(labels.elements.cupTop.style.opacity).toBe('1');
+  });
+
   it('never removes hidden labels from the accessibility tree', () => {
     const { tilt, parts } = scene();
     const state = { spinRate: 1, labelOpacity: 0 };

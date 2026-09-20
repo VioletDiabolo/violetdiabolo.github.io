@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { ROOMS, HERO_ID } from '../src/scroll/choreography.js';
+import { ROOMS, HERO_ID, OPACITY_SETTLE } from '../src/scroll/choreography.js';
 import { SECTION_FOR_ROOM, applySectionSides } from '../src/ui/layout.js';
 import { renderSections } from '../src/ui/sections.js';
 
@@ -132,6 +132,67 @@ describe('applySectionSides', () => {
       expect(root.querySelector(`[data-section="${id}"]`).dataset.side, id).toBe(grid.textSide);
     }
     expect(root.querySelector('[data-section="footer"]').dataset.side, 'footer').toBeUndefined();
+  });
+});
+
+describe('the grid room hands over from the object', () => {
+  it("holds media's cards back until the object has finished fading out", () => {
+    // The one place on the page where a section's content and the object are scheduled to
+    // want the same half of the screen. Media opens the grid room: its top edge crosses
+    // the viewport's BOTTOM well before the object has faded, so its first row of cards
+    // would sit on top of a fully visible, fully exploded object. Measured against live
+    // canvas pixels at 61 scroll positions, the captions read 1.02:1 in that window --
+    // white text on a white wireframe edge. sections.css holds the card column back past
+    // the fade instead of putting anything behind the captions.
+    //
+    // Recomputed here from ROOMS and the section heights rather than restated, because
+    // the literal in the stylesheet is only correct RELATIVE to those: retune a section's
+    // height or the fade and a fixed number goes quietly wrong while still looking
+    // deliberate. Everything below is in vh.
+    const cssPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/styles/sections.css');
+    const css = readFileSync(cssPath, 'utf8');
+
+    const heights = Object.fromEntries(
+      [...css.matchAll(/\[data-section='(\w+)'\]\s*\{\s*min-height:\s*(\d+)vh/g)]
+        .map((m) => [m[1], Number(m[2])]),
+    );
+    const order = ['hero', 'about', 'events', 'media', 'board', 'contact'];
+    for (const id of order) expect(heights[id], `${id} has no min-height`).toBeGreaterThan(0);
+    const footer = Number(css.match(/\.section-footer\s*\{[^}]*min-height:\s*(\d+)vh/)[1]);
+
+    // The scroll timeline is bound to #content with enter 'top top' / leave 'bottom
+    // bottom', so progress 1 is reached after (page height - one viewport) of scrolling.
+    const span = order.reduce((a, id) => a + heights[id], 0) + footer - 100;
+    const gridStart = ROOMS.at(-2).end;
+    const grid = ROOMS.at(-1);
+    const fadeDone = gridStart + (grid.end - gridStart) * OPACITY_SETTLE;
+
+    const mediaTop = heights.hero + heights.about + heights.events;
+    // A card becomes visible one viewport before its own top reaches the viewport's top.
+    // The section's own top padding is ignored, which only ever makes this stricter.
+    const required = fadeDone * span - mediaTop + 100;
+
+    const declared = css.match(
+      /\[data-section='media'\]\[data-side='center'\]\s*\.room-body\s*\{[^}]*margin-top:\s*(\d+)vh/,
+    );
+    expect(declared, 'media no longer holds its card column back at all').not.toBeNull();
+    expect(Number(declared[1]), `the first media card appears while the object is still visible (needs >= ${required.toFixed(1)}vh)`)
+      .toBeGreaterThanOrEqual(required);
+  });
+
+  it('leaves media enough room to actually show the cards it held back', () => {
+    // The other half of the same trade: hold the cards back too far and they run past the
+    // end of their own section, which pushes board and contact down and desynchronises
+    // every room from the section it is supposed to be playing over.
+    const cssPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/styles/sections.css');
+    const css = readFileSync(cssPath, 'utf8');
+    const media = Number(css.match(/\[data-section='media'\]\s*\{\s*min-height:\s*(\d+)vh/)[1]);
+    const held = Number(css.match(
+      /\[data-section='media'\]\[data-side='center'\]\s*\.room-body\s*\{[^}]*margin-top:\s*(\d+)vh/,
+    )[1]);
+    // Ten video cards wrap to at most four rows at the widths this layout targets, and a
+    // row is roughly a third of a viewport tall (16/9 thumbnail plus its caption).
+    expect(media - held, 'the cards no longer fit below the hold-back').toBeGreaterThanOrEqual(110);
   });
 });
 

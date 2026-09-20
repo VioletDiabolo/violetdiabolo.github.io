@@ -191,10 +191,18 @@ describe('rooms', () => {
 describe('the closing room clears its centred title', () => {
   const grid = ROOMS.at(-1);
   const gridStart = ROOMS.at(-2).end;
-  // [data-side='center'] h1/h2 are held at top: 66vh (src/styles/sections.css), so the
-  // object's bottom edge has to stay above that line: at least 100 - 66 = 34% of the
-  // viewport clear beneath it, measured from the very bottom.
-  const TITLE_TOP_PCT = 66;
+  // The closing room's title is held at top: 18vh -- [data-room='grid'][data-side='center']
+  // .room-head in src/styles/sections.css -- so the object's bottom edge has to stay above
+  // that line: 100 - 18 = 82% of the viewport clear beneath it, measured from the bottom.
+  //
+  // This was 66 while that room's column was centred and its title sat in the lower third.
+  // The grid pattern moved the title to a sticky column at the top left, which makes the
+  // bar strictly harder to clear, not easier: every sample that violated at 66 still
+  // violates at 18, and samples that cleared 66 can now fail. It passes for the reason the
+  // assertion below states -- the object is GONE, not merely low -- which is also why the
+  // horizontal protection the left-hand column now gets (the object is right of centre for
+  // the whole fade) is a second line of defence rather than the one being measured here.
+  const TITLE_TOP_PCT = 18;
   /** Below this the object is a ghost, and there is genuinely nothing to lay text over. */
   const INVISIBLE = 0.05;
   const SAMPLES = 400;
