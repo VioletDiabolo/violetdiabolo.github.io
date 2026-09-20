@@ -26,7 +26,13 @@ import { PART_LABELS, LABEL_OFFSET_X, createLabels } from '../src/diabolo/labels
 import { buildDiabolo } from '../src/diabolo/build.js';
 import { PART_IDS } from '../src/diabolo/profiles.js';
 
-const scene = () => buildDiabolo({ materials: { cup: {}, gasket: {}, hub: {}, bearing: {} }, segments: 16 });
+const scene = () => buildDiabolo({
+  materials: {
+    cup: {}, gasket: {}, hub: {}, bearing: {},
+    edge: { cup: {}, gasket: {}, hub: {}, bearing: {} },
+  },
+  segments: 16,
+});
 
 describe('PART_LABELS', () => {
   it('labels every part', () => {

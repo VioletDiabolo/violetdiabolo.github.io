@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { Group } from 'three';
-import { buildDiabolo, HOME } from '../src/diabolo/build.js';
+import { buildDiabolo, HOME, PROFILE_POINTS, RADIAL_SEGMENTS } from '../src/diabolo/build.js';
 import { PART_IDS, DIMS, bearingProfile, hubConeProfile, gasketProfile } from '../src/diabolo/profiles.js';
 
-const stubMaterials = { cup: { id: 'cup' }, gasket: { id: 'gasket' }, hub: { id: 'hub' }, bearing: { id: 'bearing' } };
+const stubMaterials = {
+  cup: { id: 'cup' }, gasket: { id: 'gasket' }, hub: { id: 'hub' }, bearing: { id: 'bearing' },
+  edge: {
+    cup: { id: 'edge-cup' }, gasket: { id: 'edge-gasket' },
+    hub: { id: 'edge-hub' }, bearing: { id: 'edge-bearing' },
+  },
+};
 const build = () => buildDiabolo({ materials: stubMaterials, segments: 32 });
 
 describe('buildDiabolo', () => {
@@ -120,5 +126,43 @@ describe('scene graph nesting', () => {
     const { tilt, spinner } = build();
     expect(tilt.name).toBe('diaboloTilt');
     expect(spinner.name).toBe('diaboloSpinner');
+  });
+});
+
+describe('edge wireframe', () => {
+  const built = () => buildDiabolo({ materials: stubMaterials });
+  const edgesOf = (parts, id) => {
+    const mesh = parts[id].children.find((c) => c.geometry && c.type === 'Mesh');
+    return { mesh, edges: mesh.children.find((c) => c.type === 'LineSegments') };
+  };
+
+  it('gives every part a LineSegments child of its mesh, not of its group', () => {
+    const { parts } = built();
+    for (const id of PART_IDS) {
+      const { mesh, edges } = edgesOf(parts, id);
+      expect(edges, `${id} has no edge overlay`).toBeDefined();
+      // Parented to the mesh so it inherits the flip scale and adds no new owner.
+      expect(edges.parent).toBe(mesh);
+    }
+  });
+
+  it('draws a countable number of lines, not a solid mesh', () => {
+    // The failure mode is not "no edges" but "so many the object reads as solid".
+    // Measured at 8 profile points x 12 radial: 48-204 per part, 780 across the object.
+    const { parts } = built();
+    let total = 0;
+    for (const id of PART_IDS) {
+      const { edges } = edgesOf(parts, id);
+      const lines = edges.geometry.attributes.position.count / 2;
+      expect(lines, `${id} draws ${lines} lines`).toBeGreaterThan(20);
+      expect(lines, `${id} draws ${lines} lines`).toBeLessThan(400);
+      total += lines;
+    }
+    expect(total, `${total} lines across the object`).toBeLessThan(1200);
+  });
+
+  it('keeps geometry low-poly enough for the edges to be legible', () => {
+    expect(RADIAL_SEGMENTS).toBeLessThanOrEqual(16);
+    expect(PROFILE_POINTS).toBeLessThanOrEqual(12);
   });
 });

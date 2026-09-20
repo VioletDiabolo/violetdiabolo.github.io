@@ -3,8 +3,8 @@ import { buildDiabolo } from './build.js';
 import { createMaterials, disposeMaterials } from './materials.js';
 
 export const TIER_SETTINGS = Object.freeze({
-  high: { dpr: 2.0, segments: 128, transmission: true },
-  base: { dpr: 1.5, segments: 64, transmission: false },
+  high: { dpr: 2.0 },
+  base: { dpr: 1.5 },
 });
 
 /** Camera framing. Exported because the scroll choreography dollies between these and
@@ -103,10 +103,9 @@ export function createStage({ canvas, tier }) {
   camera.position.set(0, 0.15, CAMERA_NEAR_Z);
   camera.lookAt(0, 0, 0);
 
-  const materials = createMaterials({ renderer, settings });
-  const { tilt, spinner, parts } = buildDiabolo({ materials, segments: settings.segments });
+  const materials = createMaterials();
+  const { tilt, spinner, parts } = buildDiabolo({ materials });
   scene.add(tilt);
-  scene.environment = materials._envTarget.texture;
 
   /** anime.js writes these scalars; the render loop and overlays only read them. */
   const state = { spinRate: 1, labelOpacity: 0 };

@@ -1,4 +1,4 @@
-import { Group, LatheGeometry, Mesh } from 'three';
+import { EdgesGeometry, Group, LatheGeometry, LineSegments, Mesh } from 'three';
 import { PART_IDS, DIMS, cupProfile, gasketProfile, hubConeProfile, bearingProfile } from './profiles.js';
 
 const halfBearing = DIMS.bearingHeight / 2;
@@ -36,7 +36,14 @@ const MATERIAL_FOR = {
   axleBearing: 'bearing',
 };
 
-export function buildDiabolo({ materials, segments = 96 }) {
+/** Profile points per part. Low so EdgesGeometry yields a countable wireframe. */
+export const PROFILE_POINTS = 8;
+/** Revolution steps. Measured: 8 x 12 gives 48-204 lines per part, 780 across the object. */
+export const RADIAL_SEGMENTS = 12;
+/** Include every facet boundary. Raising this makes a smooth lathe lose its wireframe. */
+export const EDGE_THRESHOLD = 1;
+
+export function buildDiabolo({ materials, segments = PROFILE_POINTS, radialSegments = RADIAL_SEGMENTS }) {
   // Two nested groups, so the scroll-driven turn and the continuous spin never write
   // the same object. anime.js owns tilt.rotation.x; the render loop owns
   // spinner.rotation.y. Collapsing these into one group reintroduces the collision.
@@ -47,8 +54,6 @@ export function buildDiabolo({ materials, segments = 96 }) {
   tilt.add(spinner);
 
   const parts = {};
-
-  const radialSegments = Math.max(24, Math.round(segments * 0.75));
 
   for (const id of PART_IDS) {
     const group = new Group();
@@ -70,6 +75,14 @@ export function buildDiabolo({ materials, segments = 96 }) {
       mesh.position.y = -halfBearing;
       group.userData.spinMesh = mesh;
     }
+
+    // Parented to the mesh, not the group: it inherits the flip scale for free and adds
+    // no new owner of any transform.
+    const edges = new LineSegments(
+      new EdgesGeometry(geometry, EDGE_THRESHOLD),
+      materials.edge[MATERIAL_FOR[id]],
+    );
+    mesh.add(edges);
 
     group.add(mesh);
     group.position.y = HOME[id].y;

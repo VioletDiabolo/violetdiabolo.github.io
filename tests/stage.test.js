@@ -39,11 +39,6 @@ describe('resolveQualityTier', () => {
     expect(resolveQualityTier(undefined)).toBe('base');
   });
 
-  it('enables transmission only on the high tier', () => {
-    expect(TIER_SETTINGS.high.transmission).toBe(true);
-    expect(TIER_SETTINGS.base.transmission).toBe(false);
-  });
-
   it('caps device pixel ratio lower on the base tier', () => {
     expect(TIER_SETTINGS.base.dpr).toBeLessThan(TIER_SETTINGS.high.dpr);
   });

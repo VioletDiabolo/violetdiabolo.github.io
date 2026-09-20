@@ -7,7 +7,13 @@ import { CAMERA_NEAR_Z } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
 import { PART_IDS, DIMS } from '../src/diabolo/profiles.js';
 
-const scene = () => buildDiabolo({ materials: { cup: {}, gasket: {}, hub: {}, bearing: {} }, segments: 16 });
+const scene = () => buildDiabolo({
+  materials: {
+    cup: {}, gasket: {}, hub: {}, bearing: {},
+    edge: { cup: {}, gasket: {}, hub: {}, bearing: {} },
+  },
+  segments: 16,
+});
 // A plain stub, not a real Three.js camera: createEntrance only ever writes
 // camera.position.z, so this is all the shape it needs.
 const stubCamera = () => ({ position: { z: 0 } });

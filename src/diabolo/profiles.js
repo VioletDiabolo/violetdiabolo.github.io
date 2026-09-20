@@ -59,10 +59,13 @@ export function gasketProfile() {
  * Runs bottom-up in the same sense as the assembly: local y=0 is the BEARING end
  * (narrow), local y=hubHeight is the CUP-NECK end (wide). Authoring it the other way
  * round mounts the cone inverted, leaving a ~0.05 radius step at both of its seams.
+ *
+ * A linear taper is exact at two subdivisions — the endpoints are identical at any count.
+ * Subdividing further only multiplies edge lines: 312 at 24 points versus 48 at 2.
  */
 export function hubConeProfile() {
   const pts = [];
-  const segments = 24;
+  const segments = 2;
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
     const radius = DIMS.bearingRadius * (1 - t) + DIMS.neckRadius * t;

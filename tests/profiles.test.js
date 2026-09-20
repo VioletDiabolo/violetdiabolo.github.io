@@ -74,6 +74,21 @@ describe('small parts', () => {
   });
 });
 
+describe('hub cone density', () => {
+  it('describes its taper with as few points as a straight line needs', () => {
+    // A linear taper is exact at 2 subdivisions; subdividing 24 times only multiplies
+    // edge lines. Measured: 312 lines at 24 points versus 48 at 2, identical endpoints.
+    expect(hubConeProfile()).toHaveLength(3);
+  });
+
+  it('still spans the same radii, so the silhouette is unchanged', () => {
+    const p = hubConeProfile();
+    expect(p[0].x).toBeCloseTo(DIMS.bearingRadius, 6);
+    expect(p.at(-1).x).toBeCloseTo(DIMS.neckRadius, 6);
+    expect(p.at(-1).y).toBeCloseTo(DIMS.hubHeight, 6);
+  });
+});
+
 describe('proportions', () => {
   it('keeps the black axle assembly a minor share of total height, as in the reference photo', () => {
     const totalHeight = 2 * (DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness + DIMS.cupHeight);
