@@ -133,10 +133,6 @@ body { overflow-x: hidden; }
   column-gap: var(--gutter);
 }
 
-[data-side='right'] .room {
-  grid-template-columns: minmax(0, 1fr) minmax(0, var(--text-col));
-}
-
 /* ---------------------------------------------------------------------------
  * Hero
  * ------------------------------------------------------------------------- */
@@ -424,6 +420,19 @@ body { overflow-x: hidden; }
  */
 [data-section='media'][data-side='center'] .room-body {
   margin-top: 240vh;
+}
+
+/*
+ * The mirror. --rc / --oc already move the boxes between the tracks; this is the other
+ * half, swapping which track is the narrow one. It sits AFTER every room has declared
+ * its own grid-template-columns and carries an extra attribute so it outranks them --
+ * written earlier and less specific, as it first was, the grid room's own template won
+ * and a right-sided grid room put its reading column in the WIDE track, which is the
+ * exact inverse of what data-side asked for. No room in ROOMS is right-sided today, so
+ * nothing on the page would have shown it.
+ */
+[data-room][data-side='right'] .room {
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--text-col));
 }
 
 /* ---------------------------------------------------------------------------
