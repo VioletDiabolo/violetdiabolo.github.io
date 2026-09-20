@@ -63,7 +63,7 @@ describe('reduced motion boot path', () => {
     }));
 
     document.body.innerHTML =
-      '<div id="stage"><canvas id="renderer"></canvas><div id="spill-layer"></div><div id="label-layer"></div></div>' +
+      '<div id="stage"><canvas id="renderer"></canvas><div id="label-layer"></div></div>' +
       '<main id="content"></main>';
 
     await import('../src/main.js');
@@ -79,19 +79,15 @@ describe('reduced motion boot path', () => {
     expect(window.__vd.lifecycle).toBeNull();
     expect(window.__vd?.choreography ?? null).toBeNull();
     // addOverlay was stubbed as a bare vi.fn() and never checked: main.js could stop
-    // registering either the CSS3D label layer or the light-spill layer and every other
-    // test here would stay green (both are real, unmocked modules in this file, so they
-    // would simply render nothing and, after stage.dispose()'s own fix, never leak
-    // either — nothing would fail). Assert both registrations happen, with the right
-    // objects: createLabels()'s return shape is the only one with `sprites`,
-    // createSpill()'s the only one with `element`.
-    expect(window.__vd.stage.addOverlay).toHaveBeenCalledTimes(2);
+    // registering the CSS3D label layer and this test would stay green (labels.js is a
+    // real, unmocked module in this file, so it would simply render nothing and, after
+    // stage.dispose()'s own fix, never leak either — nothing would fail). Assert the
+    // registration happens, with the right object: createLabels()'s return shape is the
+    // one with `sprites`.
+    expect(window.__vd.stage.addOverlay).toHaveBeenCalledTimes(1);
     const registered = window.__vd.stage.addOverlay.mock.calls.map(([overlay]) => overlay);
     const labelsOverlay = registered.find((o) => 'sprites' in o);
-    const spillOverlay = registered.find((o) => 'element' in o);
     expect(labelsOverlay, 'the labels overlay was never registered').toBeDefined();
-    expect(spillOverlay, 'the spill overlay was never registered').toBeDefined();
-    expect(labelsOverlay).not.toBe(spillOverlay);
   });
 
   it('shows the object in profile with labels visible, rather than face-on with labels hidden', async () => {
@@ -114,7 +110,7 @@ describe('reduced motion boot path', () => {
     }));
 
     document.body.innerHTML =
-      '<div id="stage"><canvas id="renderer"></canvas><div id="spill-layer"></div><div id="label-layer"></div></div>' +
+      '<div id="stage"><canvas id="renderer"></canvas><div id="label-layer"></div></div>' +
       '<main id="content"></main>';
 
     await import('../src/main.js');

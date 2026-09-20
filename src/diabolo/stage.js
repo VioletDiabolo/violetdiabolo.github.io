@@ -154,7 +154,7 @@ export function createStage({ canvas, tier }) {
     disposeMaterials(materials);
     renderer.dispose();
     // Mirrors render()'s and resize()'s own loops above: without this, an overlay's DOM
-    // subtree (the CSS3D label layer, the spill element) outlives the stage that owned it.
+    // subtree (the CSS3D label layer) outlives the stage that owned it.
     for (const overlay of overlays) overlay.dispose();
   }
 

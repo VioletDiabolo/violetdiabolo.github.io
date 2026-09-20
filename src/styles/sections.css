@@ -11,8 +11,8 @@
  * measure and a text-shadow instead of relying on empty space alone (see below).
  *
  * There is no drawn structure anywhere in this file: no grid, no hairline rule, no
- * solid backdrop behind a heading or paragraph, no counter. Space and the object's
- * own light (.light-spill, stage.css) are the only separators.
+ * solid backdrop behind a heading or paragraph, no counter. Space alone is the
+ * only separator.
  */
 
 #content {

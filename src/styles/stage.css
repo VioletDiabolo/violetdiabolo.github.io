@@ -124,33 +124,3 @@ html[data-stage='unsupported'] .stage-fallback {
   color: var(--ink-dim);
   font-weight: 400;
 }
-
-/* ---------------------------------------------------------------------------
- * The light spill (see src/diabolo/spill.js): a soft bloom tracking the object's
- * projected screen position every frame. This is the page's connective tissue in
- * place of a grid or hairline rules -- light emitted by the subject, not decoration
- * applied to the page.
- * ------------------------------------------------------------------------- */
-#spill-layer { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-
-.light-spill {
-  position: absolute;
-  inset: -20%;
-  /* A hot, small core (--violet-lift, the same "glow/hover" colour used everywhere
-     else on the page light touches something) so the source itself reads as
-     bright, then falls through the mid violet into the deep anchor colour before
-     fading out well short of the edges -- reaching toward the reading column
-     without ever washing all the way into it. Wider and hotter than the previous
-     pass: this is now the page's only connective device, so it has to carry that
-     job alone rather than share it with a grid or hairline rules.
-   */
-  background: radial-gradient(
-    circle at var(--spill-x, 50%) var(--spill-y, 50%),
-    color-mix(in oklab, var(--violet-lift) 55%, transparent) 0%,
-    color-mix(in oklab, var(--violet) 30%, transparent) 16%,
-    color-mix(in oklab, var(--violet-deep) 16%, transparent) 36%,
-    transparent 68%
-  );
-  /* No transition here: the position is driven per frame, and a CSS transition would be a
-     second animation driver fighting the render loop. */
-}

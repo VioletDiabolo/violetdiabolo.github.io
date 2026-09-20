@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 const allCss = () =>
@@ -123,11 +123,20 @@ describe('the editorial pairing', () => {
   });
 });
 
-describe('the light spill is wired to the object', () => {
-  it('positions the bloom from the properties the overlay writes', () => {
-    const stage = read('../src/styles/stage.css');
-    expect(stage).toMatch(/var\(--spill-x/);
-    expect(stage).toMatch(/var\(--spill-y/);
+describe('the light spill is gone', () => {
+  it('leaves no spill module behind', () => {
+    expect(existsSync(new URL('../src/diabolo/spill.js', import.meta.url))).toBe(false);
+  });
+
+  it('positions nothing from the spill custom properties', () => {
+    // The bloom tracked a glossy object's screen position. An unlit object emits nothing,
+    // so a gradient still following it would be decoration with no idea behind it.
+    expect(allCss()).not.toMatch(/--spill-[xy]/);
+    expect(allCss()).not.toMatch(/light-spill/);
+  });
+
+  it('mounts no spill layer', () => {
+    expect(read('../index.html')).not.toMatch(/spill-layer/);
   });
 });
 

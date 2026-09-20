@@ -5,9 +5,9 @@
  *
  * The editorial rewrite (see sections.css's own header for the composition this
  * serves): no drawn structure survives here -- no hairline-rule token, no solid
- * backdrop behind text, no page-spanning grid. The object's own light
- * (src/diabolo/spill.js, .light-spill in stage.css) is the only connective device
- * left; everything else is type, colour and space.
+ * backdrop behind text, no page-spanning grid, no light spilled from the object
+ * either (src/diabolo/materials.js -- it is flat and unlit, so it casts none).
+ * Everything here is type, colour and space.
  */
 
 :root {
@@ -74,13 +74,13 @@ body {
    * Film grain (SVG feTurbulence noise, alpha baked into the filter itself) is the
    * one atmospheric layer left on the page background. There is no fixed bloom and
    * no grid here any more -- both read as decoration applied TO the page, which is
-   * exactly what the client's own feedback singled out. The only light the page
-   * has now comes from the object itself, moves with it, and lives entirely in
-   * .light-spill (stage.css) and src/diabolo/spill.js -- a single, honest source
-   * rather than an ambient one competing with it. `background-attachment: fixed`
-   * pins the grain to the viewport so it never scrolls with the page (iOS Safari
-   * treats `fixed` as `scroll`; the grain still renders there, just travelling
-   * with the page, which is a harmless degradation).
+   * exactly what the client's own feedback singled out. A tracking gradient used to
+   * stand in for light cast by the object, but the object is flat and unlit
+   * (src/diabolo/materials.js) and casts none, so that gradient was decoration with
+   * no idea behind it and is gone too -- grain is what remains. `background-attachment:
+   * fixed` pins the grain to the viewport so it never scrolls with the page (iOS
+   * Safari treats `fixed` as `scroll`; the grain still renders there, just
+   * travelling with the page, which is a harmless degradation).
    */
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix in='noise' type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05' intercept='0'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
