@@ -35,15 +35,8 @@ export const ACCENT = 'gasket';
  * needed two separate fixes for.
  */
 export function createMaterials() {
-  const fill = (key, extra = {}) => {
-    const material = new MeshBasicMaterial({ color: new Color(PART_COLORS[key]), ...extra });
-    // three's own MeshBasicMaterial constructor sets `this.envMap = null` unconditionally
-    // (see node_modules/three/src/materials/MeshBasicMaterial.js) -- not something any
-    // argument here can suppress. Stripped so an unlit fill never carries even a null
-    // lighting property, matching the 'declares no lighting properties anywhere' contract.
-    delete material.envMap;
-    return material;
-  };
+  const fill = (key, extra = {}) =>
+    new MeshBasicMaterial({ color: new Color(PART_COLORS[key]), ...extra });
 
   return {
     cup: fill('cup', { side: DoubleSide }),

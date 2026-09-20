@@ -177,6 +177,22 @@ describe('camera aim target', () => {
   });
 });
 
+describe('tone mapping', () => {
+  it('passes the flat unlit palette through untransformed', () => {
+    // createStage() needs a real WebGL context, so it never runs under jsdom/vitest -- same
+    // constraint as the aimCamera and overlay-disposal guards above, so source inspection is
+    // again the only route available. ACES filmic is an HDR display transform meant for lit
+    // PBR output; applied to flat MeshBasicMaterial/LineBasicMaterial fills it desaturates
+    // and shifts every authored colour, defeating the palette's exact saturation/luminance
+    // arithmetic (materials.dom.test.js). That regression shipped once already (ACES
+    // survived the deletion of the PBR path) and is silent -- nothing crashes or fails
+    // functionally, the object just renders in the wrong colours -- so it needs a guard.
+    const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
+    expect(source).toMatch(/renderer\.toneMapping\s*=\s*NoToneMapping\s*;/);
+    expect(source).not.toMatch(/ACESFilmicToneMapping/);
+  });
+});
+
 describe('overlay disposal', () => {
   it('disposes every registered overlay when the stage disposes, so their DOM subtrees do not leak', () => {
     // createStage() needs a real WebGL context, so it never runs under jsdom/vitest —

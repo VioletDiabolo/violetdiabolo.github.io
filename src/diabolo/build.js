@@ -40,7 +40,11 @@ const MATERIAL_FOR = {
 export const PROFILE_POINTS = 8;
 /** Revolution steps. Measured: 8 x 12 gives 48-204 lines per part, 780 across the object. */
 export const RADIAL_SEGMENTS = 12;
-/** Include every facet boundary. Raising this makes a smooth lathe lose its wireframe. */
+/** Degrees: a boundary is only drawn where adjacent faces meet at more than this angle, so
+ *  a flat span (e.g. the hub cone's now-linear taper, see profiles.js) draws no seam at its
+ *  interior ring -- this is why the hub cone measures 48 lines, the low end of the range
+ *  above, rather than a higher count from a spurious extra loop. Raising this further would
+ *  start dropping real creases too, and a smooth lathe would lose its wireframe. */
 export const EDGE_THRESHOLD = 1;
 
 export function buildDiabolo({ materials, segments = PROFILE_POINTS, radialSegments = RADIAL_SEGMENTS }) {

@@ -146,6 +146,24 @@ describe('edge wireframe', () => {
     }
   });
 
+  it('assigns each part edge its intended edge material', () => {
+    // Mirrors 'assigns each part its intended material' above. Guards the
+    // materials.edge[MATERIAL_FOR[id]] lookup directly: Line's constructor signature is
+    // `constructor(geometry = new BufferGeometry(), material = new LineBasicMaterial())` --
+    // a default parameter -- so a lookup that misses (e.g. dropping the MATERIAL_FOR
+    // indirection) silently substitutes a fresh white material instead of throwing, and no
+    // other test here reads edges.material at all.
+    const { parts } = built();
+    const edgeMaterialIdOf = (id) => edgesOf(parts, id).edges.material.id;
+    expect(edgeMaterialIdOf('cupTop')).toBe('edge-cup');
+    expect(edgeMaterialIdOf('cupBottom')).toBe('edge-cup');
+    expect(edgeMaterialIdOf('gasketTop')).toBe('edge-gasket');
+    expect(edgeMaterialIdOf('gasketBottom')).toBe('edge-gasket');
+    expect(edgeMaterialIdOf('hubConeTop')).toBe('edge-hub');
+    expect(edgeMaterialIdOf('hubConeBottom')).toBe('edge-hub');
+    expect(edgeMaterialIdOf('axleBearing')).toBe('edge-bearing');
+  });
+
   it('draws a countable number of lines, not a solid mesh', () => {
     // The failure mode is not "no edges" but "so many the object reads as solid".
     // Measured at 8 profile points x 12 radial: 48-204 per part, 780 across the object.

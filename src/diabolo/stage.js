@@ -1,4 +1,4 @@
-import { ACESFilmicToneMapping, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
+import { NoToneMapping, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { buildDiabolo } from './build.js';
 import { createMaterials, disposeMaterials } from './materials.js';
 
@@ -95,8 +95,12 @@ export function createStage({ canvas, tier }) {
   const settings = TIER_SETTINGS[tier];
 
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // The object is entirely flat, unlit colour (MeshBasicMaterial fills, LineBasicMaterial
+  // edges), not lit PBR output. ACES filmic is an HDR display transform: applied here it
+  // desaturates and shifts every authored palette value (materials.js's PART_COLORS /
+  // EDGE_COLORS are tuned by exact saturation and luminance arithmetic). NoToneMapping
+  // passes those colours through untransformed, which is what an unlit object needs.
+  renderer.toneMapping = NoToneMapping;
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
