@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ROOMS, SHOWCASE_ID, SPACING, PROFILE_X, LATERAL_OFFSET, explodedY, partYAt,
+  ROOMS, SHOWCASE_ID, SPACING, PROFILE_X, FACE_ON_X, LATERAL_OFFSET, LATERAL_SETTLE,
+  OPACITY_SETTLE, explodedY, partYAt,
 } from '../src/scroll/choreography.js';
 import { HOME } from '../src/diabolo/build.js';
 import { CAMERA_NEAR_Z, CAMERA_FAR_Z, CAMERA_FOV } from '../src/diabolo/stage.js';
@@ -105,6 +106,27 @@ describe('ROOMS', () => {
     expect(ROOMS[0].camZ).toBe(CAMERA_NEAR_Z);
   });
 
+  it('opens the scrub with a turn, because the entrance lands face-on', () => {
+    // entrance.js seeds tilt.rotation.x to FACE_ON_X synchronously, so the object's first
+    // painted frame looks straight down the axle. The hero room's target is HERO_TILT, a
+    // different angle, and the ~1.15 rad between them is the turn the first scroll makes.
+    // That turn is DELIBERATE: the object is meant to show its face and then rotate as
+    // you scroll, which is why the entrance is not seeded to the hero's own tiltX the way
+    // its position and camera are. It is pinned here because structurally it is identical
+    // to the opening-dolly defect the camZ test above exists to catch -- nothing else
+    // distinguishes an intended opening turn from a room that forgot to match the seed,
+    // so without this the turn could be quietly equalised away and no test would notice.
+    //
+    // This is the OPENING turn only, out of face-on and into the hero room. It is not the
+    // later turn round to profile that the six-act table's "so the turn has somewhere to
+    // go" meant; that phrasing has been retired from entrance.test.js for the ambiguity.
+    const hero = ROOMS[0];
+    expect(hero.tiltX, 'the hero room starts face-on, so the opening turn is gone')
+      .not.toBeCloseTo(FACE_ON_X, 6);
+    expect(Math.abs(hero.tiltX - FACE_ON_X), 'the opening turn is too small to read')
+      .toBeGreaterThan(0.5);
+  });
+
   it('keeps the camera between its near and far distances', () => {
     // Distance from the object, not raw camZ. No room sets camX any more -- the orbit act
     // is gone -- so hypot reduces to camZ throughout. It is kept because the bound being
@@ -113,6 +135,13 @@ describe('ROOMS', () => {
     // CAMERA_NEAR_Z even though the camera sat exactly 7 units out. Anything that
     // reintroduces a camX is still guarded correctly, rather than passing by omission.
     for (const room of ROOMS) {
+      // Without this line the hypot is false assurance rather than future-proofing: the
+      // generator stopped animating camera.position.x with the orbit act (see
+      // choreography.js), so a re-added camX would be validated here and then silently
+      // ignored in production. Reintroducing one has to change the generator too, and
+      // this is what says so.
+      expect(room.camX, `${room.id} sets camX, which the generator no longer animates`)
+        .toBeUndefined();
       const distance = Math.hypot(room.camX ?? 0, room.camZ);
       expect(distance, `${room.id} is too close`).toBeGreaterThanOrEqual(CAMERA_NEAR_Z - 0.01);
       expect(distance, `${room.id} is too far`).toBeLessThanOrEqual(CAMERA_FAR_Z + 0.01);
@@ -137,36 +166,40 @@ describe('ROOMS', () => {
     }
   });
 
-  /**
-   * The lift exists for exactly one reason: to stop centred text being laid over the
-   * object. A room at `opacity: 0` has no object to lay text over, so it is exempt -- not
-   * because centred rooms stopped mattering, but because the hazard is gone with the
-   * object. The two tests below are the only place that exemption applies, and it is
-   * falsifiable: set `grid.opacity` to 1 and both fail, because grid is centred, unlifted
-   * and would then be visible.
-   */
-  const centredAndVisible = () => ROOMS.filter((r) => r.textSide === 'center' && r.opacity > 0);
-
-  it('lifts the object in the visible centred rooms, so the title is not laid over it', () => {
-    // Rooms with the column on one side avoid overlap horizontally instead; they must not
-    // be paying for a lift they have no use for.
+  it('leaves the rooms with a column beside them unlifted, since they separate sideways', () => {
+    // A lift exists for exactly one reason: to stop centred text being laid over the
+    // object. Rooms with the column on one side avoid the overlap horizontally instead,
+    // so they must not be paying for a lift they have no use for.
     for (const room of ROOMS) {
       if (room.textSide !== 'center') expect(room.y, `${room.id} should not need a lift`).toBe(0);
     }
-    for (const room of centredAndVisible()) {
-      expect(room.y, `${room.id} centres text on a centred, visible object`).toBeGreaterThan(0.3);
-    }
   });
 
-  it('leaves room beneath the object in the visible centred rooms for the text to live', () => {
-    const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
-    const half = DIMS.cupHeight + DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness;
-    for (const room of centredAndVisible()) {
-      const vh = visibleHalfHeight(room.camZ);
-      // Percentage of the viewport, measured from the very bottom, still clear once the
-      // object's own bottom edge (room.y - half) is accounted for.
-      const clearBelowPct = 100 * ((vh + room.y - half) / (2 * vh));
-      expect(clearBelowPct, `${room.id} leaves no room for the title`).toBeGreaterThan(25);
+  /**
+   * The centred room's clearance is NOT asserted here, and that is deliberate.
+   *
+   * It used to be, guarded by an `opacity === 0` exemption over this table -- "at zero
+   * opacity there is no object to lay text over". That reasoning holds at the table's
+   * final frame and nowhere else: `grid` reaches x = 0 in the first LATERAL_SETTLE of
+   * its room, while the fade was still mid-flight, so the object really was centred,
+   * exploded and ~0.89 opaque under a title held at 66vh. Worse, the exemption's own set
+   * came out empty, so the loop it guarded ran zero assertions and reported green.
+   *
+   * The clearance now lives where the distinction can be made honestly -- against the
+   * ANIMATED state.objectOpacity, sampled across the room's interior, in
+   * choreography.dom.test.js's 'the closing room clears its centred title'. Endpoint data
+   * cannot express "invisible before it arrives", so no endpoint test should pretend to.
+   */
+  it('fades a centred room out faster than it crosses to the centre', () => {
+    // The table-level half of that invariant: the behavioural half is the DOM test above.
+    // Anything at OPACITY_SETTLE >= LATERAL_SETTLE puts a visible object under a centred
+    // column with no horizontal escape left.
+    expect(OPACITY_SETTLE).toBeLessThan(LATERAL_SETTLE);
+    for (const room of ROOMS) {
+      if (room.textSide === 'center') {
+        expect(room.opacity, `${room.id} centres text on an object that stays visible`)
+          .toBeLessThan(0.05);
+      }
     }
   });
 

@@ -4,7 +4,7 @@ import { initReveal } from './ui/reveal.js';
 import { createStage, resolveQualityTier, readSignals } from './diabolo/stage.js';
 import { createLabels } from './diabolo/labels.js';
 import { createLifecycle } from './diabolo/lifecycle.js';
-import { createChoreography, PROFILE_X } from './scroll/choreography.js';
+import { createChoreography, PROFILE_X, HERO_ID } from './scroll/choreography.js';
 import { createEntrance } from './scroll/entrance.js';
 import { supportsWebGL, prefersReducedMotion } from './fallback/detect.js';
 
@@ -72,6 +72,14 @@ function boot() {
   window.__vd.entrance = entrance;
 
   if (reducedMotion) {
+    // Re-stamped for the static object below. The call in boot()'s opening lines gives
+    // each section its own room's side, which is right only while the object travels
+    // through those rooms. Here it never does: entrance.skip() parks it at the hero
+    // room's position, at full opacity, and no scroll timeline is ever attached, so one
+    // object position has to serve every section. Without this the media section keeps
+    // the grid room's centred column and reads straight through an object that is
+    // sitting, permanently and undimmed, where the hero left it.
+    applySectionSides(content, { staticAt: HERO_ID });
     // No lifecycle: its render loop applies a continuous idle spin every frame purely
     // from elapsed time (diabolo/stage.js's rotationDeltas), with no user input driving
     // it. That is exactly the autoplaying motion reduced-motion users must not get.

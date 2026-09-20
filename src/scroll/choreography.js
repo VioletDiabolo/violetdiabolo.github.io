@@ -50,8 +50,33 @@ export const LATERAL_OFFSET = 1.6;
  */
 export const LATERAL_SETTLE = 0.22;
 
+/**
+ * Fraction of a room the object spends fading to its new opacity. Deliberately well
+ * under LATERAL_SETTLE, and that ordering is the whole point of the constant.
+ *
+ * A room whose column is centred has no horizontal escape: once `x` reaches 0 the object
+ * is under the text with nowhere left to go, and the only thing stopping it being laid
+ * over the title is that there is nothing left to see. Fading across a room's full
+ * duration makes that true at the final frame alone -- mid-room the object was still at
+ * ~0.89 opacity, dead centre, spanning roughly a quarter to nine tenths of the viewport,
+ * straight through a title held at 66vh. At 0.10 against LATERAL_SETTLE's 0.22 the fade
+ * lands at 45% of the way to centre, so the object is gone before it ever arrives.
+ *
+ * Opacity alone rides this shorter duration. `spinRate` and `labelOpacity` keep the full
+ * room, because neither is a thing the reading column can collide with.
+ */
+export const OPACITY_SETTLE = 0.10;
+
 /** The one room the explosion plays in. Everywhere else the object is whole. */
 export const SHOWCASE_ID = 'showcase';
+
+/**
+ * The room the object is parked in whenever the scrub never runs: reduced motion skips
+ * the entrance to exactly this state and attaches no timeline (see main.js, entrance.js).
+ * Named rather than spelled out at each site so the static reading side, the entrance's
+ * seeding and the table itself cannot drift apart.
+ */
+export const HERO_ID = 'hero';
 
 /** Lifted off profile so the hero reads as an object rather than a diagram. */
 const HERO_TILT = -0.42;
@@ -124,9 +149,11 @@ export function createChoreography({ parts, tilt, state, camera, scrollTarget })
     timeline.add(tilt.position, { x: room.x, y: room.y, duration: duration * LATERAL_SETTLE }, at);
     // camera.position.x is never animated -- there is no orbit room. It stays at 0.
     timeline.add(camera.position, { z: room.camZ, duration }, at);
-    timeline.add(state, {
-      spinRate: room.spin, labelOpacity: room.labels, objectOpacity: room.opacity, duration,
-    }, at);
+    timeline.add(state, { spinRate: room.spin, labelOpacity: room.labels, duration }, at);
+    // Opacity on its own, shorter duration -- see OPACITY_SETTLE. A separate add() on the
+    // same target is how anime.js expresses that: different properties, so still exactly
+    // one owner each, the same way tilt.position already runs shorter than tilt.rotation.
+    timeline.add(state, { objectOpacity: room.opacity, duration: duration * OPACITY_SETTLE }, at);
 
     previousEnd = room.end;
   }

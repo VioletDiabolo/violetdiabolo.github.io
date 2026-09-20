@@ -1,6 +1,6 @@
 import { createTimeline } from 'animejs';
 import { HOME } from '../diabolo/build.js';
-import { FACE_ON_X, ROOMS } from './choreography.js';
+import { FACE_ON_X, HERO_ID, ROOMS } from './choreography.js';
 import { CAMERA_NEAR_Z } from '../diabolo/stage.js';
 
 // The scroll choreography's first room. Its lateral position and camera distance are
@@ -9,7 +9,7 @@ import { CAMERA_NEAR_Z } from '../diabolo/stage.js';
 // and dollying in over the first scroll. Rotation is deliberately NOT seeded to the
 // hero's own tiltX: the entrance lands face-on (FACE_ON_X) and the hero room turns the
 // object from there, which is the opening move the scrub exists to make.
-const HERO = ROOMS.find((room) => room.id === 'hero');
+const HERO = ROOMS.find((room) => room.id === HERO_ID);
 
 /**
  * How far out parts begin, comfortably beyond any exploded position (1.65 units at

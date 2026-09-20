@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { ROOMS } from '../src/scroll/choreography.js';
+import { ROOMS, HERO_ID } from '../src/scroll/choreography.js';
 import { SECTION_FOR_ROOM, applySectionSides } from '../src/ui/layout.js';
 
 const build = () => {
@@ -32,7 +32,7 @@ describe('room to section mapping', () => {
 });
 
 describe('applySectionSides', () => {
-  it('gives every mapped section the side its room says', () => {
+  it('gives every mapped section its own room\'s side while the object travels', () => {
     const root = build();
     applySectionSides(root);
     for (const room of ROOMS) {
@@ -48,6 +48,42 @@ describe('applySectionSides', () => {
       const side = root.querySelector(`[data-section="${SECTION_FOR_ROOM[room.id]}"]`).dataset.side;
       if (side === 'left') expect(room.x).toBeGreaterThan(0);
       if (side === 'right') expect(room.x).toBeLessThan(0);
+    }
+  });
+
+  it('gives every section the held room\'s side when the object never moves', () => {
+    // Reduced motion: main.js skips the entrance to one room's state and attaches no
+    // scroll timeline, so the object sits at the hero room's position, at full opacity,
+    // for the whole page. One object position means one correct reading side. Before
+    // this existed, media kept the grid room's centred column and laid its title over an
+    // object that was never going to fade or move out from under it.
+    const root = build();
+    applySectionSides(root, { staticAt: HERO_ID });
+    const hero = ROOMS.find((r) => r.id === HERO_ID);
+    for (const room of ROOMS) {
+      const el = root.querySelector(`[data-section="${SECTION_FOR_ROOM[room.id]}"]`);
+      expect(el.dataset.side, SECTION_FOR_ROOM[room.id]).toBe(hero.textSide);
+    }
+    // Not a tautology only because the table disagrees with itself here: grid's own side
+    // is 'center', so a section really did change hands.
+    expect(ROOMS.at(-1).textSide, 'the static path no longer differs from the normal one')
+      .not.toBe(hero.textSide);
+  });
+
+  it('refuses a room name that does not exist, rather than silently stamping per-room sides', () => {
+    // A typo falling through to the default would look exactly like success while
+    // restoring the overlap the parameter exists to prevent.
+    const root = build();
+    expect(() => applySectionSides(root, { staticAt: 'showcase-room' })).toThrow(/no room named/);
+  });
+
+  it('leaves sections with no room alone on the static path too', () => {
+    // board and contact getting no side is a known gap (see the test below); the static
+    // path must not widen it by stamping them either.
+    const root = build();
+    applySectionSides(root, { staticAt: HERO_ID });
+    for (const id of ['board', 'contact', 'footer']) {
+      expect(root.querySelector(`[data-section="${id}"]`).dataset.side, id).toBeUndefined();
     }
   });
 

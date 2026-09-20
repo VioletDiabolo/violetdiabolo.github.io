@@ -58,11 +58,36 @@ export function createMaterials() {
   };
 }
 
+/**
+ * Every material in the structure, flat, whatever container key it sits under.
+ *
+ * Two places need the full set and must never disagree about it: stage.js's render loop,
+ * which writes state.objectOpacity onto each one, and disposeMaterials below. Both used
+ * to walk the shape themselves, hardcoding "the top level, plus `edge`" -- so a material
+ * added under any new key would have been half-wired by one and leaked by the other, in
+ * silence. That is the same shape as the edge-material defect this branch already
+ * shipped: a seam built and then not connected, with nothing throwing.
+ *
+ * Recursion stops at anything Three marks as a material, so a material's own object-valued
+ * properties are never walked; `seen` guards against a container that points back at one
+ * of its own ancestors.
+ */
+export function flattenMaterials(materials) {
+  const found = [];
+  const seen = new Set();
+  const visit = (value) => {
+    if (!value || typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    if (value.isMaterial) {
+      found.push(value);
+      return;
+    }
+    for (const child of Object.values(value)) visit(child);
+  };
+  visit(materials);
+  return found;
+}
+
 export function disposeMaterials(materials) {
-  for (const value of Object.values(materials)) {
-    if (value && typeof value.dispose === 'function') value.dispose();
-  }
-  for (const value of Object.values(materials.edge ?? {})) {
-    if (value && typeof value.dispose === 'function') value.dispose();
-  }
+  for (const material of flattenMaterials(materials)) material.dispose();
 }

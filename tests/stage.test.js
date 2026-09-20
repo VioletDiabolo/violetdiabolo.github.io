@@ -220,4 +220,15 @@ describe('object opacity bridge', () => {
     expect(source, 'the render loop never applies state.objectOpacity')
       .toMatch(/for \(const material of materialList\) material\.opacity = state\.objectOpacity;/);
   });
+
+  it('takes that list from materials.js, rather than assembling one here by hand', () => {
+    // flattenMaterials is tested directly in materials.dom.test.js; this is the other half
+    // of the same guard -- that the list the render loop walks is actually the one that
+    // module produces. A hand-built array here would pass every test in that file and
+    // still miss a material added under a new container key, fading the object partway
+    // and stopping. Source inspection for the usual reason: createStage() needs WebGL.
+    const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
+    expect(source, 'materialList is not built from flattenMaterials')
+      .toMatch(/const materialList = flattenMaterials\(materials\);/);
+  });
 });

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { createChoreography, ROOMS, PART_RANK, explodedY } from '../src/scroll/choreography.js';
+import {
+  createChoreography, ROOMS, PART_RANK, explodedY, LATERAL_SETTLE,
+} from '../src/scroll/choreography.js';
 import { CAMERA_NEAR_Z, CAMERA_FOV } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
 import { DIMS } from '../src/diabolo/profiles.js';
@@ -115,19 +117,23 @@ describe('the explosion is contained', () => {
 describe('rooms', () => {
   it('reaches a distinct state at each room boundary, bar the panel which repeats the hero', () => {
     const { timeline, parts, tilt, camera } = setup();
-    const seen = new Set();
-    for (const room of ROOMS) {
+    const stateAt = (room) => {
       seekTo(timeline, room.end);
-      seen.add([
+      return [
         parts.cupTop.position.y.toFixed(2), tilt.rotation.x.toFixed(2),
         tilt.position.x.toFixed(2), camera.position.z.toFixed(2),
-      ].join('|'));
-    }
-    // Four rooms, three distinct states. The panel is DEFINED to land exactly where the
-    // hero did -- the page's panel slides up and covers the object, so animating it there
-    // would move something nobody can see (see ROOMS). Every other room must differ, or
-    // it is scroll distance spent on nothing.
-    expect(seen.size, 'a room other than the panel repeats a state already reached').toBe(3);
+      ].join('|');
+    };
+    const [hero, panel, showcase, grid] = ROOMS.map(stateAt);
+    // The panel is DEFINED to land exactly where the hero did -- the page's panel slides
+    // up and covers the object, so animating it there would move something nobody can see
+    // (see ROOMS). Naming that pair is the point: counting distinct states alone reported
+    // the same 3 whichever two rooms collided, so showcase and grid quietly sharing a
+    // state would have passed as this intended repeat. Every other room must differ, or it
+    // is scroll distance spent on nothing.
+    expect(panel, 'the panel no longer repeats the hero, which is its whole design').toBe(hero);
+    expect(new Set([hero, showcase, grid]).size, 'a room other than the panel repeats a state')
+      .toBe(3);
   });
 
   it('drives the spin rate from scroll position', () => {
@@ -156,18 +162,88 @@ describe('rooms', () => {
     const { timeline, tilt } = setup();
     const COLUMN = 0.38;
     let overlapping = 0;
+    let examined = 0;
     const SAMPLES = 400;
     for (let i = 0; i <= SAMPLES; i++) {
       const f = i / SAMPLES;
       timeline.seek(timeline.duration * f);
       const room = ROOMS.find((r) => f <= r.end) ?? ROOMS.at(-1);
+      // A centred room has no side for the object to be on, so there is nothing for this
+      // measure to say about it -- its own clearance is the vertical sweep's job, below.
       if (room.textSide === 'center') continue;
+      examined += 1;
       const visibleWidth = 2 * room.camZ * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
       const centre = 0.5 + tilt.position.x / visibleWidth;
       const half = DIMS.rimRadius / visibleWidth;
       const near = room.textSide === 'left' ? centre - half : centre + half;
       if (room.textSide === 'left' ? near < COLUMN : near > 1 - COLUMN) overlapping += 1;
     }
-    expect(overlapping / SAMPLES, 'the object spends too long over the text').toBeLessThan(0.08);
+    // Over EXAMINED, not over SAMPLES. The grid room is centred and skipped, so 45% of
+    // the sweep can no longer contribute an overlap at all: dividing by the full count
+    // would quietly relax the same 8% threshold to the ~15% of the sweep it can actually
+    // reach, and it would loosen again every time another room turned centred.
+    expect(examined, 'every sample was skipped, so nothing was actually checked')
+      .toBeGreaterThan(0);
+    expect(overlapping / examined, 'the object spends too long over the text').toBeLessThan(0.08);
+  });
+});
+
+describe('the closing room clears its centred title', () => {
+  const grid = ROOMS.at(-1);
+  const gridStart = ROOMS.at(-2).end;
+  // [data-side='center'] h1/h2 are held at top: 66vh (src/styles/sections.css), so the
+  // object's bottom edge has to stay above that line: at least 100 - 66 = 34% of the
+  // viewport clear beneath it, measured from the very bottom.
+  const TITLE_TOP_PCT = 66;
+  /** Below this the object is a ghost, and there is genuinely nothing to lay text over. */
+  const INVISIBLE = 0.05;
+  const SAMPLES = 400;
+  const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
+  // The object's own top edge, read off the ANIMATED part positions rather than assumed
+  // assembled: cupTop's rim sits cupHeight above its group origin, so this is 1.095 when
+  // whole and 2.51 at full explode. The grid room opens fully exploded, so the assembled
+  // constant the endpoint tests use would understate the overlap by more than a unit.
+  const topEdge = ({ tilt, parts }) => tilt.position.y + parts.cupTop.position.y + DIMS.cupHeight;
+
+  it('is laid over that title only while it is fading out', () => {
+    // The vertical counterpart of the lateral sweep above, and the only test anywhere that
+    // samples the INTERIOR of a centred room. Its endpoint twin cannot do this job: grid's
+    // table entry is `opacity: 0`, which at the endpoint is true, so an endpoint test reads
+    // "no object to lay text over" and exempts itself. Across the room's interior the
+    // object is still fading, still exploded and still dead centre -- which is the state a
+    // visitor actually sees. Skipping is therefore keyed to the ANIMATED
+    // state.objectOpacity, never to the table's endpoint value.
+    const scene = setup();
+    let visible = 0;
+    let violating = 0;
+    for (let i = 0; i <= SAMPLES; i++) {
+      const f = gridStart + (grid.end - gridStart) * (i / SAMPLES);
+      scene.timeline.seek(scene.timeline.duration * f);
+      if (scene.state.objectOpacity < INVISIBLE) continue;
+      visible += 1;
+      const vh = visibleHalfHeight(scene.camera.position.z);
+      const clearBelowPct = 100 * ((vh - topEdge(scene)) / (2 * vh));
+      if (clearBelowPct <= 100 - TITLE_TOP_PCT) violating += 1;
+    }
+    // Unlike the lateral sweep, the denominator is every sample in the room rather than
+    // only those examined: a skipped sample here means the object is GONE, which is the
+    // pass condition itself, not a sample another room's geometry excuses.
+    expect(visible, 'every sample was skipped, so nothing was actually checked')
+      .toBeGreaterThan(0);
+    expect(violating / SAMPLES, 'the object sits over the closing title for too long')
+      .toBeLessThan(0.12);
+  });
+
+  it('has faded out by the time it reaches the centre of the frame', () => {
+    // Why the room needs no vertical lift: there is nothing left to see by the time the
+    // object arrives dead centre. The lateral move takes LATERAL_SETTLE of the room, so
+    // the fade has to take less. Once x reaches 0 the object is under the centred column
+    // with no horizontal escape left, and anything still visible there is over the title.
+    const { timeline, tilt, state } = setup();
+    const centred = gridStart + (grid.end - gridStart) * LATERAL_SETTLE;
+    seekTo(timeline, centred);
+    expect(tilt.position.x, 'the object is not actually centred here').toBeCloseTo(0, 6);
+    expect(state.objectOpacity, 'still visible when it reaches the centre')
+      .toBeLessThan(INVISIBLE);
   });
 });

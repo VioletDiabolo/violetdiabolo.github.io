@@ -5,7 +5,8 @@ import { HOME } from '../src/diabolo/build.js';
 // mock re-exports the same camera constants entrance.js and choreography.js import,
 // instead of a second, driftable copy of the numbers.
 import { CAMERA_FOV, CAMERA_NEAR_Z, CAMERA_FAR_Z } from '../src/diabolo/stage.js';
-import { PROFILE_X } from '../src/scroll/choreography.js';
+import { PROFILE_X, ROOMS, HERO_ID } from '../src/scroll/choreography.js';
+import { SECTION_FOR_ROOM } from '../src/ui/layout.js';
 
 // A minimal stand-in for createStage()'s return value. Real HOME part ids/shape (plain
 // { position: { y }, add() } is all entrance.js and labels.js touch — add() is a no-op
@@ -117,5 +118,42 @@ describe('reduced motion boot path', () => {
 
     expect(window.__vd.stage.state.labelOpacity).toBe(1);
     expect(window.__vd.stage.tilt.rotation.x).toBe(PROFILE_X);
+  });
+
+  it('reads every section against the one place the object is parked', async () => {
+    // The object is frozen here: entrance.skip() leaves it at the hero room's x, at the
+    // initial objectOpacity of 1, and no scroll timeline is ever attached to move or fade
+    // it (see the first test in this block). Per-room sides describe a journey it never
+    // makes -- media would keep the grid room's centred column, whose h2 sections.css
+    // holds at top: 66vh, directly over an undimmed object that never leaves. One object
+    // position, one reading side.
+    vi.doMock('../src/fallback/detect.js', () => ({
+      supportsWebGL: () => true,
+      prefersReducedMotion: () => true,
+    }));
+    vi.doMock('../src/diabolo/stage.js', () => ({
+      resolveQualityTier: () => 'base',
+      readSignals: () => ({}),
+      createStage: () => stubStage(),
+      CAMERA_FOV,
+      CAMERA_NEAR_Z,
+      CAMERA_FAR_Z,
+    }));
+
+    document.body.innerHTML =
+      '<div id="stage"><canvas id="renderer"></canvas><div id="label-layer"></div></div>' +
+      '<main id="content"></main>';
+
+    await import('../src/main.js');
+
+    const hero = ROOMS.find((r) => r.id === HERO_ID);
+    for (const room of ROOMS) {
+      const el = document.querySelector(`[data-section="${SECTION_FOR_ROOM[room.id]}"]`);
+      expect(el.dataset.side, SECTION_FOR_ROOM[room.id]).toBe(hero.textSide);
+    }
+    // The grid room's own side differs, so this is a real re-stamp rather than the
+    // default path happening to agree.
+    expect(document.querySelector('[data-section="media"]').dataset.side)
+      .not.toBe(ROOMS.at(-1).textSide);
   });
 });

@@ -95,7 +95,12 @@ describe('createEntrance', () => {
     }
   });
 
-  it('leaves the object face-on when it finishes, so the turn has somewhere to go', () => {
+  // Renamed from "so the turn has somewhere to go", which was written for the six-act
+  // table and meant the later turn from face-on round to profile. Under four rooms the
+  // turn it actually guards is the OPENING one, out of face-on and into the hero room's
+  // HERO_TILT across the first 12% of scroll. That the two angles differ at all is pinned
+  // in choreography.test.js ('opens the scrub with a turn'); this pins the near end of it.
+  it('leaves the object face-on when it finishes, which is where the opening turn starts', () => {
     const { tilt, parts } = scene();
     const camera = stubCamera();
     const { timeline } = createEntrance({ parts, tilt, camera, onComplete: () => {} });

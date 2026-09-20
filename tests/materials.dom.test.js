@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { LineBasicMaterial, MeshBasicMaterial } from 'three';
-import { PART_COLORS, EDGE_COLORS, ACCENT, createMaterials, disposeMaterials } from '../src/diabolo/materials.js';
+import {
+  PART_COLORS, EDGE_COLORS, ACCENT, createMaterials, disposeMaterials, flattenMaterials,
+} from '../src/diabolo/materials.js';
 
 // envMap is checked separately, in 'declares no lighting properties anywhere' below: three
 // 0.186 gives MeshBasicMaterial (though not LineBasicMaterial) a nullable envMap slot
@@ -139,5 +141,50 @@ describe('createMaterials', () => {
     }
     disposeMaterials(m);
     expect(disposed).toHaveLength(Object.keys(PART_COLORS).length * 2);
+  });
+});
+
+describe('flattenMaterials', () => {
+  it('finds every material createMaterials returns, fills and edges alike', () => {
+    // stage.js's render loop writes state.objectOpacity onto exactly this list every
+    // frame. Anything it misses fades partway and then stops, which reads as a rendering
+    // glitch rather than a missing entry in an array -- so the coverage is pinned here
+    // rather than left to a hand-maintained list in a file that needs WebGL to run.
+    const m = createMaterials();
+    const flat = flattenMaterials(m);
+    expect(flat).toHaveLength(Object.keys(PART_COLORS).length * 2);
+    for (const key of Object.keys(PART_COLORS)) {
+      expect(flat, `${key} fill`).toContain(m[key]);
+      expect(flat, `${key} edge`).toContain(m.edge[key]);
+    }
+  });
+
+  it('reaches a material added under a container key nobody knew about', () => {
+    // The actual regression this guards: the old hardcoded walk knew about the top level
+    // and `edge`, and nothing else. A future `glow: { rim }` would have been invisible to
+    // both the fade and the disposal, with no error anywhere.
+    const m = createMaterials();
+    const buried = new MeshBasicMaterial();
+    expect(flattenMaterials({ ...m, glow: { inner: { rim: buried } } })).toContain(buried);
+  });
+
+  it('never walks into a material\'s own properties', () => {
+    // MeshBasicMaterial carries object-valued properties of its own (color, envMap slot,
+    // userData). Recursing through them would return duplicates and, worse, make the
+    // per-frame opacity write depend on three's internals.
+    expect(flattenMaterials(createMaterials())).toHaveLength(Object.keys(PART_COLORS).length * 2);
+  });
+
+  it('returns nothing for an empty bag rather than throwing', () => {
+    expect(flattenMaterials({})).toEqual([]);
+    expect(flattenMaterials(null)).toEqual([]);
+  });
+
+  it('is what disposeMaterials disposes, so the two sets cannot diverge', () => {
+    const m = createMaterials();
+    const disposed = [];
+    for (const mat of flattenMaterials(m)) mat.dispose = () => disposed.push(mat);
+    disposeMaterials(m);
+    expect(disposed).toEqual(flattenMaterials(m));
   });
 });

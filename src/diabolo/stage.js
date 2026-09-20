@@ -1,6 +1,6 @@
 import { NoToneMapping, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { buildDiabolo } from './build.js';
-import { createMaterials, disposeMaterials } from './materials.js';
+import { createMaterials, disposeMaterials, flattenMaterials } from './materials.js';
 
 export const TIER_SETTINGS = Object.freeze({
   high: { dpr: 2.0 },
@@ -110,12 +110,11 @@ export function createStage({ canvas, tier }) {
   const materials = createMaterials();
   // Flattened once, at construction. Materials are SHARED across parts (one cup material
   // for both cups, and so on), so fading the object is eight writes per frame rather than
-  // one per mesh. `isMaterial` skips the `edge` container object itself, and picks up any
-  // fill added later without this list needing to be kept in step by hand.
-  const materialList = [
-    ...Object.values(materials).filter((m) => m?.isMaterial),
-    ...Object.values(materials.edge),
-  ];
+  // one per mesh. The traversal lives in materials.js, alongside createMaterials and the
+  // disposal that has to cover the identical set: a list assembled here by hand would go
+  // stale the moment that module added a material under a container key this file had
+  // never heard of, and it would go stale silently.
+  const materialList = flattenMaterials(materials);
   const { tilt, spinner, parts } = buildDiabolo({ materials });
   scene.add(tilt);
 
