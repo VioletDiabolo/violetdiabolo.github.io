@@ -16,8 +16,8 @@ import { buildPicture } from './picture.js';
  * pair, which is the whole reason the wrapper exists. The flat heading/paragraph/list
  * structure this replaces could not express any of them: a sticky text column standing
  * beside a scrolling column of cards needs the two to be SIBLINGS in a two-track grid,
- * and a composition pinned for the length of a 440vh section needs one box to pin rather
- * than three that each stick at a separately guessed offset and drift apart as the
+ * and a composition pinned for the length of a multi-screen section needs one box to pin
+ * rather than three that each stick at a separately guessed offset and drift apart as the
  * heading rewraps. `.room` is also the single reveal unit per section (src/ui/reveal.js).
  *
  * data-section, data-room, the id and the class all stay on the <section> itself:

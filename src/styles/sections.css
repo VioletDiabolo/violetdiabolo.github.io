@@ -68,20 +68,50 @@ body { overflow-x: hidden; }
 .room-body { min-width: 0; }
 
 /*
- * Scroll length: each section's height is proportional to the span of the room playing
- * over it (src/scroll/choreography.js ROOMS), not a uniform 100vh -- the choreography
- * needs ~20 screens of scroll to read as distinct beats rather than a blur. These
- * heights also decide WHICH section is on screen when each room's tween lands: measured
- * against the timeline, about's top reaches the viewport at progress 0.102 (the hero
- * room ends at 0.12), events at 0.327 (the panel ends at 0.30) and media at 0.531 (the
- * showcase ends at 0.55). Change one and the rooms stop matching what is being read.
+ * Scroll length. These are not chosen, they are DERIVED, and the derivation is the whole
+ * of the invariant: each section is exactly as long as the room that plays over it.
+ *
+ * The timeline is bound to #content with enter 'top top' / leave 'bottom bottom'
+ * (src/scroll/choreography.js), so progress 1 is reached after (document height - one
+ * viewport) of scrolling. Call that scrollable span S. A section whose top sits at a
+ * cumulative height c reaches the top of the viewport at progress c / S -- so pinning a
+ * room to a section means giving that section the room's share of S:
+ *
+ *     S = 1200vh   (total 1300vh, less the one viewport that is never scrolled past)
+ *
+ *     hero      0.00 -> 0.12    0.12 x 1200 = 144vh   hero
+ *     panel     0.12 -> 0.30    0.18 x 1200 = 216vh   about
+ *     showcase  0.30 -> 0.55    0.25 x 1200 = 300vh   events
+ *     grid      0.55 -> 1.00    0.45 x 1200 = 540vh + the trailing viewport = 640vh,
+ *                               split media 360 / board 150 / contact 90 / footer 40
+ *
+ * The three handovers are now exact rather than approximate: about's top reaches the
+ * viewport at 144/1200 = 0.1200 against the hero room's end of 0.12, events at 360/1200 =
+ * 0.3000 against the panel's 0.30, media at 660/1200 = 0.5500 against the showcase's 0.55.
+ * The version this replaces ran to 2000vh and missed all three by a third to half a screen.
+ *
+ * Why S = 1200 rather than some other multiple of 100 (any multiple of 100 lands all three
+ * boundaries on a whole vh): it is the smallest one where every section still clears the
+ * tallest content it has to show, measured live at 1440x900, 768x1024 and 375x812. Media's
+ * card column alone is 327vh on a phone -- ten 16:9 facades in a single track. Go below
+ * what a section's content needs and the section grows past its min-height, which moves
+ * every boundary after it and desynchronises the rooms silently, in the browser, with the
+ * stylesheet still reading as though it were aligned.
+ *
+ * The grid room's four sections are sized against content rather than against a tween: the
+ * grid room's own beat (reassemble, spin, fade) is over by progress 0.595 -- 714vh -- and
+ * everything after that is reading, not object. That is why board and contact are now the
+ * two shortest sections on the page and not, as they were, two of the three longest.
+ *
+ * tests/sections-layout.dom.test.js pins both halves of this: the handovers against ROOMS,
+ * and each section against the content measured inside it.
  */
-[data-section='hero']    { min-height: 200vh; }
-[data-section='about']   { min-height: 440vh; }
-[data-section='events']  { min-height: 400vh; }
+[data-section='hero']    { min-height: 144vh; }
+[data-section='about']   { min-height: 216vh; }
+[data-section='events']  { min-height: 300vh; }
 [data-section='media']   { min-height: 360vh; }
-[data-section='board']   { min-height: 360vh; }
-[data-section='contact'] { min-height: 240vh; }
+[data-section='board']   { min-height: 150vh; }
+[data-section='contact'] { min-height: 90vh; }
 
 /*
  * Which half the reading column takes. Two custom properties rather than two copies of
@@ -310,11 +340,12 @@ body { overflow-x: hidden; }
 
 /*
  * The section itself becomes a one-cell grid purely so .room STRETCHES to fill it. A
- * grid room's content is a fraction of its section's height -- board's roster is about
- * 60vh inside 360vh -- so a plain block .room ends where its content does, and the
- * sticky title below has only that 60vh of containing block to travel through. Measured
- * live: "BOARD" held for a fifth of its section and then scrolled away, leaving three
- * screens of nothing. The pinned rooms deliberately do NOT get this: their .room is
+ * grid room's content can be a fraction of its section's height -- board's roster measures
+ * 98vh at 1440x900 inside a 150vh section -- so a plain block .room ends where its content
+ * does, and the sticky title below has only that much containing block to travel through.
+ * Measured live back when the section was 360vh: "BOARD" held for a fifth of it and then
+ * scrolled away, leaving three screens of nothing. The section is now proportioned to the
+ * roster instead, but this rule is still what lets the title hold for all of it. The pinned rooms deliberately do NOT get this: their .room is
  * sticky at 100dvh and needs the section to be TALLER than it, not equal to it.
  */
 [data-room='grid'] { display: grid; }
@@ -399,27 +430,31 @@ body { overflow-x: hidden; }
  *
  * Measured, not guessed. The object is not fully faded until progress 0.595 (the grid
  * room starts at the showcase's end, 0.55, and OPACITY_SETTLE spends 0.10 of the room on
- * the fade), which is 1166vh into the page's 1960vh of scroll. Media's own top edge
- * crosses the viewport's BOTTOM at 940vh -- progress 0.48 -- so without this its first
+ * the fade), which is 714vh into the page's 1200vh of scroll. Media's own top edge
+ * crosses the viewport's BOTTOM at 560vh -- progress 0.467 -- so without this its first
  * row of cards shares the right-hand half with a fully visible, fully exploded object
- * for about a fifth of a screen's worth of scroll. Sampled against live canvas pixels at
- * 61 scroll positions, the card captions measured 1.02:1 there, where a bright wireframe
- * edge crosses a glyph: invisible text, not dim text.
+ * for about two thirds of a screen's worth of scroll. Sampled against live canvas pixels
+ * at 61 scroll positions, the card captions measured 1.02:1 there, where a bright
+ * wireframe edge crosses a glyph: invisible text, not dim text.
  *
- * 240vh moves the first card past the fade rather than putting anything behind the
- * captions, and it buys the grid room the opening beat it wanted anyway -- the title held
- * at the left while the object reassembles, spins up and goes. Board and contact need
- * nothing: their cards arrive at progress 0.67 and 0.85, long after the object is gone.
+ * The requirement recomputes with the section heights, and shrank with them: 154vh now,
+ * against 226vh when the page was 2000vh long. 165vh moves the first card past the fade
+ * rather than putting anything behind the captions -- a tenth of a screen of margin over
+ * the requirement, the same proportion the old 240 held over its own 226 -- and it buys
+ * the grid room the opening beat it wanted anyway: the title held at the left while the
+ * object reassembles, spins up and goes. Measured against the new heights, the first card
+ * becomes visible at 725vh, 11vh after the fade completes. Board and contact need
+ * nothing: their cards arrive at progress 0.77 and 0.98, long after the object is gone.
  *
  * Scoped to data-side="center" deliberately. Under reduced motion src/ui/layout.js stamps
  * these sections 'left' instead, the whole section keeps to the reading column, and the
  * parked object is never behind the cards at all -- so there is nothing to hold back and
- * 230vh of blank column would be pure damage. tests/sections-layout.dom.test.js
+ * 165vh of blank column would be pure damage. tests/sections-layout.dom.test.js
  * recomputes the requirement from ROOMS and the section heights, so this number cannot
  * quietly stop being enough.
  */
 [data-section='media'][data-side='center'] .room-body {
-  margin-top: 240vh;
+  margin-top: 165vh;
 }
 
 /*
@@ -766,7 +801,11 @@ body { overflow-x: hidden; }
    * simply matches the rest of the page, which is left-aligned throughout.
    */
   justify-content: flex-start;
-  min-height: 60vh;
+  /* 40vh, down from 60: one line of text inside 20vh of padding measures 22vh at 375x812
+     and 21vh at 1440x900, so 60 was two fifths of a screen of nothing after the last
+     thing on the page. It still counts towards the scrollable span the rooms are
+     proportioned against -- see the derivation at the top of this file. */
+  min-height: 40vh;
   padding-block: clamp(4rem, 10vh, 7rem);
   padding-inline: var(--gutter);
 }
@@ -811,17 +850,36 @@ body { overflow-x: hidden; }
 
   /*
    * Hero and showcase keep their pinned composition, below the band rather than behind
-   * it. Their sections run 200vh and 400vh while their content is 405px and 449px on a
+   * it. Their sections run 144vh and 300vh while their content is 405px and 449px on a
    * 375x812 phone -- measured -- so without this you read the room in the first half
-   * screen and then scroll through two to four screens of nothing while the object
-   * carries on alone. Pinned, the composition is on screen for the whole room, which is
-   * what it is on desktop.
+   * screen and then scroll through the rest of it with nothing but the object. Pinned,
+   * the composition is on screen for the whole room, which is what it is on desktop.
    *
-   * The panel is deliberately NOT in this list: its content measures 746px against the
-   * 487px this leaves below the band, so pinning it would strand a third of the club's
-   * own story off the bottom of the screen where no scroll could reach it. It flows
-   * instead, and the violet sheet it leaves behind is at least the effect the room is
-   * for. The grid rooms are not here either, for the obvious reason that their cards
+   * The panel is deliberately NOT in this list, and this is the one room on the page whose
+   * mobile treatment is decided by arithmetic rather than by taste. Its content measures
+   * 746px against the 487px the band leaves below it, so pinning it would strand a third
+   * of the club's own story off the bottom of the screen where no scroll could reach it;
+   * the alternatives -- shrinking the serif and cropping the photograph into 373px of
+   * usable height -- would cramp the one surface on the page that is meant to be
+   * generous. So it flows.
+   *
+   * Flowing was already right; what was wrong was the length behind it. The content is
+   * 746px -- 92vh at 375x812 -- and at 440vh this section left 295vh of empty violet
+   * behind it, measured by scrolling the built page in 10vh steps and asking what was on
+   * the screen. At 216vh the same content leaves 71vh, a little over two thirds of a
+   * screen. The residue is structural rather than slack: 40vh of it is the band itself
+   * (copy that has scrolled up behind an opaque band is not on screen any more) and the
+   * rest is the showcase's own top padding before its first line appears. Closing it
+   * completely would mean either cropping the club's group photograph into a portrait,
+   * which cuts people out of the one picture of them, or making this section shorter
+   * than the panel room's share of the timeline, which is the alignment at the top of
+   * this file.
+   *
+   * Nothing here mitigates an overlap, because at this width there is no overlap to
+   * mitigate: the object holds its own band (stage.css) and the sheet scrolls beneath
+   * it, undimmed.
+   *
+   * The grid rooms are not in the list either, for the obvious reason that their cards
    * have to scroll.
    */
   [data-room='hero'] .room,
