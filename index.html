@@ -9,7 +9,14 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <!--
+    Inter carries the page: 200 for the hero's hairline headline, 300 for the section
+    titles, 400/500/600 for body, cards and the filled controls. Instrument Serif is
+    loaded upright only (the italic axis went with the editorial pass that used it) and
+    has exactly one job left: the panel room, the single printed surface in the scroll.
+    Space Mono is the 3D part labels' and nothing else's.
+  -->
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@200;300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="./src/styles/base.css" />
   <link rel="stylesheet" href="./src/styles/stage.css" />
@@ -18,15 +25,27 @@
 <body>
   <div id="stage">
     <canvas id="renderer" aria-hidden="true"></canvas>
-    <div id="spill-layer"></div>
     <div id="label-layer"></div>
 
     <!--
       Shown only when html[data-stage="unsupported"] (src/fallback/detect.js found no
-      WebGL context). Built from the same two-mirrored-bowl / cyan-gasket-pair /
-      black-cone / chrome-axle assembly the 3D scene renders, and the bowls use the
-      exact same GRADIENT_STOPS colours as src/diabolo/materials.js so this reads as
-      the same object, not a placeholder for it.
+      WebGL context). Built from the same two-mirrored-bowl / gasket-pair / hub-cone /
+      axle assembly the 3D scene renders, and drawn the same way it is: near-black fills
+      and bright strokes, so this reads as the same object rather than a placeholder for
+      it. The gaskets keep the object's one colour. The construction centreline that used
+      to run down the middle went with the technical-drawing language the page no longer
+      speaks.
+
+      The eight hexes below are a HAND-KEPT COPY of PART_COLORS and EDGE_COLORS
+      (src/diabolo/materials.js). Nothing derives them -- this is static markup with no
+      build step reaching into that module -- so they are a copy that has to be re-synced
+      by hand whenever the object's palette is retuned, which this branch did twice.
+      Editing one here without editing materials.js, or the reverse, is caught by
+      tests/materials.dom.test.js: it reads this SVG and asserts the two sets are equal
+      in both directions, so neither a palette change that missed this file nor a colour
+      invented here can pass. Do not treat that test as optional bookkeeping -- it is the
+      only thing connecting these two lists, and the visitors who see this drawing are
+      the ones least likely to be looked at.
     -->
     <!--
       No role/aria-label here: this SVG is purely decorative -- the page's text content
@@ -34,51 +53,31 @@
       itself no longer does: #label-layer, its sibling, holds genuine, readable content).
     -->
     <svg class="stage-fallback" viewBox="0 0 320 600" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs>
-        <linearGradient id="vd-bowl-top" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" stop-color="#4c1d95" />
-          <stop offset="0.5" stop-color="#7c3aed" />
-          <stop offset="0.85" stop-color="#9d6ff0" />
-          <stop offset="1" stop-color="#d9bdf7" />
-        </linearGradient>
-        <linearGradient id="vd-bowl-bottom" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#4c1d95" />
-          <stop offset="0.5" stop-color="#7c3aed" />
-          <stop offset="0.85" stop-color="#9d6ff0" />
-          <stop offset="1" stop-color="#d9bdf7" />
-        </linearGradient>
-        <linearGradient id="vd-chrome" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="#7d8087" />
-          <stop offset="0.5" stop-color="#f4f5f7" />
-          <stop offset="1" stop-color="#7d8087" />
-        </linearGradient>
-      </defs>
-
-      <!-- construction centreline, drawn first so everything else paints over it -->
-      <line x1="160" y1="4" x2="160" y2="596" stroke="rgba(168,110,240,0.28)" stroke-width="1" stroke-dasharray="2 8" />
-
       <!-- top bowl (cupTop): neck at the waist, rim flaring out at the top -->
       <path d="M142,230 C136,165 100,90 32,32 Q160,8 288,32 C220,90 184,165 178,230 Z"
-            fill="url(#vd-bowl-top)" stroke="rgba(8,6,13,0.4)" stroke-width="1.5" />
+            fill="#0c0a12" stroke="#efeaf8" stroke-width="1.5" />
+      <!-- the rim, seen open: the circle EdgesGeometry draws around the lathe's mouth -->
+      <ellipse cx="160" cy="27" rx="128" ry="19" fill="#0c0a12" stroke="#efeaf8" stroke-width="1.5" />
 
-      <!-- top gasket (cyan ring) -->
-      <rect x="136" y="228" width="48" height="16" rx="6" fill="#5fd7e8" />
+      <!-- top gasket: the object's one colour -->
+      <rect x="136" y="228" width="48" height="16" rx="6" fill="#cf2f2a" stroke="#ff6a62" stroke-width="1.5" />
 
-      <!-- top hub cone (black), narrowing into the bearing -->
-      <path d="M136,244 L184,244 L176,286 L144,286 Z" fill="#131017" />
+      <!-- top hub cone, narrowing into the bearing -->
+      <path d="M136,244 L184,244 L176,286 L144,286 Z" fill="#08070c" stroke="#b9b4c6" stroke-width="1.5" />
 
-      <!-- chrome axle bearing, centred -->
-      <rect x="144" y="286" width="32" height="28" rx="4" fill="url(#vd-chrome)" />
+      <!-- axle bearing, centred -->
+      <rect x="144" y="286" width="32" height="28" rx="3" fill="#14131a" stroke="#f2f4f8" stroke-width="1.5" />
 
-      <!-- bottom hub cone (black), mirrored -->
-      <path d="M144,314 L176,314 L184,356 L136,356 Z" fill="#131017" />
+      <!-- bottom hub cone, mirrored -->
+      <path d="M144,314 L176,314 L184,356 L136,356 Z" fill="#08070c" stroke="#b9b4c6" stroke-width="1.5" />
 
-      <!-- bottom gasket (cyan ring) -->
-      <rect x="136" y="356" width="48" height="16" rx="6" fill="#5fd7e8" />
+      <!-- bottom gasket -->
+      <rect x="136" y="356" width="48" height="16" rx="6" fill="#cf2f2a" stroke="#ff6a62" stroke-width="1.5" />
 
       <!-- bottom bowl (cupBottom): mirror of the top bowl -->
       <path d="M142,372 C136,437 100,512 32,568 Q160,592 288,568 C220,512 184,437 178,372 Z"
-            fill="url(#vd-bowl-bottom)" stroke="rgba(8,6,13,0.4)" stroke-width="1.5" />
+            fill="#0c0a12" stroke="#efeaf8" stroke-width="1.5" />
+      <ellipse cx="160" cy="573" rx="128" ry="19" fill="#0c0a12" stroke="#efeaf8" stroke-width="1.5" />
     </svg>
   </div>
   <main id="content"></main>

@@ -1,59 +1,129 @@
 /*
- * Foundation layer: design tokens, reset, atmosphere, and global typography/links.
- * Layout (the sticky stage, section grids, component treatment) lives in stage.css
- * and sections.css -- this file only holds things that are true everywhere.
+ * Foundation layer: design tokens, reset, atmosphere, global typography, links, and the
+ * fixed site nav. Layout -- the sticky stage, the four room patterns, component
+ * treatment -- lives in stage.css and sections.css; this file only holds what is true
+ * everywhere.
  *
- * The editorial rewrite (see sections.css's own header for the composition this
- * serves): no drawn structure survives here -- no hairline-rule token, no solid
- * backdrop behind text, no page-spanning grid. The object's own light
- * (src/diabolo/spill.js, .light-spill in stage.css) is the only connective device
- * left; everything else is type, colour and space.
+ * THE THESIS: the workbench and the one sheet on it.
+ *
+ * A diabolo is two cups on an axle -- a machine -- and the club's art is what a machine
+ * looks like spun fast enough to stop reading as one. So the page is a near-black
+ * workbench on which the object is DRAWN, in bright line on dark mass (see
+ * src/diabolo/materials.js), and nothing else on the page is drawn at all: no rules, no
+ * boxes around content, no plates behind text, no shadows an unlit object could not
+ * cast. Type and space carry everything else.
+ *
+ * Exactly one surface in the whole scroll is PRINTED rather than drawn: the panel room,
+ * a full-bleed violet sheet set in serif and carrying the club's own story and a
+ * photograph, which slides up over the object and covers it. That is where all the
+ * boldness is spent; everything around it stays quiet.
+ *
+ * Colour is rationed to two rings that never meet. The object's is the red gasket
+ * (materials.js, object scope). The page's is --accent below, violet. One page accent,
+ * one object accent, and they are never collapsed into each other -- that is the rule,
+ * and it holds.
+ *
+ * What does NOT hold, and used to be claimed here, is that the page accent "appears in
+ * four places only". It is spent on two kinds of thing, and the second kind is easy to
+ * forget when reading this file alone:
+ *
+ *   as an AREA, where it is the loudest thing on the page and is rationed hard --
+ *     the panel room's sheet, the nav's call to action, and the showcase's two form
+ *     pills. Three surfaces, all of them asking a visitor to turn up or press something.
+ *
+ *   as a MARK, small and on the near-black ground, where it reads as "this is live" --
+ *     every link (`a` below), the focus ring, .board-position, .part-label-index on the
+ *     object's own labels, and the hover/focus rings on .media-facade and
+ *     .semester-select (all sections.css/stage.css).
+ *
+ * The second list is not an erosion of the first; it is what an accent is for. But a
+ * file that IS the design contract has to describe itself correctly, so it is written
+ * out rather than undercounted. The constraint worth defending is the one above: the
+ * violet is the page's and the red is the object's, and nothing else on the page is
+ * coloured at all.
  */
 
 :root {
-  /* ---- Palette. One dominant field, violet dominant, cyan used sparingly. ---- */
-  --stage:        #08060d; /* near-black ground */
-  --stage-rgb:    8, 6, 13; /* same colour as --stage, as a triplet for rgba() */
-  --stage-raised: #14101f; /* the one step up from --stage: a soft surface for
-                               interactive cards, never a ruled box */
-  --violet-deep:  #57068c; /* NYU violet, the anchor */
-  --violet:       #8b45d6;
-  --violet-lift:  #a86ef0; /* glow / hover */
-  --cyan:         #5fd7e8; /* the gasket's colour. Marks a JOIN -- mechanical (the gasket
-                               seating cup to hub) or interactive (:focus-visible below,
-                               attention landing on a control). The only other accent,
-                               and used only where that meaning actually applies. */
-  --ink:          #f4f0f8;
-  --ink-dim:      #a79fb5;
+  /* ---- Ground. Two values and no more: a page that is nearly all one black cannot
+   *      have a "surface hierarchy", and inventing one would put a box round content
+   *      that is meant to sit on the bench. --surface is for CONTROLS -- things you
+   *      press -- and for the hero's one card. Never for a paragraph. ---- */
+  --stage:      #08060d; /* near-black ground */
+  --stage-rgb:  8, 6, 13; /* same colour as --stage, as a triplet for rgba() */
+  --surface:    #16121f;
 
-  /* ---- Type. An editorial pairing, not the previous technical one: a high-contrast
-   *      display serif used only where it can run at real size (the hero, section
-   *      headings), and a plain sans for everything read at length. A small serif
-   *      reads as an ordinary body face and wastes the whole effect, so h3 and
-   *      smaller stay on --font-body -- see the h1/h2 vs h3 split below.
-   *      --font-mono now belongs to exactly one thing on the page: the 3D object's
-   *      own part labels (.part-label, stage.css). Nothing in the reading column
-   *      sets it any more. ---- */
-  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  /* ---- The page's one accent. #c676ff is NYU violet's own hue (275 deg against the
+   *      crest's 276) taken up to a lightness that can carry near-black text: --accent-ink
+   *      on --accent measures 7.05:1, so the panel is a AAA reading surface and the CTA
+   *      pill's label clears AA with room to spare. The crest value itself, #57068c,
+   *      manages 1.72:1 against the same ink and cannot carry text at all. On the ground
+   *      it runs the other way: --accent on --stage is 7.14:1, which is what makes the
+   *      focus ring and the body links legible without a second colour.
+   *
+   *      Every ratio in this file is WCAG 2.x relative luminance --
+   *      L = 0.2126R + 0.7152G + 0.0722B on linearised sRGB, (L1+0.05)/(L2+0.05) --
+   *      recomputed from the hexes beside it rather than carried forward. Three figures
+   *      that had been carried forward did not survive that: the crest's was 1.66 and is
+   *      1.7154; --accent/--stage was 7.15 in three places here and is 7.1355, so 7.14;
+   *      and --ink-dim's is below. ---- */
+  --accent:     #c676ff;
+  --accent-ink: #0a0810; /* the near-black that sits ON the accent, never on --stage */
+
+  --ink:     #f5f2fa; /* 18.20:1 on --stage */
+  /* 8.22:1, not the 8.34 this said for most of the branch -- recomputed, and the same
+     figure docs/VERIFICATION.md measured against live pixels. Still a de-emphasis well
+     clear of AAA body text, not a contrast compromise; the wrong number was never
+     load-bearing, but a design contract that rounds in its own favour is not one. */
+  --ink-dim: #aaa2b8; /* 8.22:1 on --stage */
+
+  /* ---- Type. The display voice is a HAIRLINE GROTESQUE, not a serif, and that is the
+   *      one call in this pass worth stating outright: an Inter 200 headline set at 9rem
+   *      is itself a line drawing, which is the same logic the object is built on. A
+   *      high-contrast serif at that size reads literary and editorial -- a magazine
+   *      feature about a club rather than the club -- and it competed with the object
+   *      instead of agreeing with it.
+   *
+   *      Instrument Serif keeps one real job rather than being dropped: the panel, the
+   *      single printed surface on the page. Confining it there is what makes the panel
+   *      feel like a different material instead of a different colour.
+   *
+   *      --font-mono belongs to exactly one thing: the 3D object's own part labels
+   *      (.part-label, stage.css). Nothing in the reading column sets it. ---- */
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-panel:   'Instrument Serif', 'Iowan Old Style', Georgia, serif;
   --font-mono:    'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Both sizes are the part labels' now -- see the comment above. */
+  /* Both sizes are the part labels' -- see the comment above. */
   --mono-2xs: 0.68rem; /* part-label name */
   --mono-xs:  0.75rem; /* part-label index */
 
-  /* ---- The reading column. Sized and measured against the object's own drift:
-   *      across the six acts (src/scroll/choreography.js ACTS) it travels roughly
-   *      26.6%-73.4% of the viewport, so a column at or under 38% wide, pinned to
-   *      whichever edge its act's textSide names (src/ui/layout.js writes
-   *      data-side), never shares screen space with it. Hero and the closing act
-   *      are the two acts with the object centred instead of offset, so they get
-   *      the wider, centred measure. See sections.css for where these are used. ---- */
-  --column:      min(38%, 30rem);
-  --column-wide: min(64%, 44rem);
+  /* ---- Scale. A fourth (x1.333) at the top, tightening to a minor third lower down,
+   *      where the steps have to stay distinguishable at small sizes. ---- */
+  --type-hero:  clamp(3.4rem, 9.6vw, 9rem); /* 9.6, not 10.5: see the h1 in sections.css */
+  --type-title: clamp(2.1rem, 5vw, 4.25rem);
+  --type-panel: clamp(2.2rem, 4.6vw, 3.9rem);
+  --type-lead:  clamp(1.05rem, 1.4vw, 1.3rem);
+  --type-micro: 0.78rem;
 
-  --radius: 14px; /* soft, not technical -- the old 2px read as a drafting-tool corner */
-  --gutter: clamp(1.5rem, 5vw, 4rem);
+  /* ---- Measures. --text-col is the head of a hero/panel/showcase room, and 38% is not
+   *      a taste judgement: tests/choreography.dom.test.js sweeps 400 points of the scrub
+   *      asserting the object stays out of a column of exactly `COLUMN = 0.38`, so a
+   *      wider column here would silently stop being the thing that test is protecting.
+   *      Measured live at 46% the object's own part labels were already clipping the
+   *      showcase's lead paragraph. --label-col is the grid rooms' sticky title column,
+   *      which lives in the one room that has faded the object out. ---- */
+  --text-col:  min(38%, 30rem);
+  --label-col: clamp(6.5rem, 15vw, 13rem);
+  --measure:   62ch;
+
+  /* Two radii, because they mean different things: a card is a cut rectangle, a control
+     is a pressable pill. One radius on everything is how a page stops having hierarchy. */
+  --radius:      6px;
+  --radius-pill: 999px;
+
+  --gutter: clamp(1.25rem, 5vw, 4.5rem);
+  --nav-h:  clamp(3.25rem, 7vh, 4.25rem);
 
   color-scheme: dark;
 }
@@ -67,20 +137,21 @@ body {
   background-color: var(--stage);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 1.05rem;
-  line-height: 1.7;
+  font-size: 1rem;
+  line-height: 1.65;
+  /* Inter's defaults leave the caps in this club's own copy (VIOLET DIABOLO, ABOUT US,
+     MEDIA) sitting slightly loose; -0.005em is a nudge, not a tracked-out label style. */
+  letter-spacing: -0.005em;
 
   /*
-   * Film grain (SVG feTurbulence noise, alpha baked into the filter itself) is the
-   * one atmospheric layer left on the page background. There is no fixed bloom and
-   * no grid here any more -- both read as decoration applied TO the page, which is
-   * exactly what the client's own feedback singled out. The only light the page
-   * has now comes from the object itself, moves with it, and lives entirely in
-   * .light-spill (stage.css) and src/diabolo/spill.js -- a single, honest source
-   * rather than an ambient one competing with it. `background-attachment: fixed`
-   * pins the grain to the viewport so it never scrolls with the page (iOS Safari
-   * treats `fixed` as `scroll`; the grain still renders there, just travelling
-   * with the page, which is a harmless degradation).
+   * Film grain (SVG feTurbulence noise, alpha baked into the filter itself) is the one
+   * atmospheric layer on the page background. There is no bloom and no grid -- both read
+   * as decoration applied TO the page, which is what the client's own feedback singled
+   * out -- and no gradient standing in for light, because the object is flat and unlit
+   * (src/diabolo/materials.js) and casts none. `background-attachment: fixed` pins the
+   * grain to the viewport so it never scrolls with the page (iOS Safari treats `fixed` as
+   * `scroll`; the grain still renders there, just travelling with the page, which is a
+   * harmless degradation).
    */
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix in='noise' type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05' intercept='0'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -100,27 +171,27 @@ h1, h2, h3 {
   line-height: 1.05;
 }
 
-/* The display voice: Instrument Serif, run large, only where it can be. Weight
-   comes down (this face has one real weight, 400 -- its own stroke contrast does
-   the work a bold weight would on a sans) as size goes up. */
+/* The display voice: Inter, run large and thin. Weight comes DOWN as size goes up --
+   200 is only legible because the hero is set at 9rem; the section titles, a step
+   smaller, need 300 to hold the same visual weight of line. */
 h1, h2 {
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-weight: 300;
+  letter-spacing: -0.03em;
 }
 
-/* h3 (board/media/form card headings) stays on the body face at a small size --
-   see the --font-display comment above for why a small serif is skipped here. */
+/* Card headings (board, media, forms) stay on the body face: they are read at a glance
+   in a grid, not looked at, and a thin grotesque at 1rem is just a weak sans. */
 h3 {
   font-family: var(--font-body);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  line-height: 1.35;
 }
 
 p {
   margin: 0;
-  max-width: 62ch;
+  max-width: var(--measure);
 }
 
 /* ---------------------------------------------------------------------------
@@ -128,10 +199,11 @@ p {
  * ------------------------------------------------------------------------- */
 
 a {
-  color: var(--violet-lift);
+  color: var(--accent);
   text-decoration: underline;
-  text-underline-offset: 0.2em;
-  text-decoration-color: color-mix(in oklab, var(--violet-lift) 40%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+  text-decoration-color: color-mix(in oklab, var(--accent) 45%, transparent);
   transition: color 0.2s ease, text-decoration-color 0.2s ease;
 }
 
@@ -141,17 +213,242 @@ a:hover {
 }
 
 /* ---------------------------------------------------------------------------
- * Accessibility: a keyboard user must always be able to see where they are.
- * Cyan, not violet -- see --cyan's own comment above. Keyboard focus is
- * exactly the "interactive join" cyan is reserved for, and borrowing the
- * gasket's colour for it means the accent still reads as rare (it only
- * appears while tabbing) without inventing a fourth palette colour.
+ * The site nav. Fixed, above both the stage (z-index 0) and the content column
+ * (z-index 1), so it survives the panel room sliding up underneath it.
+ *
+ * Pills are filled in --surface rather than left translucent on purpose: a pill's label
+ * has the moving object behind it for most of the page, and a translucent fill makes its
+ * contrast a function of whatever the canvas happens to be drawing. Opaque, its label is
+ * 16.63:1 everywhere, measurably and permanently.
+ * ------------------------------------------------------------------------- */
+
+.site-nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: clamp(0.4rem, 1.5vw, 1rem);
+  min-height: var(--nav-h);
+  padding: 0.5rem var(--gutter);
+}
+
+/*
+ * Every item in the nav is an opaque chip, the wordmark included, and every one of them
+ * carries a 2px ring in the page's own ground colour.
+ *
+ * That ring is invisible for the whole page bar one room -- it is --stage on --stage --
+ * and it exists entirely for the panel. The nav is fixed, the violet panel scrolls
+ * underneath it, and on that ground a white wordmark measures 2.54:1 and the violet
+ * call to action disappears into a field of its own colour. Neither is something the
+ * nav can detect and react to without a scroll listener, so instead every chip carries
+ * its own edge and the nav is correct on any ground it is ever laid over. Measured
+ * against the panel: a dark chip's own label is 16.63:1 (--ink on --surface, and the
+ * chip is opaque, so the panel behind it changes nothing), the chip itself stands off
+ * the violet at 6.52:1 (--surface on --accent), and the ringed call to action is 7.05:1
+ * for its label with a 7.14:1 edge marking the control. The single "dark chips 15.6:1"
+ * this replaces was neither of the two real numbers and matched nothing in the file.
+ */
+.site-nav-mark,
+.site-nav-links a,
+.site-nav-cta {
+  box-shadow: 0 0 0 2px var(--stage);
+}
+
+.site-nav-mark {
+  margin-right: auto;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  padding: 0.45rem 0.9rem;
+  background: var(--surface);
+  font-size: var(--type-micro);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-nav-links {
+  display: flex;
+  gap: 0.3rem;
+  min-width: 0;
+  /* Both axes named explicitly: setting overflow-x alone makes the UA compute overflow-y
+     as auto, which turns this row into a vertical scroll container for no reason. */
+  overflow: auto hidden;
+  scrollbar-width: none;
+}
+
+.site-nav-links::-webkit-scrollbar { display: none; }
+
+.site-nav-links a,
+.site-nav-cta {
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  padding: 0.45rem 0.9rem;
+  font-size: var(--type-micro);
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.site-nav-links a {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.site-nav-links a:hover {
+  background: color-mix(in oklab, var(--surface) 55%, var(--accent));
+  color: var(--ink);
+}
+
+/* The one filled control in the page's chrome. A club page's job is to get people to
+   turn up, so the accent goes here and to the two forms that do the same job. */
+.site-nav-cta {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.site-nav-cta:hover {
+  background: color-mix(in oklab, var(--accent) 72%, white);
+  color: var(--accent-ink);
+}
+
+/*
+ * Narrow screens. At 375px the wordmark chip alone takes 140 of the 335px the bar has,
+ * which left the pill row scrolling and clipped "Eve" mid-word -- technically reachable,
+ * but it reads as a broken layout rather than a scrollable one. The wordmark goes: the
+ * hero's h1 says the club's name in 9rem type about sixty pixels below it, so it is the
+ * one item in the bar that is genuinely redundant here, and the four section links plus
+ * the call to action then fit outright with room to spare (measured: 338px of 375px).
+ * The overflow behaviour above stays as the safety net for a 320px device.
+ */
+@media (max-width: 767px) {
+  .site-nav {
+    gap: 0.3rem;
+  }
+
+  .site-nav-mark {
+    display: none;
+  }
+
+  .site-nav-cta {
+    margin-left: auto;
+  }
+
+  .site-nav-links a,
+  .site-nav-cta {
+    font-size: 0.72rem;
+    padding: 0.42rem 0.62rem;
+  }
+}
+
+/* A jump link lands the section's top edge at the viewport's top, which is underneath
+   the fixed nav. Offsetting by the bar's height is what keeps the heading visible. */
+[data-section] { scroll-margin-top: var(--nav-h); }
+
+/*
+ * Below 768px the obstruction over the top of the viewport is not the nav, it is the
+ * object's own band (stage.css): #stage becomes a 40dvh band at z-index 2, ABOVE
+ * #content's 1, opaque, and the nav (z-index 3, ~52-57px tall here) is laid on top of
+ * that band rather than beside it -- the band is taller than the nav in every case, so
+ * it is the band's height a jump link has to clear, not the nav's. --nav-h alone left a
+ * landed section's heading and first paragraph roughly 268px behind the band: measured
+ * live at 375x812, scroll-margin-top computed to 52-57px against a 324.8px band.
+ */
+@media (max-width: 767px) {
+  [data-section] { scroll-margin-top: 40dvh; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Accessibility: a keyboard user must always be able to see where they are. The accent
+ * is the page's mark of "attention has landed on a control", so it is the focus ring
+ * too -- 7.14:1 against the near-black ground everywhere except the fixed nav.
+ *
+ * The nav is `position: fixed` at z-index 3 and is laid over whatever room has scrolled
+ * underneath it -- the near-black ground for most of the page, but the panel room's own
+ * violet sheet (--accent) for the whole of it. An accent-on-accent ring there is 1.00:1,
+ * and on .site-nav-cta, whose FILL is also --accent, focused and unfocused are then
+ * pixel-identical apart from the chip's own permanent edge.
+ *
+ * `[data-room='panel'] :focus-visible { outline-color: var(--accent-ink) }` used to sit
+ * here as the fix, on the theory that the nav's ring would inherit the panel's override
+ * the way the panel's own text does. It never can: the nav is prepended straight to
+ * <body> (main.js), a sibling of #content, never a descendant of `[data-room='panel']`
+ * -- so that selector cannot match anything the nav ever draws. That half of the
+ * reasoning stands, and it is why the nav needs the treatment below.
+ *
+ * The other half went too far. It also concluded that `[data-room='panel']` has no
+ * focusable descendants of its own, so the selector could never reach anything either
+ * way, and dropped it. True of today's markup and a bad reason to leave the room
+ * undefended: the panel is the club's OWN STORY (content/index.js ABOUT.body), the one
+ * place on the page where prose is likely to grow a link, and this room is 216vh of a
+ * 1300vh page. A link added there today would take the global ring above -- --accent on
+ * a full-bleed --accent sheet, 1.00:1 -- and be invisible to a keyboard user for a sixth
+ * of the page, with nothing failing anywhere. "No element can trigger it" is a reason to
+ * write a rule carefully, not a reason to leave the one room whose ground is known to
+ * break the default ring with no rule at all.
+ *
+ * So both grounds are covered, by the same two tones rather than by two different ideas:
+ *
+ *   the nav can't detect which ground is behind it without a scroll listener (the same
+ *   constraint its permanent stage-coloured edge ring exists for, in the comment above
+ *   .site-nav-mark), so its ring is made correct on ANY ground;
+ *
+ *   the panel's ground is known -- its own violet sheet -- but not uniformly: the room
+ *   also carries a photograph (PHOTOS.group), and a link wrapping one would sit on
+ *   arbitrary pixels rather than on the sheet. A single tone picked for the violet would
+ *   go quiet there, so the panel takes the same any-ground ring instead of a second,
+ *   narrower answer that is right until the markup changes.
+ *
+ * Two tones, layered so the OUTER edge -- the one actually touching whatever is really
+ * behind the element -- is always the tone that ground needs.
  * ------------------------------------------------------------------------- */
 
 :focus-visible {
-  outline: 2px solid var(--cyan);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
-  border-radius: var(--radius);
+}
+
+/*
+ * --ink on --stage is 18.20:1 (root token comment above); on the panel's --accent it is
+ * 2.55:1 -- the same figure task 5 measured for the white wordmark text and rejected.
+ * --stage on the panel is 7.14:1 (the accent/stage pair, read the other way -- contrast
+ * ratio does not care which is foreground); on --stage itself it is 1:1, same as the
+ * chips' own resting edge. Neither token alone clears 3:1 on both grounds, so the ring
+ * uses both, stage on the outside: outline-color: ink is the band that shows on the
+ * near-black ground the page mostly is, and the box-shadow -- spread past the outline,
+ * not just up to it -- repeats the chip's dark edge far enough out to read as a second,
+ * separate ring specifically where the outline itself goes quiet. Measured against live
+ * canvas/panel pixels: see .superpowers/sdd/task-5-fixes-report.md, finding 2.
+ *
+ * The spread is 7px, not the 6px it shipped at, and the reason is worth a line because a
+ * single pixel of it is doing all the work on the violet. Measured outward from the
+ * element's border box, with `outline: 2px` at `outline-offset: 3px` over a shadow spread
+ * of S, the painted bands are:
+ *
+ *     stage [0, 3)      ink [3, 5)      stage [5, S)
+ *
+ * On the panel the ink band is 2.55:1 and fails 3:1 on its own, so that trailing stage
+ * band -- 7.14:1 -- is the entire visible difference between focused and unfocused there.
+ * At S = 6 it is ONE CSS pixel wide, and one pixel is not a margin: half a device pixel
+ * of offset rounding, or anyone later widening the outline to 3px "to make focus clearer",
+ * erases the only band that can be seen and makes the ring worse by trying to improve it.
+ * S = 7 makes it 2px. Nothing else about the ring changes, and on the near-black ground
+ * the page mostly is, the ink band was never the one at risk.
+ */
+.site-nav :focus-visible,
+/*
+ * The panel room joins the nav here rather than getting a violet-specific ring of its
+ * own -- see the block comment above for why the room needs a rule at all today, and why
+ * the same any-ground treatment is the right one for a room that is mostly a flat sheet
+ * but also carries a photograph.
+ */
+[data-room='panel'] :focus-visible {
+  outline-color: var(--ink);
+  box-shadow: 0 0 0 7px var(--stage);
 }
 
 /* ---------------------------------------------------------------------------

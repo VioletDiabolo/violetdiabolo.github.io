@@ -39,11 +39,6 @@ describe('resolveQualityTier', () => {
     expect(resolveQualityTier(undefined)).toBe('base');
   });
 
-  it('enables transmission only on the high tier', () => {
-    expect(TIER_SETTINGS.high.transmission).toBe(true);
-    expect(TIER_SETTINGS.base.transmission).toBe(false);
-  });
-
   it('caps device pixel ratio lower on the base tier', () => {
     expect(TIER_SETTINGS.base.dpr).toBeLessThan(TIER_SETTINGS.high.dpr);
   });
@@ -182,6 +177,22 @@ describe('camera aim target', () => {
   });
 });
 
+describe('tone mapping', () => {
+  it('passes the flat unlit palette through untransformed', () => {
+    // createStage() needs a real WebGL context, so it never runs under jsdom/vitest -- same
+    // constraint as the aimCamera and overlay-disposal guards above, so source inspection is
+    // again the only route available. ACES filmic is an HDR display transform meant for lit
+    // PBR output; applied to flat MeshBasicMaterial/LineBasicMaterial fills it desaturates
+    // and shifts every authored colour, defeating the palette's exact saturation/luminance
+    // arithmetic (materials.dom.test.js). That regression shipped once already (ACES
+    // survived the deletion of the PBR path) and is silent -- nothing crashes or fails
+    // functionally, the object just renders in the wrong colours -- so it needs a guard.
+    const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
+    expect(source).toMatch(/renderer\.toneMapping\s*=\s*NoToneMapping\s*;/);
+    expect(source).not.toMatch(/ACESFilmicToneMapping/);
+  });
+});
+
 describe('overlay disposal', () => {
   it('disposes every registered overlay when the stage disposes, so their DOM subtrees do not leak', () => {
     // createStage() needs a real WebGL context, so it never runs under jsdom/vitest —
@@ -189,8 +200,38 @@ describe('overlay disposal', () => {
     // only route available. dispose() already frees geometry, materials and the
     // renderer but, unlike render() and resize() just above it (both of which already
     // loop `for (const overlay of overlays)`), never iterated overlays at all — leaking
-    // the CSS3D label subtree and the spill element's DOM node on every teardown.
+    // every registered overlay's DOM subtree on every teardown. That was two overlays when
+    // the defect was found; the light spill has since gone and the CSS3D label layer is
+    // the only one left, which is exactly why the assertion below is written against the
+    // LOOP rather than against a list of overlays that keeps changing.
     const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
     expect(source).toMatch(/for\s*\(const overlay of overlays\)\s*overlay\.dispose\(\);/);
+  });
+});
+
+describe('object opacity bridge', () => {
+  it('reads state.objectOpacity onto every material in the render loop, never a second owner', () => {
+    // createStage() needs a real WebGL context, so it never runs under jsdom/vitest --
+    // same constraint as the aimCamera, tone-mapping and overlay-disposal guards above,
+    // so source inspection is again the only route available. anime.js owns
+    // state.objectOpacity (scroll/choreography.js writes it); the render loop only reads
+    // it, exactly the bridge state.spinRate already uses. A seam built but never wired --
+    // the edge materials created and then not handed to the geometry -- shipped on this
+    // branch once already, so this pins the read rather than trusting it.
+    const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
+    expect(source, 'state never declares objectOpacity').toMatch(/objectOpacity:\s*1/);
+    expect(source, 'the render loop never applies state.objectOpacity')
+      .toMatch(/for \(const material of materialList\) material\.opacity = state\.objectOpacity;/);
+  });
+
+  it('takes that list from materials.js, rather than assembling one here by hand', () => {
+    // flattenMaterials is tested directly in materials.dom.test.js; this is the other half
+    // of the same guard -- that the list the render loop walks is actually the one that
+    // module produces. A hand-built array here would pass every test in that file and
+    // still miss a material added under a new container key, fading the object partway
+    // and stopping. Source inspection for the usual reason: createStage() needs WebGL.
+    const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
+    expect(source, 'materialList is not built from flattenMaterials')
+      .toMatch(/const materialList = flattenMaterials\(materials\);/);
   });
 });

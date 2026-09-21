@@ -1,4 +1,4 @@
-import { Group, LatheGeometry, Mesh } from 'three';
+import { EdgesGeometry, Group, LatheGeometry, LineSegments, Mesh } from 'three';
 import { PART_IDS, DIMS, cupProfile, gasketProfile, hubConeProfile, bearingProfile } from './profiles.js';
 
 const halfBearing = DIMS.bearingHeight / 2;
@@ -36,7 +36,23 @@ const MATERIAL_FOR = {
   axleBearing: 'bearing',
 };
 
-export function buildDiabolo({ materials, segments = 96 }) {
+/** Profile points per part. Low so EdgesGeometry yields a countable wireframe. */
+export const PROFILE_POINTS = 8;
+/** Revolution steps. Measured: 8 x 12 gives 48-204 lines per part, 780 across the object. */
+export const RADIAL_SEGMENTS = 12;
+/** Degrees: a boundary is only drawn where adjacent faces meet at more than this angle, so
+ *  a flat span (e.g. the hub cone's now-linear taper, see profiles.js) draws no seam at its
+ *  interior ring -- this is why the hub cone measures 48 lines, the low end of the range
+ *  above, rather than a higher count from a spurious extra loop. The number itself is not
+ *  sensitive: swept at 1, 5 and 10 degrees the hub cone measures 48 lines at all three, so
+ *  anything in that range is the same drawing. Where it does start to bite is above about
+ *  30 degrees, which is where the 12 radial creases of the lathe itself sit -- past that
+ *  this threshold stops suppressing a spurious interior ring and starts dropping the
+ *  object's real edges, and a smooth lathe loses its wireframe. 1 is kept as the value
+ *  furthest from that cliff rather than as a tuned figure. */
+export const EDGE_THRESHOLD = 1;
+
+export function buildDiabolo({ materials, segments = PROFILE_POINTS, radialSegments = RADIAL_SEGMENTS }) {
   // Two nested groups, so the scroll-driven turn and the continuous spin never write
   // the same object. anime.js owns tilt.rotation.x; the render loop owns
   // spinner.rotation.y. Collapsing these into one group reintroduces the collision.
@@ -47,8 +63,6 @@ export function buildDiabolo({ materials, segments = 96 }) {
   tilt.add(spinner);
 
   const parts = {};
-
-  const radialSegments = Math.max(24, Math.round(segments * 0.75));
 
   for (const id of PART_IDS) {
     const group = new Group();
@@ -70,6 +84,14 @@ export function buildDiabolo({ materials, segments = 96 }) {
       mesh.position.y = -halfBearing;
       group.userData.spinMesh = mesh;
     }
+
+    // Parented to the mesh, not the group: it inherits the flip scale for free and adds
+    // no new owner of any transform.
+    const edges = new LineSegments(
+      new EdgesGeometry(geometry, EDGE_THRESHOLD),
+      materials.edge[MATERIAL_FOR[id]],
+    );
+    mesh.add(edges);
 
     group.add(mesh);
     group.position.y = HOME[id].y;

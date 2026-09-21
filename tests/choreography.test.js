@@ -1,208 +1,233 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ACTS, SPACING, FACE_ON_X, PROFILE_X, LATERAL_OFFSET, explodedY, partYAt,
+  ROOMS, SHOWCASE_ID, SPACING, PROFILE_X, FACE_ON_X, LATERAL_OFFSET, LATERAL_SETTLE,
+  OPACITY_SETTLE, explodedY, partYAt,
 } from '../src/scroll/choreography.js';
 import { HOME } from '../src/diabolo/build.js';
 import { CAMERA_NEAR_Z, CAMERA_FAR_Z, CAMERA_FOV } from '../src/diabolo/stage.js';
 import { DIMS, PART_IDS } from '../src/diabolo/profiles.js';
 
-const byId = () => Object.fromEntries(ACTS.map((a) => [a.id, a]));
+describe('ROOMS', () => {
+  const byId = () => Object.fromEntries(ROOMS.map((r) => [r.id, r]));
 
-describe('ACTS', () => {
-  it('names the six acts in order', () => {
-    expect(ACTS.map((a) => a.id)).toEqual(
-      ['arrival', 'apart', 'recombine', 'spin', 'orbit', 'settle'],
-    );
+  it('names the four rooms in order', () => {
+    expect(ROOMS.map((r) => r.id)).toEqual(['hero', 'panel', 'showcase', 'grid']);
   });
 
   it('covers the whole scrub without gaps or overlap', () => {
-    for (let i = 1; i < ACTS.length; i++) {
-      expect(ACTS[i].end).toBeGreaterThan(ACTS[i - 1].end);
-    }
-    expect(ACTS.at(-1).end).toBe(1);
+    for (let i = 1; i < ROOMS.length; i++) expect(ROOMS[i].end).toBeGreaterThan(ROOMS[i - 1].end);
+    expect(ROOMS.at(-1).end).toBe(1);
   });
 
-  it('gives every act enough room to read as a transition rather than a cut', () => {
+  it('matches the spans the spec sets', () => {
+    expect(ROOMS.map((r) => r.end)).toEqual([0.12, 0.30, 0.55, 1.00]);
+  });
+
+  // Carried over from the six-act table this replaces. The exact-span test above catches
+  // drift; only this says what must be true of ANY valid table -- a room too short to
+  // register reads as a cut rather than a transition.
+  it('gives every room enough scroll to read as a transition rather than a cut', () => {
     let previous = 0;
-    for (const act of ACTS) {
-      expect(act.end - previous, `${act.id} is too short to register`).toBeGreaterThanOrEqual(0.08);
-      previous = act.end;
+    for (const room of ROOMS) {
+      expect(room.end - previous, `${room.id} is too short to register`).toBeGreaterThanOrEqual(0.08);
+      previous = room.end;
     }
   });
 
-  it('starts face-on and assembled', () => {
-    expect(ACTS[0].explode).toBe(0);
-    expect(ACTS[0].tiltX).toBeCloseTo(FACE_ON_X, 10);
+  it('explodes in exactly one room', () => {
+    const exploding = ROOMS.filter((r) => r.explode > 0);
+    expect(exploding).toHaveLength(1);
+    expect(exploding[0].id).toBe(SHOWCASE_ID);
+    expect(exploding[0].explode).toBe(1);
   });
 
-  it('explodes only in the apart act, then recombines', () => {
-    const a = byId();
-    expect(a.apart.explode).toBe(1);
-    expect(a.recombine.explode).toBe(0);
-    expect(a.spin.explode).toBe(0);
+  it('keeps the object assembled everywhere else', () => {
+    for (const room of ROOMS) {
+      if (room.id === SHOWCASE_ID) continue;
+      expect(room.explode, `${room.id} is partly exploded`).toBe(0);
+    }
   });
 
-  it('reaches profile at the recombine act and holds it through the spin', () => {
-    const a = byId();
-    expect(a.recombine.tiltX).toBeCloseTo(PROFILE_X, 10);
-    expect(a.spin.tiltX).toBeCloseTo(PROFILE_X, 10);
+  it('shows the part labels only where the object is apart', () => {
+    for (const room of ROOMS) {
+      expect(room.labels, `${room.id}`).toBe(room.id === SHOWCASE_ID ? 1 : 0);
+    }
   });
 
-  it('returns face-on to close, so the page ends where it began', () => {
-    expect(ACTS.at(-1).tiltX).toBeCloseTo(FACE_ON_X, 10);
-    expect(ACTS.at(-1).explode).toBe(0);
+  // Carried over from the six-act table, where it guarded the `apart` act. The labels are
+  // only legible if the thing carrying them is not whipping past.
+  it('slows the spin while the labels are meant to be read', () => {
+    const r = byId();
+    expect(r.showcase.spin).toBe(Math.min(...ROOMS.map((room) => room.spin)));
   });
 
-  it('tips the axle off vertical only while spinning, as a diabolo on a string does', () => {
-    const a = byId();
-    expect(a.arrival.tiltZ).toBe(0);
-    expect(Math.abs(a.spin.tiltZ)).toBeGreaterThan(0.05);
+  it('holds the object still behind the panel, which covers it', () => {
+    const r = byId();
+    expect(r.panel.x).toBeCloseTo(r.hero.x, 6);
+    expect(r.panel.camZ).toBeCloseTo(r.hero.camZ, 6);
+    expect(r.panel.explode).toBe(r.hero.explode);
   });
 
-  it('varies the spin across acts, so scroll visibly drives it', () => {
-    const rates = ACTS.map((a) => a.spin);
-    expect(new Set(rates).size).toBeGreaterThan(3);
+  it('fades the object out by the grid room, where content takes over', () => {
+    const r = byId();
+    expect(r.hero.opacity).toBe(1);
+    expect(r.showcase.opacity).toBe(1);
+    expect(r.grid.opacity).toBeLessThan(0.2);
+  });
+
+  it('varies the spin between rooms, so scroll visibly drives it', () => {
+    const rates = ROOMS.map((r) => r.spin);
+    expect(new Set(rates).size).toBeGreaterThan(2);
     expect(Math.max(...rates)).toBeGreaterThan(2 * Math.min(...rates));
   });
 
-  it('slows the spin while the labels are meant to be read', () => {
-    const a = byId();
-    expect(a.apart.spin).toBeLessThan(a.spin.spin);
+  it('pulls the camera back for the explosion and nowhere else', () => {
+    const r = byId();
+    expect(r.showcase.camZ).toBeGreaterThan(r.hero.camZ);
+    expect(r.showcase.camZ).toBeGreaterThan(r.grid.camZ);
   });
 
-  it('keeps every act inside the camera frustum', () => {
-    // Distance from the object, not raw camZ: see "keeps the camera between its near and
-    // far distances" below for why the orbit act needs hypot(camX, camZ) here.
+  it('keeps every room inside the camera frustum', () => {
     const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
     const assembledHalf = DIMS.cupHeight + DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness;
     const explodedHalf = 3 * SPACING + DIMS.cupHeight;
-    for (const act of ACTS) {
-      const halfExtent = act.explode === 1 ? explodedHalf : assembledHalf;
-      const distance = Math.hypot(act.camX, act.camZ);
-      const reach = Math.abs(act.y) + halfExtent;
-      expect(visibleHalfHeight(distance), `${act.id} clips`).toBeGreaterThan(reach * 1.1);
+    for (const room of ROOMS) {
+      const reach = Math.abs(room.y) + (room.explode === 1 ? explodedHalf : assembledHalf);
+      expect(visibleHalfHeight(room.camZ), `${room.id} clips`).toBeGreaterThan(reach * 1.1);
     }
   });
 
   it('starts the scrub at the distance the entrance seeds, so there is no opening dolly', () => {
-    // entrance.js seeds camera.position.z to CAMERA_NEAR_Z synchronously before the
-    // scroll timeline exists (see its own doc comment and frustum test). If arrival's
-    // camZ ever drifts from that value, the very first scroll tick would dolly the
-    // camera to arrival's camZ, an opening jump nothing here currently guards.
-    expect(ACTS[0].camZ).toBe(CAMERA_NEAR_Z);
+    // entrance.js seeds camera.position.z to CAMERA_NEAR_Z synchronously before the scroll
+    // timeline exists (see its own doc comment and frustum test). If the first room's camZ
+    // ever drifts from that value, the very first scroll tick would dolly the camera to
+    // that camZ, an opening jump nothing else here guards. Carried over from the six-act
+    // table, where it pinned `arrival`; the defect it was written for is unchanged.
+    expect(ROOMS[0].camZ).toBe(CAMERA_NEAR_Z);
+  });
+
+  it('opens the scrub with a turn, because the entrance lands face-on', () => {
+    // entrance.js seeds tilt.rotation.x to FACE_ON_X synchronously, so the object's first
+    // painted frame looks straight down the axle. The hero room's target is HERO_TILT, a
+    // different angle, and the ~1.15 rad between them is the turn the first scroll makes.
+    // That turn is DELIBERATE: the object is meant to show its face and then rotate as
+    // you scroll, which is why the entrance is not seeded to the hero's own tiltX the way
+    // its position and camera are. It is pinned here because structurally it is identical
+    // to the opening-dolly defect the camZ test above exists to catch -- nothing else
+    // distinguishes an intended opening turn from a room that forgot to match the seed,
+    // so without this the turn could be quietly equalised away and no test would notice.
+    //
+    // This is the OPENING turn only, out of face-on and into the hero room. It is not the
+    // later turn round to profile that the six-act table's "so the turn has somewhere to
+    // go" meant; that phrasing has been retired from entrance.test.js for the ambiguity.
+    const hero = ROOMS[0];
+    expect(hero.tiltX, 'the hero room starts face-on, so the opening turn is gone')
+      .not.toBeCloseTo(FACE_ON_X, 6);
+    expect(Math.abs(hero.tiltX - FACE_ON_X), 'the opening turn is too small to read')
+      .toBeGreaterThan(0.5);
   });
 
   it('keeps the camera between its near and far distances', () => {
-    // Distance from the object, not raw camZ: the orbit act swings camX away from 0,
-    // so at 40 degrees off-axis camZ alone (5.362) reads as nearer than CAMERA_NEAR_Z
-    // even though the camera sits exactly ORBIT_RADIUS (7) units out. camZ and distance
-    // coincide for every other act, whose camX is 0.
-    for (const act of ACTS) {
-      const distance = Math.hypot(act.camX, act.camZ);
-      expect(distance).toBeGreaterThanOrEqual(CAMERA_NEAR_Z - 0.01);
-      expect(distance).toBeLessThanOrEqual(CAMERA_FAR_Z + 0.01);
+    // Distance from the object, not raw camZ. No room sets camX any more -- the orbit act
+    // is gone -- so hypot reduces to camZ throughout. It is kept because the bound being
+    // checked is a DISTANCE, and the six-act table proved that matters: orbit swung camX
+    // away from 0, and at 40 degrees off-axis its camZ alone (5.362) read as nearer than
+    // CAMERA_NEAR_Z even though the camera sat exactly 7 units out. Anything that
+    // reintroduces a camX is still guarded correctly, rather than passing by omission.
+    for (const room of ROOMS) {
+      // Without this line the hypot is false assurance rather than future-proofing: the
+      // generator stopped animating camera.position.x with the orbit act (see
+      // choreography.js), so a re-added camX would be validated here and then silently
+      // ignored in production. Reintroducing one has to change the generator too, and
+      // this is what says so.
+      expect(room.camX, `${room.id} sets camX, which the generator no longer animates`)
+        .toBeUndefined();
+      const distance = Math.hypot(room.camX ?? 0, room.camZ);
+      expect(distance, `${room.id} is too close`).toBeGreaterThanOrEqual(CAMERA_NEAR_Z - 0.01);
+      expect(distance, `${room.id} is too far`).toBeLessThanOrEqual(CAMERA_FAR_Z + 0.01);
     }
   });
 
-  it('orbits the camera in exactly one act, holding its distance', () => {
-    const orbiting = ACTS.filter((a) => Math.abs(a.camX) > 0.01);
-    expect(orbiting).toHaveLength(1);
-    expect(orbiting[0].id).toBe('orbit');
-    expect(
-      Math.hypot(orbiting[0].camX, orbiting[0].camZ),
-      'the orbit must swing the camera, not dolly it',
-    ).toBeCloseTo(7, 1);
-  });
-
-  it('swings the camera far enough to read as an orbit, without passing the object', () => {
-    // hypot(R·sinθ, R·cosθ) is R for any θ, so the radius test above says nothing about
-    // the angle. This is the only assertion that does.
-    const orbit = ACTS.find((a) => a.id === 'orbit');
-    const degrees = Math.atan2(orbit.camX, orbit.camZ) * (180 / Math.PI);
-    expect(degrees).toBeGreaterThan(25);
-    expect(degrees).toBeLessThan(55);
-  });
-
   it('puts the object on the opposite side from the reading column', () => {
-    for (const act of ACTS) {
-      if (act.textSide === 'left') expect(act.x, act.id).toBeGreaterThan(0);
-      if (act.textSide === 'right') expect(act.x, act.id).toBeLessThan(0);
-      if (act.textSide === 'center') expect(act.x, act.id).toBe(0);
+    for (const room of ROOMS) {
+      if (room.textSide === 'left') expect(room.x, room.id).toBeGreaterThan(0);
+      if (room.textSide === 'right') expect(room.x, room.id).toBeLessThan(0);
+      if (room.textSide === 'center') expect(room.x, room.id).toBe(0);
     }
   });
 
   it('moves the object far enough aside to clear a 38% reading column', () => {
-    // Distance from the object, not raw camZ: see "keeps the camera between its near and
-    // far distances" above for why the orbit act needs hypot(camX, camZ) here.
-    const offset = ACTS.filter((a) => a.x !== 0);
+    const offset = ROOMS.filter((r) => r.x !== 0);
     expect(offset.length).toBeGreaterThan(0);
-    for (const act of offset) {
-      const distance = Math.hypot(act.camX, act.camZ);
-      const visibleWidth = 2 * distance * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
-      const nearEdgePct = 50 + (100 * (Math.abs(act.x) - DIMS.rimRadius)) / visibleWidth;
-      expect(nearEdgePct, `${act.id} overlaps the reading column`).toBeGreaterThanOrEqual(42);
+    for (const room of offset) {
+      const visibleWidth = 2 * room.camZ * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
+      const nearEdgePct = 50 + (100 * (Math.abs(room.x) - DIMS.rimRadius)) / visibleWidth;
+      expect(nearEdgePct, `${room.id} overlaps the reading column`).toBeGreaterThanOrEqual(42);
     }
   });
 
-  it('lifts the object in the centred acts, so the title is not laid over it', () => {
-    // The other acts avoid overlap by putting the object opposite the text. The centred
-    // acts have no opposite side, so they separate vertically instead.
-    for (const act of ACTS) {
-      if (act.textSide === 'center') {
-        expect(act.y, `${act.id} centres text on a centred object`).toBeGreaterThan(0.3);
-      } else {
-        expect(act.y, `${act.id} should not need a lift`).toBe(0);
+  it('leaves the rooms with a column beside them unlifted, since they separate sideways', () => {
+    // A lift exists for exactly one reason: to stop centred text being laid over the
+    // object. Rooms with the column on one side avoid the overlap horizontally instead,
+    // so they must not be paying for a lift they have no use for.
+    for (const room of ROOMS) {
+      if (room.textSide !== 'center') expect(room.y, `${room.id} should not need a lift`).toBe(0);
+    }
+  });
+
+  /**
+   * The centred room's clearance is NOT asserted here, and that is deliberate.
+   *
+   * It used to be, guarded by an `opacity === 0` exemption over this table -- "at zero
+   * opacity there is no object to lay text over". That reasoning holds at the table's
+   * final frame and nowhere else: `grid` reaches x = 0 in the first LATERAL_SETTLE of
+   * its room, while the fade was still mid-flight, so the object really was centred,
+   * exploded and ~0.89 opaque under a title held at 66vh. Worse, the exemption's own set
+   * came out empty, so the loop it guarded ran zero assertions and reported green.
+   *
+   * The clearance now lives where the distinction can be made honestly -- against the
+   * ANIMATED state.objectOpacity, sampled across the room's interior, in
+   * choreography.dom.test.js's 'the closing room is empty for nearly all of its centred
+   * title'. Endpoint data cannot express "invisible before it arrives", so no endpoint
+   * test should pretend to. That DOM test does not check where the title sits, only that
+   * the object is gone by the time it would matter -- see its own comment for why an
+   * earlier version of it claimed more than that.
+   */
+  it('fades a centred room out faster than it crosses to the centre', () => {
+    // The table-level half of that invariant: the behavioural half is the DOM test above.
+    // Anything at OPACITY_SETTLE >= LATERAL_SETTLE puts a visible object under a centred
+    // column with no horizontal escape left.
+    expect(OPACITY_SETTLE).toBeLessThan(LATERAL_SETTLE);
+    for (const room of ROOMS) {
+      if (room.textSide === 'center') {
+        expect(room.opacity, `${room.id} centres text on an object that stays visible`)
+          .toBeLessThan(0.05);
       }
     }
   });
 
-  it('leaves room beneath the object in the centred acts for the text to live', () => {
-    const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
-    const half = DIMS.cupHeight + DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness;
-    for (const act of ACTS.filter((a) => a.textSide === 'center')) {
-      const vh = visibleHalfHeight(Math.hypot(act.camX, act.camZ));
-      // Percentage of the viewport, measured from the very bottom, still clear once the
-      // object's own bottom edge (act.y - half, lifted by the act's y) is accounted for.
-      // (vh + act.y - half) is that bottom edge's distance up from the bottom of the
-      // frustum; dividing by the full 2*vh span and scaling to 100 turns it into a percent.
-      const clearBelowPct = 100 * ((vh + act.y - half) / (2 * vh));
-      expect(clearBelowPct, `${act.id} leaves no room for the title`).toBeGreaterThan(25);
-    }
-  });
-
-  it('pins every act state, so no field can drift unnoticed', () => {
-    // The structural tests above say what must be true of any valid table. This says what
-    // this particular table is. Both matter: invariants document intent, this catches drift.
-    // y, camX and camZ included: this test's own name previously overclaimed while omitting
-    // them, so nothing here caught arrival's camZ drifting from CAMERA_NEAR_Z (I3's own
-    // dedicated test is what actually pins that one field; this is the comprehensive check
-    // the name always implied). camX and camZ are rounded like tiltZ already was: orbit's
-    // are Math.sin/cos results, not clean literals, so exact equality would be fragile.
-    const actual = ACTS.map((a) => [
-      a.id, a.end, a.explode, +a.tiltZ.toFixed(2), a.y, +a.camX.toFixed(2), +a.camZ.toFixed(2),
-      a.spin, a.labels, a.textSide,
-    ]);
-    expect(actual).toEqual([
-      ['arrival',   0.10, 0, 0,    0.55, 0,    6.2,  1.0, 0, 'center'],
-      ['apart',     0.32, 1, 0,    0,    0,    10,   0.4, 1, 'left'],
-      ['recombine', 0.52, 0, 0,    0,    0,    7,    1.2, 0, 'right'],
-      ['spin',      0.70, 0, 0.14, 0,    0,    7,    4.0, 0, 'left'],
-      ['orbit',     0.88, 0, 0.14, 0,    4.50, 5.36, 1.2, 0, 'right'],
-      ['settle',    1.00, 0, 0,    0.6,  0,    6.8,  0.5, 0, 'center'],
+  it('pins every room state, so no field can drift unnoticed', () => {
+    expect(ROOMS.map((r) => [r.id, r.end, r.explode, r.spin, r.labels, r.opacity])).toEqual([
+      ['hero',     0.12, 0, 1.0, 0, 1],
+      ['panel',    0.30, 0, 1.0, 0, 1],
+      ['showcase', 0.55, 1, 0.5, 1, 1],
+      ['grid',     1.00, 0, 1.6, 0, 0],
     ]);
   });
 
-  it('pins each act orientation and lateral offset', () => {
-    const byId = Object.fromEntries(ACTS.map((a) => [a.id, a]));
-    expect(byId.arrival.tiltX).toBeCloseTo(FACE_ON_X, 10);
-    expect(byId.apart.tiltX).toBeCloseTo(FACE_ON_X * 0.45, 10);
-    expect(byId.recombine.tiltX).toBeCloseTo(PROFILE_X, 10);
-    expect(byId.spin.tiltX).toBeCloseTo(PROFILE_X, 10);
-    expect(byId.orbit.tiltX).toBeCloseTo(PROFILE_X, 10);
-    expect(byId.settle.tiltX).toBeCloseTo(FACE_ON_X, 10);
-    for (const id of ['apart', 'spin']) expect(byId[id].x).toBeCloseTo(LATERAL_OFFSET, 10);
-    for (const id of ['recombine', 'orbit']) expect(byId[id].x).toBeCloseTo(-LATERAL_OFFSET, 10);
-    for (const id of ['arrival', 'settle']) expect(byId[id].x).toBe(0);
+  it('pins each room orientation, framing and reading side', () => {
+    // The pin above deliberately omits tiltX, x, y, camZ and textSide. Without this,
+    // nothing catches those five drifting -- which is the exact gap that let `arrival`'s
+    // camZ drift away from CAMERA_NEAR_Z under the six-act table.
+    const r = byId();
+    for (const id of ['hero', 'panel']) expect(r[id].tiltX, id).toBeCloseTo(-0.42, 10);
+    for (const id of ['showcase', 'grid']) expect(r[id].tiltX, id).toBeCloseTo(PROFILE_X, 10);
+    for (const id of ['hero', 'panel']) expect(r[id].x, id).toBeCloseTo(LATERAL_OFFSET * 0.55, 10);
+    expect(r.showcase.x).toBeCloseTo(LATERAL_OFFSET * 0.5, 10);
+    expect(r.grid.x).toBe(0);
+    expect(ROOMS.map((room) => room.y)).toEqual([0, 0, 0, 0]);
+    expect(ROOMS.map((room) => room.camZ)).toEqual([6.2, 6.2, 10, 7]);
+    expect(ROOMS.map((room) => room.textSide)).toEqual(['left', 'left', 'left', 'center']);
   });
 });
 

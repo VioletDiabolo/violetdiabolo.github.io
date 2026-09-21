@@ -26,6 +26,20 @@ describe('sections', () => {
   });
 });
 
+describe('contact', () => {
+  it('exposes its social links as a labelled nav landmark', () => {
+    // Regression guard: this landmark was briefly a <div role="navigation">, which maps
+    // to the same accessible role but is a single attribute nothing asserted -- a typo
+    // or an edit that dropped it would silently demote the landmark with a green suite.
+    // A real <nav> can't be lost that quietly.
+    renderSections(document.getElementById('content'));
+    const contact = document.querySelector('[data-section="contact"]');
+    const socials = contact.querySelector('.socials');
+    expect(socials.tagName, 'the socials landmark is no longer a real <nav>').toBe('NAV');
+    expect(socials.getAttribute('aria-label'), 'socials nav has no accessible name').toBeTruthy();
+  });
+});
+
 describe('board', () => {
   it('defaults to the newest semester', () => {
     const el = document.getElementById('content');

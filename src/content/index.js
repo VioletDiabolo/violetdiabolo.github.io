@@ -21,6 +21,19 @@ export const EVENTS = {
     'All equipment will be provided, and anyone is welcome, regardless of experience!',
 };
 
+/**
+ * The hero's teaser card: the one thing a visitor to a club page actually needs before
+ * they scroll -- when and where to turn up. Every fact here is already in EVENTS.body
+ * above, restated in the short form a card can hold; nothing new is claimed on the
+ * club's behalf. Kept as its own export rather than folded into EVENTS so the verbatim
+ * practice-logistics prose the tests pin stays exactly as it was.
+ */
+export const HERO_TEASER = Object.freeze({
+  heading: 'Saturdays, 1–3PM',
+  detail: 'Kimmel 606. Equipment provided, and no experience needed.',
+  action: Object.freeze({ label: 'See practice details', target: 'events' }),
+});
+
 // Headings for the sections that don't otherwise carry a `heading` field (MEDIA is an
 // array, BOARD is a semester map, CONTACT is just an email/linktree pair) - kept here so
 // ui/sections.js never hardcodes club-facing copy, matching ABOUT.heading/EVENTS.heading.

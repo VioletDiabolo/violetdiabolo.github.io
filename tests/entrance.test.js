@@ -2,12 +2,18 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   ENTRANCE_SCATTER, entranceStartY, createEntrance,
 } from '../src/scroll/entrance.js';
-import { FACE_ON_X, ACTS } from '../src/scroll/choreography.js';
+import { FACE_ON_X, ROOMS } from '../src/scroll/choreography.js';
 import { CAMERA_NEAR_Z } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
 import { PART_IDS, DIMS } from '../src/diabolo/profiles.js';
 
-const scene = () => buildDiabolo({ materials: { cup: {}, gasket: {}, hub: {}, bearing: {} }, segments: 16 });
+const scene = () => buildDiabolo({
+  materials: {
+    cup: {}, gasket: {}, hub: {}, bearing: {},
+    edge: { cup: {}, gasket: {}, hub: {}, bearing: {} },
+  },
+  segments: 16,
+});
 // A plain stub, not a real Three.js camera: createEntrance only ever writes
 // camera.position.z, so this is all the shape it needs.
 const stubCamera = () => ({ position: { z: 0 } });
@@ -56,27 +62,27 @@ describe('createEntrance', () => {
     expect(camera.position.z).toBe(CAMERA_NEAR_Z);
   });
 
-  it('seeds tilt.position to the arrival act\'s target synchronously, so the hero title clears the object from the very first frame', () => {
+  it('seeds tilt.position to the hero room\'s target synchronously, so the hero title clears the object from the very first frame', () => {
     // Without this, tilt.position sits at the Three.js Group default (0, 0) and the
-    // scroll choreography only tweens the lift in gradually across the first 10% of
+    // scroll choreography only tweens the object aside gradually across the first 12% of
     // scroll — the hero (and, since skip() shares this seeding, the reduced-motion
     // still) would land the title on top of the object instead of clear of it.
-    const arrival = ACTS.find((a) => a.id === 'arrival');
+    const hero = ROOMS.find((r) => r.id === 'hero');
     const { tilt, parts } = scene();
     const camera = stubCamera();
     createEntrance({ parts, tilt, camera, onComplete: () => {} });
-    expect(tilt.position.x).toBe(arrival.x);
-    expect(tilt.position.y).toBe(arrival.y);
+    expect(tilt.position.x).toBe(hero.x);
+    expect(tilt.position.y).toBe(hero.y);
   });
 
-  it('skip() leaves tilt.position at the same arrival target', () => {
-    const arrival = ACTS.find((a) => a.id === 'arrival');
+  it('skip() leaves tilt.position at the same hero target', () => {
+    const hero = ROOMS.find((r) => r.id === 'hero');
     const { tilt, parts } = scene();
     const camera = stubCamera();
     const { skip } = createEntrance({ parts, tilt, camera, onComplete: () => {} });
     skip();
-    expect(tilt.position.x).toBe(arrival.x);
-    expect(tilt.position.y).toBe(arrival.y);
+    expect(tilt.position.x).toBe(hero.x);
+    expect(tilt.position.y).toBe(hero.y);
   });
 
   it('converges every part onto its rest position by the end', () => {
@@ -89,7 +95,12 @@ describe('createEntrance', () => {
     }
   });
 
-  it('leaves the object face-on when it finishes, so the turn has somewhere to go', () => {
+  // Renamed from "so the turn has somewhere to go", which was written for the six-act
+  // table and meant the later turn from face-on round to profile. Under four rooms the
+  // turn it actually guards is the OPENING one, out of face-on and into the hero room's
+  // HERO_TILT across the first 12% of scroll. That the two angles differ at all is pinned
+  // in choreography.test.js ('opens the scrub with a turn'); this pins the near end of it.
+  it('leaves the object face-on when it finishes, which is where the opening turn starts', () => {
     const { tilt, parts } = scene();
     const camera = stubCamera();
     const { timeline } = createEntrance({ parts, tilt, camera, onComplete: () => {} });

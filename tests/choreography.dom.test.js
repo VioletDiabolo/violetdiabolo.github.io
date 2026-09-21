@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { createChoreography, ACTS, PART_RANK, explodedY, FACE_ON_X, PROFILE_X } from '../src/scroll/choreography.js';
+import {
+  createChoreography, ROOMS, PART_RANK, explodedY, LATERAL_SETTLE, OPACITY_SETTLE,
+} from '../src/scroll/choreography.js';
 import { CAMERA_NEAR_Z, CAMERA_FOV } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
 import { DIMS } from '../src/diabolo/profiles.js';
@@ -27,9 +29,24 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 // this works fine under jsdom. Materials are never sampled by anime.js, so plain
 // placeholder objects stand in for them.
 function buildScene() {
-  const materials = { cup: {}, gasket: {}, hub: {}, bearing: {} };
+  const materials = {
+    cup: {}, gasket: {}, hub: {}, bearing: {},
+    edge: { cup: {}, gasket: {}, hub: {}, bearing: {} },
+  };
   return buildDiabolo({ materials, segments: 16 });
 }
+
+const setup = () => {
+  const target = document.createElement('div');
+  target.style.position = 'static';
+  document.body.append(target);
+  const { tilt, spinner, parts } = buildScene();
+  const state = { spinRate: 1, labelOpacity: 0, objectOpacity: 1 };
+  const camera = { position: { x: 0, y: 0, z: CAMERA_NEAR_Z } };
+  const choreo = createChoreography({ parts, tilt, state, camera, scrollTarget: target });
+  return { ...choreo, parts, tilt, spinner, state, camera };
+};
+const seekTo = (tl, f) => tl.seek(tl.duration * f);
 
 describe('scroll target validation', () => {
   const build = (position) => {
@@ -37,7 +54,7 @@ describe('scroll target validation', () => {
     el.style.position = position;
     document.body.append(el);
     const { tilt, parts } = buildScene();
-    const state = { spinRate: 1, labelOpacity: 0 };
+    const state = { spinRate: 1, labelOpacity: 0, objectOpacity: 1 };
     return () => createChoreography({ parts, tilt, state, scrollTarget: el });
   };
 
@@ -54,37 +71,30 @@ describe('scroll target validation', () => {
   });
 });
 
-describe('acts', () => {
-  const setup = () => {
-    const target = document.createElement('div');
-    target.style.position = 'static';
-    document.body.append(target);
-    const { tilt, spinner, parts } = buildDiabolo({
-      materials: { cup: {}, gasket: {}, hub: {}, bearing: {} }, segments: 16,
-    });
-    const state = { spinRate: 1, labelOpacity: 0 };
-    const camera = { position: { x: 0, y: 0, z: CAMERA_NEAR_Z } };
-    const choreo = createChoreography({ parts, tilt, state, camera, scrollTarget: target });
-    return { ...choreo, parts, tilt, spinner, state, camera };
-  };
-  const at = (tl, f) => tl.seek(tl.duration * f);
+describe('the explosion is contained', () => {
+  const apartness = (parts) => Math.abs(parts.cupTop.position.y - HOME.cupTop.y);
 
-  it('reaches a visibly different state at each act boundary', () => {
-    const { timeline, parts, tilt, camera } = setup();
-    const seen = new Set();
-    for (const act of ACTS) {
-      at(timeline, act.end);
-      seen.add([
-        parts.cupTop.position.y.toFixed(2), tilt.rotation.x.toFixed(2),
-        tilt.position.x.toFixed(2), camera.position.x.toFixed(2), camera.position.z.toFixed(2),
-      ].join('|'));
-    }
-    expect(seen.size, 'two acts land on the same state').toBe(ACTS.length);
+  it('leaves the object assembled before the showcase room', () => {
+    const { timeline, parts } = setup();
+    seekTo(timeline, 0.10);
+    expect(apartness(parts)).toBeLessThan(0.02);
   });
 
-  it('explodes every part simultaneously within the apart act', () => {
+  it('pulls it fully apart inside the showcase room', () => {
     const { timeline, parts } = setup();
-    at(timeline, 0.21);
+    seekTo(timeline, 0.55);
+    expect(parts.cupTop.position.y).toBeCloseTo(explodedY('cupTop'), 3);
+  });
+
+  it('puts it back together after the showcase room', () => {
+    const { timeline, parts } = setup();
+    seekTo(timeline, 1.0);
+    expect(apartness(parts)).toBeLessThan(0.02);
+  });
+
+  it('explodes every part together, not one after another', () => {
+    const { timeline, parts } = setup();
+    seekTo(timeline, 0.43); // mid-showcase
     const moving = Object.keys(PART_RANK).filter((id) => id !== 'axleBearing');
     const progress = (id) => {
       const rest = HOME[id].y, done = explodedY(id);
@@ -96,75 +106,190 @@ describe('acts', () => {
     for (const id of moving) expect(progress(id), `${id} is out of step`).toBeCloseTo(first, 6);
   });
 
-  it('recombines while turning, rather than replaying the explosion backwards', () => {
-    const { timeline, parts, tilt } = setup();
-    at(timeline, 0.42);
-    expect(Math.abs(parts.cupTop.position.y - HOME.cupTop.y)).toBeGreaterThan(0.01);
-    expect(tilt.rotation.x).toBeGreaterThan(FACE_ON_X + 0.05);
-    expect(tilt.rotation.x).toBeLessThan(PROFILE_X - 0.001);
+  it('is still almost fully apart inside the window this block is named for', () => {
+    // The four samples above are 0.10, 0.43, 0.55 and 1.0, and not one of them lands in
+    // f in [0.55, 0.595] -- the window where "contained" is actually decided. They check
+    // the ENDPOINTS: assembled before the showcase, apart at its end, assembled again at
+    // the end of the page. Every one of those passes on a page where the explosion is
+    // smeared across the grid room as well, which is what the page in fact does.
+    //
+    // So this samples inside it. What is contained is the exploded TARGET STATE, not the
+    // tween out of it: the reassembly runs the whole grid room (cupTop leaves rest at
+    // f = 0.3014 and is still off it at f = 0.99), and what stops any of it being seen is
+    // opacity. At f = 0.57 the object is 99.5% apart and already down to 0.59 opacity; by
+    // the time the fade completes at 0.595 it is still 97.6% apart. Both halves are
+    // asserted together, because either alone is the misleading one -- "still apart" on
+    // its own reads as a containment failure, and "already fading" on its own reads as
+    // though the reassembly had finished.
+    const { timeline, parts, state } = setup();
+    seekTo(timeline, 0.57);
+    const rest = HOME.cupTop.y, done = explodedY('cupTop');
+    const apart = (parts.cupTop.position.y - rest) / (done - rest);
+    expect(apart, 'the object has substantially reassembled by f = 0.57, so the grid room ' +
+      'now plays a visible reassembly rather than hiding one').toBeGreaterThan(0.9);
+    expect(state.objectOpacity, 'the object is still near-solid at f = 0.57 -- the fade is ' +
+      'what keeps the reassembly out of sight, and it is running late')
+      .toBeLessThan(0.7);
+    expect(state.objectOpacity, 'the object is already invisible at f = 0.57, so this sample ' +
+      'no longer sits inside the fade window it exists to measure').toBeGreaterThan(0);
+  });
+
+  it('is gone before the reassembly it is still in the middle of can be seen', () => {
+    // The claim the page's layout rests on, stated as a measurement rather than as the
+    // word "contained": at the moment the fade completes, the object is still almost
+    // entirely apart -- so nothing after that point is reading a reassembly, it is
+    // reading nothing at all. This is what lets board and contact be the two shortest
+    // sections on the page. Independently reproduced in docs/VERIFICATION.md, which
+    // measured 97.5-100% across the same window.
+    const { timeline, parts, state } = setup();
+    const gridStart = ROOMS.at(-2).end;
+    const fadeDone = gridStart + (ROOMS.at(-1).end - gridStart) * OPACITY_SETTLE;
+    seekTo(timeline, fadeDone);
+    expect(state.objectOpacity, 'the fade has not finished where OPACITY_SETTLE says it does')
+      .toBeCloseTo(0, 3);
+    const rest = HOME.cupTop.y, done = explodedY('cupTop');
+    const apart = (parts.cupTop.position.y - rest) / (done - rest);
+    expect(apart, 'the object is materially reassembled by the time it disappears, which ' +
+      'would mean the grid room shows part of the reassembly after all').toBeGreaterThan(0.95);
   });
 
   it('never writes the spinner, which the render loop owns', () => {
     const { timeline, spinner } = setup();
     const before = spinner.rotation.y;
-    at(timeline, 0.63);
+    seekTo(timeline, 0.7);
     expect(spinner.rotation.y).toBe(before);
+  });
+});
+
+describe('rooms', () => {
+  it('reaches a distinct state at each room boundary, bar the panel which repeats the hero', () => {
+    const { timeline, parts, tilt, camera } = setup();
+    const stateAt = (room) => {
+      seekTo(timeline, room.end);
+      return [
+        parts.cupTop.position.y.toFixed(2), tilt.rotation.x.toFixed(2),
+        tilt.position.x.toFixed(2), camera.position.z.toFixed(2),
+      ].join('|');
+    };
+    const [hero, panel, showcase, grid] = ROOMS.map(stateAt);
+    // The panel is DEFINED to land exactly where the hero did -- the page's panel slides
+    // up and covers the object, so animating it there would move something nobody can see
+    // (see ROOMS). Naming that pair is the point: counting distinct states alone reported
+    // the same 3 whichever two rooms collided, so showcase and grid quietly sharing a
+    // state would have passed as this intended repeat. Every other room must differ, or it
+    // is scroll distance spent on nothing.
+    expect(panel, 'the panel no longer repeats the hero, which is its whole design').toBe(hero);
+    expect(new Set([hero, showcase, grid]).size, 'a room other than the panel repeats a state')
+      .toBe(3);
   });
 
   it('drives the spin rate from scroll position', () => {
     const { timeline, state } = setup();
-    at(timeline, 0.30);
+    seekTo(timeline, 0.55); // end of the showcase room, where the labels are read
     const whileApart = state.spinRate;
-    at(timeline, 0.68);
-    expect(state.spinRate, 'spin does not change between acts').toBeGreaterThan(whileApart * 1.5);
+    seekTo(timeline, 1.0); // end of the grid room
+    expect(state.spinRate, 'spin does not change between rooms').toBeGreaterThan(whileApart * 1.5);
+  });
+
+  it('fades the object out across the grid room, over the same bridge spinRate uses', () => {
+    // anime.js writes state.objectOpacity; the render loop reads it (diabolo/stage.js).
+    // The table pinning grid.opacity to 0 says nothing about the timeline actually
+    // writing it -- an interface built but never wired is the exact defect this branch
+    // shipped once with the edge materials.
+    const { timeline, state } = setup();
+    seekTo(timeline, 0.55);
+    expect(state.objectOpacity, 'the object faded before the grid room').toBeCloseTo(1, 3);
+    seekTo(timeline, 1.0);
+    expect(state.objectOpacity, 'the object never faded out').toBeCloseTo(0, 3);
   });
 
   it('keeps the object out of the reading column for nearly the whole scrub', () => {
     // The endpoint-based clearance test in choreography.test.js passes by construction:
-    // act boundaries are clean and the tween between them was never sampled.
+    // room boundaries are clean and the tween between them was never sampled.
     const { timeline, tilt } = setup();
     const COLUMN = 0.38;
     let overlapping = 0;
+    let examined = 0;
     const SAMPLES = 400;
     for (let i = 0; i <= SAMPLES; i++) {
       const f = i / SAMPLES;
       timeline.seek(timeline.duration * f);
-      const act = ACTS.find((a) => f <= a.end) ?? ACTS.at(-1);
-      if (act.textSide === 'center') continue;
-      const visibleWidth = 2 * act.camZ * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
+      const room = ROOMS.find((r) => f <= r.end) ?? ROOMS.at(-1);
+      // A centred room has no side for the object to be on, so there is nothing for this
+      // measure to say about it -- its own clearance is the vertical sweep's job, below.
+      if (room.textSide === 'center') continue;
+      examined += 1;
+      const visibleWidth = 2 * room.camZ * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * (16 / 10);
       const centre = 0.5 + tilt.position.x / visibleWidth;
       const half = DIMS.rimRadius / visibleWidth;
-      const near = act.textSide === 'left' ? centre - half : centre + half;
-      if (act.textSide === 'left' ? near < COLUMN : near > 1 - COLUMN) overlapping += 1;
+      const near = room.textSide === 'left' ? centre - half : centre + half;
+      if (room.textSide === 'left' ? near < COLUMN : near > 1 - COLUMN) overlapping += 1;
     }
-    expect(overlapping / SAMPLES, 'the object spends too long over the text').toBeLessThan(0.08);
+    // Over EXAMINED, not over SAMPLES. The grid room is centred and skipped, so 45% of
+    // the sweep can no longer contribute an overlap at all: dividing by the full count
+    // would quietly relax the same 8% threshold to the ~15% of the sweep it can actually
+    // reach, and it would loosen again every time another room turned centred.
+    expect(examined, 'every sample was skipped, so nothing was actually checked')
+      .toBeGreaterThan(0);
+    expect(overlapping / examined, 'the object spends too long over the text').toBeLessThan(0.08);
+  });
+});
+
+describe('the closing room is empty for nearly all of its centred title', () => {
+  const grid = ROOMS.at(-1);
+  const gridStart = ROOMS.at(-2).end;
+  /** Below this the object is a ghost, and there is genuinely nothing to lay text over. */
+  const INVISIBLE = 0.05;
+  const SAMPLES = 400;
+
+  // This block used to be "the closing room clears its centred title", built around a
+  // TITLE_TOP_PCT constant (66, later "tightened" to 18) meant to check the object stays
+  // clear of the title held at top: 18vh ([data-room='grid'][data-side='center']
+  // .room-head, sections.css). It did not check that. Across the room's fade window
+  // (state.objectOpacity >= INVISIBLE, which inOutSine ends at 8.56% into the room) camZ
+  // only moves 10 -> 9.93, so the object's measured clearance sits at essentially one
+  // constant value -- roughly 28% of the viewport clear below its top edge -- at every
+  // visible sample. That is below 100 - C for every C the constant was ever set to (66 or
+  // 18) and for every C up to ~72, so `violating` was always exactly equal to `visible`
+  // (≈35 of 400 samples, 8.75%), and above ~72 it was always exactly 0. Both are under the
+  // 0.12 bar the assertion checked -- the test passed for every value the constant could
+  // plausibly take, including the ones it never held, which means it was never measuring
+  // where the title sits. Lowering 66 to 18 did not make the check stronger; the comment
+  // that claimed it did ("samples that cleared 66 can now fail") was wrong -- no visible
+  // sample cleared 66 either.
+  //
+  // What follows checks the one thing the arithmetic above actually supports: the object
+  // is visible for only the front slice of the room and gone for the rest. Vertical
+  // clearance between the object and the held title is NOT covered by this or by anything
+  // else in this suite -- a real answer needs the object's projected on-screen silhouette
+  // intersected with the title's box, which is a materially bigger test than this file
+  // builds elsewhere, and building a cheap approximation of it is exactly how the removed
+  // constant ended up decorating an assertion it had no effect on. See
+  // .superpowers/sdd/task-5-fixes-report.md, finding 4.
+  it('leaves the object visible for only the front slice of the room, invisible for the rest', () => {
+    const scene = setup();
+    let visible = 0;
+    for (let i = 0; i <= SAMPLES; i++) {
+      const f = gridStart + (grid.end - gridStart) * (i / SAMPLES);
+      scene.timeline.seek(scene.timeline.duration * f);
+      if (scene.state.objectOpacity >= INVISIBLE) visible += 1;
+    }
+    expect(visible, 'every sample was skipped, so nothing was actually checked')
+      .toBeGreaterThan(0);
+    expect(visible / SAMPLES, 'the object stays visible for too much of the closing room')
+      .toBeLessThan(0.12);
   });
 
-  it('lifts clear of the closing title for nearly the whole settle act', () => {
-    // The vertical counterpart of the test above. arrival never has this problem:
-    // entrance.js seeds tilt.position.y to arrival's own target before this timeline
-    // exists, so arrival's y tween runs seeded-value-to-itself, a no-op regardless of
-    // duration (see entrance.test.js). settle has no such seed — its y genuinely ramps
-    // from the previous act's 0 up to 0.6 — and the endpoint-only clearance test in
-    // choreography.test.js only ever samples that ramp's un-ramped final state.
-    const { timeline, tilt, camera } = setup();
-    const settle = ACTS.find((a) => a.id === 'settle');
-    const prevEnd = ACTS[ACTS.indexOf(settle) - 1].end;
-    const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
-    const half = DIMS.cupHeight + DIMS.bearingHeight / 2 + DIMS.hubHeight + DIMS.gasketThickness;
-    // [data-side='center'] h1/h2 sit at top: 66vh (sections.css) — the object's bottom
-    // edge must clear above that line, i.e. clearBelowPct (percent of viewport clear
-    // beneath it, measured from the very bottom) must exceed 100 - 66 = 34.
-    const TITLE_TOP_PCT = 66;
-    const SAMPLES = 400;
-    let violating = 0;
-    for (let i = 0; i <= SAMPLES; i++) {
-      const f = prevEnd + (settle.end - prevEnd) * (i / SAMPLES);
-      timeline.seek(timeline.duration * f);
-      const vh = visibleHalfHeight(Math.hypot(camera.position.x, camera.position.z));
-      const clearBelowPct = 100 * ((vh + tilt.position.y - half) / (2 * vh));
-      if (clearBelowPct <= 100 - TITLE_TOP_PCT) violating += 1;
-    }
-    expect(violating / SAMPLES, 'the object sits over the closing title for too long').toBeLessThan(0.08);
+  it('has faded out by the time it reaches the centre of the frame', () => {
+    // Why the room needs no vertical lift: there is nothing left to see by the time the
+    // object arrives dead centre. The lateral move takes LATERAL_SETTLE of the room, so
+    // the fade has to take less. Once x reaches 0 the object is under the centred column
+    // with no horizontal escape left, and anything still visible there is over the title.
+    const { timeline, tilt, state } = setup();
+    const centred = gridStart + (grid.end - gridStart) * LATERAL_SETTLE;
+    seekTo(timeline, centred);
+    expect(tilt.position.x, 'the object is not actually centred here').toBeCloseTo(0, 6);
+    expect(state.objectOpacity, 'still visible when it reaches the centre')
+      .toBeLessThan(INVISIBLE);
   });
 });

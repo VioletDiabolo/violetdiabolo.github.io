@@ -1,10 +1,12 @@
 import { prefersReducedMotion } from '../fallback/detect.js';
 
 /**
- * One reveal unit per direct child of a scroll section (heading, body copy, the
- * media/board/form grid, etc.), so a tall section cascades in piece by piece as the
- * user scrolls, echoing the diabolo's own cascading explosion rather than popping the
- * whole section in at once.
+ * One reveal unit per direct child of a scroll section. Since the four room patterns
+ * landed that is exactly one box per section -- `.room`, the wrapper holding the room's
+ * head and body (src/ui/sections.js) -- so a room now arrives as one composition rather
+ * than cascading in piece by piece. That is deliberate: each room is a single arranged
+ * picture, and fading its parts in one after another announced the transition instead of
+ * the content. The footer, which has no `.room`, still reveals its one line directly.
  */
 const REVEAL_SELECTOR = '[data-section] > *';
 

@@ -1,27 +1,27 @@
-import { ACESFilmicToneMapping, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
+import { NoToneMapping, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { buildDiabolo } from './build.js';
-import { createMaterials, disposeMaterials } from './materials.js';
+import { createMaterials, disposeMaterials, flattenMaterials } from './materials.js';
 
 export const TIER_SETTINGS = Object.freeze({
-  high: { dpr: 2.0, segments: 128, transmission: true },
-  base: { dpr: 1.5, segments: 64, transmission: false },
+  high: { dpr: 2.0 },
+  base: { dpr: 1.5 },
 });
 
 /** Camera framing. Exported because the scroll choreography dollies between these and
  *  its tests assert the exploded object actually fits the frustum. */
 export const CAMERA_FOV = 34;
-/** Face-on and assembled: frames the cup disc. Kept equal to the arrival act's own
- *  camZ (src/scroll/choreography.js ACTS) -- entrance.js seeds the camera to this
- *  value synchronously, so the very first painted frame already matches arrival's
- *  target instead of dollying in over the first few percent of scroll. If arrival's
+/** Assembled and close: frames the whole object. Kept equal to the hero room's own
+ *  camZ (src/scroll/choreography.js ROOMS) -- entrance.js seeds the camera to this
+ *  value synchronously, so the very first painted frame already matches the hero's
+ *  target instead of dollying in over the first few percent of scroll. If the hero's
  *  camZ ever changes, this must move with it. */
 export const CAMERA_NEAR_Z = 6.2;
 /** Profile and fully exploded: the object spans ~5.02 units and needs the room. Like
- *  CAMERA_NEAR_Z, kept equal to an ACTS camZ (`apart`'s) by convention rather than by
- *  import -- the table hardcodes its own literal so it stays plain data (see ACTS's own
- *  doc comment in choreography.js). No production code reads this constant itself any
- *  more; it now exists purely as the far bound the "keeps the camera between its near
- *  and far distances" test (choreography.test.js) checks every act's distance against. */
+ *  CAMERA_NEAR_Z, kept equal to a ROOMS camZ (the showcase room's) by convention rather
+ *  than by import -- the table hardcodes its own literal so it stays plain data (see
+ *  ROOMS's own doc comment in choreography.js). No production code reads this constant
+ *  itself any more; it now exists purely as the far bound the "keeps the camera between
+ *  its near and far distances" test (choreography.test.js) checks every room against. */
 export const CAMERA_FAR_Z = 10;
 
 /**
@@ -95,21 +95,31 @@ export function createStage({ canvas, tier }) {
   const settings = TIER_SETTINGS[tier];
 
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // The object is entirely flat, unlit colour (MeshBasicMaterial fills, LineBasicMaterial
+  // edges), not lit PBR output. ACES filmic is an HDR display transform: applied here it
+  // desaturates and shifts every authored palette value (materials.js's PART_COLORS /
+  // EDGE_COLORS are tuned by exact saturation and luminance arithmetic). NoToneMapping
+  // passes those colours through untransformed, which is what an unlit object needs.
+  renderer.toneMapping = NoToneMapping;
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
   camera.position.set(0, 0.15, CAMERA_NEAR_Z);
   camera.lookAt(0, 0, 0);
 
-  const materials = createMaterials({ renderer, settings });
-  const { tilt, spinner, parts } = buildDiabolo({ materials, segments: settings.segments });
+  const materials = createMaterials();
+  // Flattened once, at construction. Materials are SHARED across parts (one cup material
+  // for both cups, and so on), so fading the object is eight writes per frame rather than
+  // one per mesh. The traversal lives in materials.js, alongside createMaterials and the
+  // disposal that has to cover the identical set: a list assembled here by hand would go
+  // stale the moment that module added a material under a container key this file had
+  // never heard of, and it would go stale silently.
+  const materialList = flattenMaterials(materials);
+  const { tilt, spinner, parts } = buildDiabolo({ materials });
   scene.add(tilt);
-  scene.environment = materials._envTarget.texture;
 
   /** anime.js writes these scalars; the render loop and overlays only read them. */
-  const state = { spinRate: 1, labelOpacity: 0 };
+  const state = { spinRate: 1, labelOpacity: 0, objectOpacity: 1 };
   const spinMesh = parts.axleBearing.userData.spinMesh;
 
   // Registered post-construction via addOverlay() — see below. Kept local (not on the
@@ -120,6 +130,9 @@ export function createStage({ canvas, tier }) {
     const spin = rotationDeltas(deltaSeconds, state.spinRate);
     spinner.rotation.y += spin.spinner;
     spinMesh.rotation.y += spin.bearing;
+    // anime.js owns state.objectOpacity; this only reads it. Materials are shared across
+    // parts, so this is one write per material per frame, not one per mesh.
+    for (const material of materialList) material.opacity = state.objectOpacity;
     aimCamera(camera, AIM_TARGET);
     renderer.render(scene, camera);
     for (const overlay of overlays) overlay.render(scene, camera);
@@ -151,7 +164,7 @@ export function createStage({ canvas, tier }) {
     disposeMaterials(materials);
     renderer.dispose();
     // Mirrors render()'s and resize()'s own loops above: without this, an overlay's DOM
-    // subtree (the CSS3D label layer, the spill element) outlives the stage that owned it.
+    // subtree (the CSS3D label layer) outlives the stage that owned it.
     for (const overlay of overlays) overlay.dispose();
   }
 

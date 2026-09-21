@@ -2,7 +2,9 @@
  * The 3D stage: the sticky WebGL canvas, and the two fallback states that stand in
  * for it. #stage and #content are SIBLINGS (see index.html) -- that is what lets the
  * sticky stage stay pinned behind #content for the entire height of the document
- * instead of unsticking after one viewport's worth of scroll.
+ * instead of unsticking after one viewport's worth of scroll. It is also what makes the
+ * panel room's slide-up free: an opaque section in #content simply rises over the stage
+ * (see sections.css), with no scroll listener anywhere.
  */
 
 #stage {
@@ -55,20 +57,51 @@ html[data-stage='unsupported'] .stage-fallback {
 }
 
 /* ---------------------------------------------------------------------------
- * Narrow screens: the content column becomes the only column (see sections.css),
- * so the diabolo no longer has a dedicated empty half to occupy. Dim it instead of
- * hiding it outright -- it stays present as atmosphere behind the text, at an
- * opacity low enough that body copy keeps full contrast on top of it.
+ * Narrow screens: the object gets a band of its own.
  *
- * Scoped to the canvas itself, NOT #stage: opacity cascades to every descendant
- * regardless of that descendant's own opacity, and #label-layer (the CSS3D part
- * labels -- genuine content, not atmosphere) is also a child of #stage. Dimming
- * #stage would have capped the labels at 30% too, for no reason connected to this
- * rule's actual purpose.
+ * There is no second column on a phone, so the desktop recipe -- object on one side,
+ * reading column on the other -- has nothing to work with, and the page has to be
+ * composed differently rather than patched. The previous build patched it: it faded the
+ * canvas to 30% and ran the text straight over the top, which is text laid on a dimmed
+ * object, exactly what the client rejected.
+ *
+ * Instead the stage keeps the top 40dvh and nothing else. Three declarations do it:
+ *   height   the band, leaving 60dvh of reading height beneath it;
+ *   z-index  2, ABOVE #content's 1, so the reading column scrolls UNDER the band and
+ *            never crosses the object at all -- the overlap is gone, not softened;
+ * The opaque background is what makes the second of those mean anything, and
+ * pointer-events returns to auto so a tap in the band is swallowed by the band rather
+ * than reaching whatever content happens to be hidden behind it.
+ *
+ * Read that last clause as the constraint it is, not as reassurance. Text SCROLLING
+ * behind the band is fine -- it is on its way somewhere and it arrives. Text HELD behind
+ * it never arrives: a sticky offset smaller than this height parks an element inside an
+ * opaque box that also eats its clicks, for as long as the offset holds it there. So
+ * every held offset below 768px has to be at or below this height, and sections.css's
+ * own narrow-screen block is where they all live -- its two pinned rooms sit at exactly
+ * 40dvh, and the grid rooms' title column is unpinned there rather than given a smaller
+ * one. The cost of getting that wrong is measured, not hypothetical: at the desktop
+ * 18vh, three section headings and every contact link on the page sat inside this band
+ * at 158-271px for the whole of their sections, invisible, with elementFromPoint at the
+ * club's own email address returning #renderer.
+ *
+ * The third declaration is not here. #content's -100dvh pull-up has to be cancelled at
+ * this width too -- with the stage no longer a full viewport tall it would drag the hero
+ * up UNDER the band -- but that property belongs to sections.css, which loads after this
+ * file (index.html) and beats an equally specific rule here no matter what it says. It is
+ * in that file's own narrow-screen block, which points back at this comment. Written here
+ * it looked right, tested green, and measured -812px in a live 375px viewport.
  * ------------------------------------------------------------------------- */
 @media (max-width: 767px) {
-  #stage > canvas {
-    opacity: 0.3;
+  #stage {
+    height: 40dvh;
+    z-index: 2;
+    background-color: var(--stage);
+    pointer-events: auto;
+  }
+
+  html[data-stage='unsupported'] .stage-fallback {
+    height: 34dvh;
   }
 }
 
@@ -102,16 +135,16 @@ html[data-stage='unsupported'] .stage-fallback {
 
 /*
  * The one place --font-mono still appears on the page: annotating the object's own
- * parts, never the reading column (see base.css's --font-mono comment). Colour,
- * weight and tracking used to come from a rule shared with the (now-deleted) hero
- * and section-heading numerals; now that those are gone, the part-label index owns
- * its own identity outright.
+ * parts, never the reading column (see base.css's --font-mono comment). These labels
+ * belong to the object, and the object is the one thing on the page drawn rather than
+ * set, so the index takes the page's accent -- it is the only mark on the canvas that
+ * belongs to the page rather than to the diabolo.
  */
 .part-label-index {
   font-size: var(--mono-xs);
   font-weight: 700;
   letter-spacing: 0.16em;
-  color: var(--violet-lift);
+  color: var(--accent);
 }
 
 .part-label-index::after {
@@ -123,34 +156,4 @@ html[data-stage='unsupported'] .stage-fallback {
   margin: 0 0.4em;
   color: var(--ink-dim);
   font-weight: 400;
-}
-
-/* ---------------------------------------------------------------------------
- * The light spill (see src/diabolo/spill.js): a soft bloom tracking the object's
- * projected screen position every frame. This is the page's connective tissue in
- * place of a grid or hairline rules -- light emitted by the subject, not decoration
- * applied to the page.
- * ------------------------------------------------------------------------- */
-#spill-layer { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-
-.light-spill {
-  position: absolute;
-  inset: -20%;
-  /* A hot, small core (--violet-lift, the same "glow/hover" colour used everywhere
-     else on the page light touches something) so the source itself reads as
-     bright, then falls through the mid violet into the deep anchor colour before
-     fading out well short of the edges -- reaching toward the reading column
-     without ever washing all the way into it. Wider and hotter than the previous
-     pass: this is now the page's only connective device, so it has to carry that
-     job alone rather than share it with a grid or hairline rules.
-   */
-  background: radial-gradient(
-    circle at var(--spill-x, 50%) var(--spill-y, 50%),
-    color-mix(in oklab, var(--violet-lift) 55%, transparent) 0%,
-    color-mix(in oklab, var(--violet) 30%, transparent) 16%,
-    color-mix(in oklab, var(--violet-deep) 16%, transparent) 36%,
-    transparent 68%
-  );
-  /* No transition here: the position is driven per frame, and a CSS transition would be a
-     second animation driver fighting the render loop. */
 }
