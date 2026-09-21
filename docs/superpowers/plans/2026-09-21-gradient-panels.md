@@ -743,6 +743,19 @@ In `index.html`, before `#content`:
 <canvas id="gradient" aria-hidden="true"></canvas>
 ```
 
+Also add a dev-server entry to `.claude/launch.json`, alongside the existing
+`violet-diabolo` preview config, because Task 8's contrast probe imports a module by
+source path that the built bundle does not contain:
+
+```json
+{
+  "name": "violet-diabolo-dev",
+  "runtimeExecutable": "npx",
+  "runtimeArgs": ["vite", "--port", "5173", "--strictPort"],
+  "port": 5173
+}
+```
+
 `aria-hidden` because it carries no information — a screen reader announcing a decorative canvas is noise.
 
 In `src/styles/base.css`:
@@ -1481,6 +1494,10 @@ The load-bearing check. For each text block, at 375 / 768 / 1440:
 
 ```js
 // Import the tested helpers rather than reimplementing them inline.
+// NOTE: this needs the DEV server (vite dev, port 5173), not `vite preview` --
+// preview serves the built bundle, which deliberately does not contain this module,
+// so the path would 404. Add a dev entry to .claude/launch.json in Task 3 and run
+// this step against it.
 const { worstCase, TIME_STEPS } = await import('/src/gradient/contrast.js');
 const canvas = document.getElementById('gradient');
 const gl = canvas.getContext('webgl');
