@@ -17,13 +17,25 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
 
 const SECTION_IDS = ['hero', 'about', 'events', 'media', 'board', 'contact'];
 
-describe('boot', () => {
-  beforeEach(() => {
-    vi.resetModules();
-    document.documentElement.removeAttribute('data-stage');
-    document.body.innerHTML = '<main id="content"></main>';
-  });
+// Shared by every describe in this file: resets modules so each test's vi.doMock takes
+// effect on a fresh import, and rebuilds the body to match index.html's own two
+// top-level nodes -- the gradient canvas (Task 3) and #content -- so main.js's
+// document.getElementById('gradient') always finds a real element instead of a null
+// that would throw inside createGradient.
+beforeEach(() => {
+  vi.resetModules();
+  vi.restoreAllMocks();
+  document.documentElement.removeAttribute('data-stage');
+  document.body.innerHTML = '<canvas id="gradient" aria-hidden="true"></canvas><main id="content"></main>';
+  // jsdom has no real WebGL implementation; left unmocked it still logs a noisy (but
+  // harmless) "Not implemented" error for every getContext('webgl') call. This is the
+  // same mock detect.dom.test.js already uses for the "no WebGL" case, and it is
+  // genuinely the condition every test in this file runs under -- gradient.dom.test.js
+  // is where a working GL stub belongs, not here.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+});
 
+describe('boot', () => {
   it('renders every section and the nav even when WebGL is unsupported', async () => {
     // The binding constraint this whole task exists to protect: content is never gated
     // behind the graphics. Every section must render with no WebGL at all.
@@ -54,8 +66,13 @@ describe('boot', () => {
       expect(document.querySelector(`[data-section="${id}"]`), id).not.toBeNull();
     }
     expect(document.querySelector('.site-nav')).not.toBeNull();
-    // Nothing yet stamps a supported state -- Task 3 mounts the gradient and does that.
-    expect(document.documentElement.dataset.stage).not.toBe('unsupported');
+    // jsdom has no real WebGL context, so createGradient (Task 3) returns null here too
+    // -- the quick supportsWebGL() probe above said yes, but the authoritative check
+    // inside createGradient still fails, and the page falls back safely rather than
+    // throwing. That is a DIFFERENT code path than the 'unsupported' test above (through
+    // createGradient's own null return, not the early supportsWebGL() branch), which is
+    // what this test exercises now that Task 3 is mounted.
+    expect(document.documentElement.dataset.stage).toBe('unsupported');
   });
 
   it('renders content and the nav before checking WebGL support at all', async () => {
@@ -78,5 +95,32 @@ describe('boot', () => {
 
     expect(contentPresentWhenChecked, 'content was not mounted before the WebGL check').toBe(true);
     expect(navPresentWhenChecked, 'the nav was not mounted before the WebGL check').toBe(true);
+  });
+});
+
+describe('the gradient mount', () => {
+  // DOM reset comes from the file-level beforeEach above; this one adds only the doMock
+  // + import both tests below share. No WebGL stub is needed: jsdom has no real WebGL
+  // context, so canvas.getContext('webgl') already returns null on its own, which is
+  // exactly the "no WebGL" condition the second test exercises -- createGradient hits
+  // its own `if (!gl) return null` branch for real, and main.js falls back to
+  // data-stage="unsupported" without ever throwing.
+  beforeEach(async () => {
+    vi.doMock('../src/fallback/detect.js', () => ({
+      supportsWebGL: () => true,
+      prefersReducedMotion: () => false,
+    }));
+    await import('../src/main.js');
+  });
+
+  it('gives the gradient a canvas behind the content', () => {
+    const canvas = document.getElementById('gradient');
+    expect(canvas, 'no gradient canvas').not.toBeNull();
+    expect(canvas.tagName).toBe('CANVAS');
+  });
+
+  it('renders every section even with no WebGL', () => {
+    // Content is never gated behind the graphics.
+    expect(document.querySelectorAll('[data-section]').length).toBeGreaterThan(4);
   });
 });

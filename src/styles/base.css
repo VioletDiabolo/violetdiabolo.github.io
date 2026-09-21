@@ -160,6 +160,34 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+ * The gradient stage (src/gradient/gradient.js, mounted by src/main.js). A fullscreen
+ * canvas fixed behind everything; #content is lifted above it so every room paints over
+ * the canvas rather than under it.
+ * ------------------------------------------------------------------------- */
+
+#gradient {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: block;
+  /* The canvas framebuffer is smaller than its CSS box (see render/budget.js);
+     the browser scales it up, which is invisible on a gradient this smooth. */
+}
+
+/* No WebGL: a static approximation of the shader's resting state. Content is never
+   gated behind the graphics, so this only has to stop the page being flat black. */
+:root[data-stage='unsupported'] #gradient {
+  background: linear-gradient(115deg, #08060c 0%, #2c1a4d 45%, #7a45cc 70%, #08060c 100%);
+}
+
+#content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------------------------------------------------------------------------
  * Typography
  * ------------------------------------------------------------------------- */
 
