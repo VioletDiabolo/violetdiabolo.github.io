@@ -10,15 +10,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!--
-    Inter carries the page: 200 for the hero's hairline headline, 300 for the section
-    titles, 400/500/600 for body, cards and the filled controls. Instrument Serif is
-    loaded upright only (the italic axis went with the editorial pass that used it) and
-    has exactly one job left: the panel room, the single printed surface in the scroll.
-    Space Mono was the 3D part labels' and nothing else's; the object is gone (this
-    branch), so nothing on the page sets --font-mono any more. Left loaded rather than
-    pulled here, since deciding whether it survives is a styling call for a later task.
+    Two families, and only two. Inter carries the page: 200 for the hero's hairline
+    headline, 300 for the section titles, 400/500/600 for body, cards and the filled
+    controls. Instrument Serif is loaded upright only (the italic axis went with the
+    editorial pass that used it) and has exactly one job: the story panel, the single
+    printed surface in the scroll.
+
+    Space Mono was here too. It set the 3D object's part labels and nothing else; the
+    object was deleted earlier on this branch and the family has been requested for no
+    glyph on the page ever since, left in place pending "a styling call for a later
+    task". The design pass is that task, so the request goes, along with --font-mono and
+    the two --mono-* sizes in base.css.
   -->
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@200;300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="./src/styles/base.css" />
   <link rel="stylesheet" href="./src/styles/sections.css" />

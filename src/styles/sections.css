@@ -9,38 +9,40 @@
  *                                                    <div class="room-body">  everything else
  *
  * `data-panel` is the LAYOUT, one of the four patterns below. `data-surface` is the
- * MATERIAL -- `solid` covers the animated gradient behind the page outright, `glass`
- * blurs it through; see the surface rules below. The hero alone carries no surface: the
- * gradient itself is the hero.
+ * MATERIAL. The hero alone carries no surface: the gradient itself is the hero.
  *
- *   hero      full-bleed. Head bottom-left, teaser card bottom-right.
- *   story     glass, full-bleed. Serif, the club's own story.
- *   feature   head top-left, body bottom-left.
- *   grid      cards in a reading column. Media, board and contact.
+ *   hero      full-bleed, no surface. Head bottom-left, teaser card bottom-right.
+ *   story     violet-tinted glass. Serif, the club's own account of itself, and a photo.
+ *   feature   glass. Title across the top, the practice details dropped bottom-right.
+ *   grid      cards beside a title column. Media, board and contact.
  *
- * The 3D object these four patterns were built to leave half a screen clear for is gone
- * (this branch strips it): `data-side` and the --rc / --oc split it drove are gone with
- * it, and no panel's layout is pinned to the viewport any more. --rc / --oc stay defined
- * below at their fixed defaults purely because `grid-column: var(--rc)` etc. still read
- * them -- there is no longer a second value either ever takes.
+ * WHERE THE SURFACES GO, AND WHY IT IS NOT AN EVEN SPLIT.
  *
- * There is still no drawn structure in this file: no grid overlay, no hairline rule, no
- * counter, and no plate behind a heading or a paragraph. The one filled box that exists
- * -- the hero's teaser card -- is an object you read as a unit, never a backing put
- * behind running text to rescue it.
- */
-
-/*
- * #content used to carry position: relative, a z-index and a -100dvh top margin here,
- * all three purely to stack correctly against #stage -- a viewport-pinned full-page
- * background that was #content's SIBLING, not its parent (see index.html), and so
- * reserved its own 100dvh box in normal flow that #content had to be pulled up over.
- * #stage is gone (this branch strips the 3D system it drew), and taking those three
- * declarations with it is not optional cleanup: left in place, `margin-top: -100dvh`
- * pulls #content's own top edge one viewport above y=0 with nothing behind it to
- * compensate for any more, which parks roughly the first 100dvh of the hero panel
- * off-screen, above the reachable scroll range, permanently -- exactly the kind of
- * "content is gated" regression this task's constraints rule out.
+ *   story    tinted glass   the one violet surface on the page
+ *   events   glass          mostly air; the gradient moving behind "come on Saturday"
+ *                           IS the argument, so the panel lets it through
+ *   media    solid          ten video cards, the densest grid on the page
+ *   board    solid          photographs and prose; a blurred backdrop behind a roster
+ *                           buys atmosphere nobody reading a bio wants
+ *   contact  solid          the page's practical endpoint. Closing on a plate and then
+ *                           releasing to bare gradient under the footer is a firmer end
+ *                           than fading out through glass
+ *
+ * That is three solid to two glass, and it is a deliberate revision of the spec this
+ * task inherited, which had three glass panels out of five. The client's own words were
+ * that panels should have "a background color" with "some" semi-transparent; a page
+ * where most sections are translucent reads as one continuous wash rather than as
+ * panels. Both surfaces are still used and both are styled, which is what the guards
+ * actually pin.
+ *
+ * SPACE, AND WHAT IT IS DOING. The panels are full-bleed and separated by --panel-gap,
+ * where nothing but the gradient shows. That alternation -- plate, light, plate -- is the
+ * only structural device in the file. There is no grid overlay, no hairline rule, no
+ * counter, and no plate behind a heading or a paragraph. The two filled boxes that exist
+ * (the hero's teaser card and the media thumbnails) are objects you read as units, never
+ * a backing put behind running text to rescue it -- and nothing on this page needs
+ * rescuing, because the gradient's own luminance ceiling keeps --ink legible on it
+ * (src/gradient/palette.js).
  */
 
 /* Horizontal-scroll safety. */
@@ -48,114 +50,114 @@ body { overflow-x: hidden; }
 
 .section {
   padding-inline: var(--gutter);
-  /* The gap a section's now-deleted min-height used to leave incidentally: with no
-     scroll-choreography span to fill, panels would otherwise sit flush against each
-     other and the gradient would never show between them. A starting value, not a
-     final one -- Task 7 sets the real rhythm. */
-  margin-bottom: clamp(2rem, 6vh, 5rem);
-  /* Fixed defaults -- there is no longer a second value either one ever takes (see the
-     header comment above). */
-  --rc: 1;
-  --oc: 2;
+  /* The gap where only the gradient shows. See --panel-gap in base.css: this is the
+     page's structure, not a leftover margin. */
+  margin-bottom: var(--panel-gap);
 }
 
 .room-head,
 .room-body { min-width: 0; }
 
-/*
- * Section length. This used to be DERIVED -- each section's min-height was a fraction of
- * a fixed scrollable span, so it would arrive at exactly the right progress against the
- * (now-deleted) scroll choreography in src/scroll/choreography.js. That timeline is gone
- * (this branch strips it, along with position: sticky), and with it the entire reason a
- * section needed a height independent of its own content: there is no handover progress
- * left to land on. Sections now simply size to whatever they contain, and the gaps
- * between them (see the margin below each panel pattern) are where the animated gradient
- * behind the page shows through undisturbed. Task 7 tunes the exact gap; this is a
- * starting point, not a final one.
- */
-
 /* ---------------------------------------------------------------------------
  * Panel surfaces, declared before any layout because they are not layout: `data-panel`
- * is the arrangement, this is the MATERIAL -- whether the animated gradient behind the
- * whole page (src/gradient/) is hidden behind a section or shows through it.
+ * is the arrangement, this is the MATERIAL.
  *
- * This used to be one rule: the (then only) panel pattern stayed permanently opaque, to
- * cover a viewport-pinned 3D object for free. That object is gone (this branch strips
- * it), and the free cover-up goes with it -- covering is now a deliberate per-section
- * choice, `solid` where content is dense enough that readability wins outright, `glass`
- * where the point is the gradient reading as atmosphere behind the panel. The hero alone
- * takes neither: the gradient itself is the hero, so there is nothing to plate it
- * against.
+ * Every alpha here is measured against one worst case -- the gradient's brightest
+ * possible pixel, rgb(128, 36, 255) -- because that is the only ground these panels are
+ * ever laid over that could fail. The composites and their ratios are in base.css beside
+ * the tokens.
  *
- * Both are minimal starting treatments -- the gradient currently renders far brighter
- * than its reference, so judging glass's exact opacity/blur against it today would be
- * judging the wrong backdrop. Task 7 tunes both once the gradient itself is fixed.
+ * `backdrop-filter` appears on exactly one selector and must stay that way: a guard in
+ * tests/visual-language.test.js fails any rule that blurs without being glass. The blur
+ * is 22px rather than the 18px this shipped at because the ribbons are narrower now --
+ * at 18px a ribbon core still read as a hard edge through the panel instead of as a
+ * colour in it.
  * ------------------------------------------------------------------------- */
+
 [data-surface='solid'] {
   background: var(--surface);
 }
 
 [data-surface='glass'] {
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
-  backdrop-filter: blur(18px) saturate(1.1);
+  background: var(--glass);
+  backdrop-filter: blur(22px) saturate(1.15);
+}
+
+/*
+ * The story panel's own material: violet-tinted glass, and the one place on the page
+ * where the club's colour is a SURFACE rather than a mark.
+ *
+ * This is the client's call, made after the spec was written, and it settles an argument
+ * the file has had twice. The panel began as an opaque --accent sheet -- the sheet in the
+ * client's own reference image -- with near-black ink on it at 7.05:1. That could not
+ * survive the surface system: an opaque --accent rule would have cancelled the glass
+ * outright, and leaving the ink tuned for a fixed violet sheet while the ground moved
+ * underneath was worse. Task 5 deleted it and shipped clear glass, which kept the
+ * gradient but lost the violet identity entirely.
+ *
+ * Tinted glass keeps both. --story-tint is --accent's hue taken down to a value that can
+ * carry WHITE text instead of black: at alpha 0.76 over the gradient's brightest pixel it
+ * composites to rgb(59, 38, 103), where --ink measures 10.1:1, and over the near-black
+ * ground it composites to rgb(30, 17, 46) at 15.9:1. The panel is unmistakably violet at
+ * both ends of that range, and the range is narrow enough that the contrast is a fact
+ * rather than a hope.
+ *
+ * Specificity note: this is (0,2,0) against [data-surface='glass']'s (0,1,0), so it wins
+ * the background regardless of source order, and it deliberately does NOT restate
+ * backdrop-filter -- the glass rule above still applies it, and restating it here would
+ * put a second blur declaration in front of the guard for no reason.
+ */
+[data-panel='story'][data-surface='glass'] {
+  background: var(--story-tint);
 }
 
 /* ---------------------------------------------------------------------------
- * Hero, story and feature share one composition: a two-track grid, the reading column
- * in one track and the rest of the panel in the other, at least one full screen tall.
- * They used to each hold a sticky box pinned for the section's whole height, with the
- * 3D object filling the second track behind it -- that object, and every position:
- * sticky rule that pinned a composition over it, is gone (this branch strips it), so the
- * panels now simply flow with the page like everything else.
+ * Hero. The gradient is the hero, so this panel has no surface and nothing is laid over
+ * the canvas except type and one card.
+ *
+ * The composition is a corner: everything is in the bottom band, the top two thirds are
+ * left to the ribbons. That is the whole idea -- a diabolo lives in the air above the
+ * hands, so the air is what the first screen is mostly made of.
  * ------------------------------------------------------------------------- */
 
-[data-panel='hero'] .room,
-[data-panel='story'] .room,
-[data-panel='feature'] .room {
+[data-panel='hero'] .room {
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
   column-gap: var(--gutter);
-}
-
-/* ---------------------------------------------------------------------------
- * Hero
- * ------------------------------------------------------------------------- */
-
-[data-panel='hero'] .room {
   align-content: end;
   align-items: end;
-  padding-block: var(--nav-h) clamp(2rem, 7vh, 4.5rem);
+  padding-block: var(--nav-h) clamp(2.5rem, 9vh, 5.5rem);
 }
 
-[data-panel='hero'] .room-head { grid-column: var(--rc); }
+[data-panel='hero'] .room-head { grid-column: 1; }
 
 /*
  * flex + justify-content, not `justify-self: end` on the item. The item shrink-to-fit
  * that justify-self relies on is circular here -- .teaser sizes itself with a percentage
  * against this very box -- so the browser resolved it back to the full track and the card
- * sat at the LEFT edge of the object's column, measured 339px in at 768. That put it
- * against the headline's overflow instead of out at the margin. Stretching the box and
- * pushing the card inside it has no such cycle.
+ * sat at the LEFT edge of the second column, measured 339px in at 768. Stretching the box
+ * and pushing the card inside it has no such cycle.
  */
 [data-panel='hero'] .room-body {
-  grid-column: var(--oc);
+  grid-column: 2;
   display: flex;
   justify-content: flex-end;
+  align-items: flex-end;
 }
 
-/* The hairline grotesque, run as large as the viewport allows. 9ch breaks the club's
-   two words onto two lines at every width, which is the shape the composition wants --
-   a tall block of thin line in the bottom-left corner, not a single long rule of text. */
 /*
+ * The hairline grotesque, run as large as the viewport allows. 9ch breaks the club's two
+ * words onto two lines at every width, which is the shape the composition wants: a tall
+ * block of thin line in the corner, not one long rule of text.
+ *
  * --type-hero is 9.6vw rather than the 10.5vw it started at, and this is why. A single
- * long word cannot wrap, so `max-width` does
- * not contain it -- the h1's BOX stays inside its column while the ink runs out the side,
- * silently, and no layout rule anywhere notices. Measured at 768: "DIABOLO" set 80.6px
- * painted 322px of ink out of a 263px column and crossed 21px into the teaser card. At
- * 9.6vw the ink ends 92px clear of the card at 768, which is the narrowest width this
- * side-by-side composition is ever used at -- at 767 and below the panel stacks (see the
- * bottom of this file) and the card sits under the headline at full width. Desktop is
+ * long word cannot wrap, so `max-width` does not contain it -- the h1's BOX stays inside
+ * its column while the ink runs out the side, silently, and no layout rule anywhere
+ * notices. Measured at 768: "DIABOLO" set 80.6px painted 322px of ink out of a 263px
+ * column and crossed 21px into the teaser card. At 9.6vw the ink ends 92px clear of the
+ * card at 768, the narrowest width this side-by-side composition is used at; at 767 and
+ * below the panel stacks and the card sits under the headline at full width. Desktop is
  * untouched in practice: 9.6vw reaches the 9rem ceiling at 1500px.
  */
 [data-panel='hero'] h1 {
@@ -166,25 +168,37 @@ body { overflow-x: hidden; }
   max-width: 9ch;
 }
 
+/*
+ * The tagline. --ink, not --ink-dim, and that is a consequence of the gradient rather
+ * than a taste change: this line sits on bare canvas, where --ink-dim measures 2.19:1
+ * against the brightest pixel the shader can emit and --ink measures 5.26:1 (see the
+ * "over bare gradient, only --ink" rule in base.css). Nothing dim can live out here.
+ *
+ * So the hierarchy between the club's name and its tagline is carried by SCALE instead
+ * of by colour -- 144px of 200-weight against 13px of 400-weight is not a comparison
+ * anyone has to squint at -- and by the gap above it. Colour was always the crudest of
+ * the three tools available here; losing it costs the composition nothing.
+ *
+ * The tracking is not a label style applied to lowercase text: the club's own copy is
+ * already capitals (content/index.js SITE.tagline), and capitals set solid are
+ * unreadable.
+ */
 [data-panel='hero'] .room-head p {
-  margin-top: clamp(0.9rem, 2.2vh, 1.5rem);
-  font-size: var(--type-micro);
+  margin-top: clamp(1.25rem, 3vh, 2.25rem);
+  font-size: 0.82rem;
   font-weight: 400;
-  /* The club's own copy is already capitals (content/index.js SITE.tagline); capitals
-     set solid are unreadable, so this is the tracking caps need, not a label style
-     applied to lowercase text. */
-  letter-spacing: 0.14em;
-  color: var(--ink-dim);
+  letter-spacing: 0.16em;
+  color: var(--ink);
   max-width: 34ch;
 }
 
 /*
  * The teaser card: when and where to turn up, before anyone has scrolled. Filled, and
- * deliberately so -- it is a discrete object in the composition, sitting in the bottom
- * band the object does not reach (at the hero room's camZ 6.2 the object spans roughly
- * 29%-71% of the viewport's height), and an opaque fill makes its contrast a fixed
- * number instead of a function of whatever the canvas is drawing. That is the opposite
- * of a plate slid under running text to rescue it.
+ * deliberately so -- it is a discrete object in the composition, and an opaque fill makes
+ * its contrast a fixed number instead of a function of whatever the canvas is drawing.
+ * That is the opposite of a plate slid under running text to rescue it: this card is a
+ * thing you read as a unit, and the dim second line inside it is only possible BECAUSE it
+ * is on a surface.
  */
 .teaser {
   width: min(19rem, 100%);
@@ -219,33 +233,31 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Story
+ * Story. The club's own account of itself, on the one violet surface.
  * ------------------------------------------------------------------------- */
 
 [data-panel='story'] .room {
-  /* Both tracks fluid here, unlike the other two pinned patterns: this panel is glass,
-     not solid, so there is no object-shaped half to keep clear and the text can have
-     real width. */
+  min-height: 100dvh;
+  display: grid;
+  /* Both tracks fluid, unlike the hero's: there is no object-shaped half to keep clear
+     here and the text can have real width. */
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   column-gap: clamp(1.5rem, 5vw, 5rem);
   align-content: center;
   align-items: center;
-  padding-block: calc(var(--nav-h) + clamp(1rem, 3vh, 2rem)) clamp(2rem, 6vh, 4rem);
+  padding-block: calc(var(--nav-h) + clamp(2rem, 6vh, 4rem)) clamp(2.5rem, 8vh, 5rem);
 }
 
-[data-panel='story'] .room-head { grid-column: var(--rc); }
-[data-panel='story'] .room-body { grid-column: var(--oc); }
+[data-panel='story'] .room-head { grid-column: 1; }
+[data-panel='story'] .room-body { grid-column: 2; }
 
 /*
- * Instrument Serif's one job on the page: set at real size on the club's own story, it
- * marks this panel as a change of material even before glass and blur do. No colour
- * override here any more -- this panel's ground used to be a fixed opaque `--accent`
- * sheet, which is what `--accent-ink` was measured against for AAA contrast (7.05:1).
- * It is glass now (`[data-surface='glass']` above): a translucent mix over whatever the
- * moving gradient is doing behind it, not a fixed light violet, so a near-black ink
- * tuned for that one fixed ground no longer describes what is actually behind this
- * text. The panel takes the page's ordinary ink colour instead, the same as every other
- * panel on a glass or solid surface.
+ * Instrument Serif's one job on the page. Set at real size on the club's own story, it
+ * marks this panel as a change of material even before the tint and the blur do.
+ *
+ * No colour override: --ink is right on this ground and measured (10.1:1 at the tint's
+ * worst composite). The near-black --accent-ink this used to take belonged to the opaque
+ * violet sheet the panel no longer is, and would be 1.4:1 here.
  */
 [data-panel='story'] h2 {
   font-family: var(--font-panel);
@@ -256,7 +268,7 @@ body { overflow-x: hidden; }
 }
 
 [data-panel='story'] p {
-  margin-top: clamp(1rem, 2.6vh, 1.9rem);
+  margin-top: clamp(1.1rem, 3vh, 2.1rem);
   font-family: var(--font-panel);
   font-size: clamp(1.15rem, 1.6vw, 1.7rem);
   /* A serif wants a little more leading than the sans default, and a little more
@@ -266,46 +278,45 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Feature. Title at the top of the reading column, copy and the two form pills at
- * the bottom of it.
+ * Feature. The title runs across the top of a full screen and the practice details drop
+ * to the bottom right, which leaves the bottom-left quadrant as nothing but glass over
+ * the gradient. That empty quadrant is the point of the pattern: this is the panel that
+ * asks a visitor to turn up, and the ribbons moving through it are the reason to.
  * ------------------------------------------------------------------------- */
 
 [data-panel='feature'] .room {
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  padding-block: calc(var(--nav-h) + clamp(1rem, 4vh, 2.5rem)) clamp(2rem, 7vh, 4.5rem);
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: var(--gutter);
+  padding-block: calc(var(--nav-h) + clamp(1.5rem, 5vh, 3rem)) clamp(2.5rem, 8vh, 5rem);
 }
 
 [data-panel='feature'] .room-head {
-  grid-column: var(--rc);
+  grid-column: 1 / -1;
   grid-row: 1;
 }
 
 [data-panel='feature'] .room-body {
-  grid-column: var(--rc);
-  grid-row: 3;
+  grid-column: 2;
+  grid-row: 2;
   align-self: end;
   display: flex;
   flex-direction: column;
-  gap: clamp(1.1rem, 2.6vh, 1.75rem);
+  align-items: flex-start;
+  gap: clamp(1.25rem, 3vh, 2rem);
 }
 
 /* ---------------------------------------------------------------------------
- * Grid. Media, board and contact: a title column beside a column of cards, like every
- * other panel's reading column.
+ * Grid. A title column beside a column of cards. Media, board and contact.
  * ------------------------------------------------------------------------- */
 
 /*
- * The section itself becomes a one-cell grid purely so .room STRETCHES to fill it,
- * rather than ending wherever its own content does and leaving the rest of the
- * section's height as bare background. Sections size to content now -- there is no
- * fixed min-height driving a grid panel taller than its own roster any more (see the
- * note where that block used to sit, above) -- so today this rule is mostly latent: a
- * grid panel's height and its .room's height are usually the same thing. It stays
- * because that stops being true the moment a section gets taller than its content for
- * any other reason (a future min-height, extra padding), and this is what keeps the
- * title column full-height rather than a fraction of it when it does. Hero, story and
- * feature deliberately do NOT get this: their .room takes a 100dvh floor of its own
- * (see above) rather than stretching to a parent grid cell.
+ * The section itself becomes a one-cell grid purely so .room STRETCHES to fill it rather
+ * than ending wherever its own content does and leaving the rest of the section's height
+ * as bare background. Hero, story and feature deliberately do NOT get this: their .room
+ * takes a 100dvh floor of its own instead of stretching to a parent grid cell.
  */
 [data-panel='grid'] { display: grid; }
 
@@ -313,22 +324,21 @@ body { overflow-x: hidden; }
   display: grid;
   grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
   column-gap: var(--gutter);
-  padding-block: clamp(3rem, 9vh, 6rem);
-  /* Head and body sit side by side in the two reading-column tracks below, so the row
-     still has to size to content rather than stretch -- stretched, it would take the
-     room's full height and tear the cards away from the top of the title. */
+  padding-block: clamp(3.5rem, 11vh, 7rem);
+  /* Head and body sit side by side in two tracks, so the row still has to size to
+     content rather than stretch -- stretched, it would take the room's full height and
+     tear the cards away from the top of the title. */
   align-content: start;
 }
 
-[data-panel='grid'] .room-head { grid-column: var(--rc); }
+[data-panel='grid'] .room-head { grid-column: 1; }
 
 [data-panel='grid'] .room-body {
-  grid-column: var(--oc);
+  grid-column: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: clamp(1.25rem, 3vh, 2rem);
-  margin-top: clamp(1.25rem, 3vh, 2rem);
 }
 
 [data-section='contact'] .room-head {
@@ -341,17 +351,16 @@ body { overflow-x: hidden; }
 /* ---------------------------------------------------------------------------
  * Section titles and body copy.
  *
- * Feature is the only panel left to size here: hero sets its own h1 above, story sets
- * its own h2 above, and grid sets its own h2 below. This used to be written the other
- * way round -- `.section:not([data-section='hero']):not([data-panel='story']) h2`,
- * meant to size "every panel but hero and story" and trust the grid rule below to win
- * for grid by coming later. :not() takes the specificity of its own argument, so that
- * selector was (0,3,1) against the grid rule's (0,1,1); the LESS specific grid rule
- * lost on font-size regardless of source order, and media/board/contact rendered at up
- * to 68px (--type-title's ceiling) inside a label column of at most 208px -- nearly
- * double the intended clamp(1.45rem, 2.4vw, 2.3rem), 36.8px at its own ceiling. Naming
- * the one panel this rule is actually for removes the conflict instead of trying to
- * out-rank a selector that was never competing on purpose.
+ * Feature is the only panel left to size here: hero sets its own h1 above, story sets its
+ * own h2 above, and grid sets its own h2 below. This used to be written the other way
+ * round -- `.section:not([data-section='hero']):not([data-panel='story']) h2`, meant to
+ * size "every panel but hero and story" and trust the grid rule below to win for grid by
+ * coming later. :not() takes the specificity of its own argument, so that selector was
+ * (0,3,1) against the grid rule's (0,1,1); the LESS specific grid rule lost on font-size
+ * regardless of source order, and media/board/contact rendered at up to 68px inside a
+ * label column of at most 208px. Naming the one panel this rule is actually for removes
+ * the conflict instead of trying to out-rank a selector that was never competing on
+ * purpose.
  * ------------------------------------------------------------------------- */
 
 [data-panel='feature'] h2 {
@@ -409,6 +418,21 @@ body { overflow-x: hidden; }
   height: auto;
   border-radius: var(--radius);
 }
+
+/*
+ * Reserve the box before the bytes arrive. buildPicture (src/ui/picture.js) sets no width
+ * or height attribute and defaults to loading="lazy", so with `height: auto` and no
+ * intrinsic size these compute to ZERO height until the image lands, and the panel below
+ * jumps when it does. Measured at 1440: the contact panel stood 372px tall with its
+ * photograph at 0px and settled 256px taller once it loaded.
+ *
+ * The two photographs are different shapes -- PHOTOS.group is 4:3 and PHOTOS.wide is a
+ * 2000x686 strip -- so the ratio is declared per section rather than shared. Both are the
+ * assets' own intrinsic ratios (confirmed against public/images/*-2000.webp), so nothing
+ * is cropped or letterboxed; this only tells the layout the shape in advance.
+ */
+[data-section='about'] .section-photo img { aspect-ratio: 4 / 3; }
+[data-section='contact'] .section-photo img { aspect-ratio: 1000 / 343; }
 
 /* ---------------------------------------------------------------------------
  * Board cards -- no fill and no border. A photograph is already a shape; putting a box
@@ -539,10 +563,9 @@ body { overflow-x: hidden; }
 }
 
 /*
- * Play affordance: a triangle in a circle, drawn in line like everything else on the
- * bench. White, not the accent -- the accent marks the three things that ask a visitor
- * to commit (the nav's call to action and the two forms). Pressing play commits to
- * nothing, so it is not coloured.
+ * Play affordance: a triangle in a circle, drawn in line like everything else. White, not
+ * the accent -- the accent marks the three things that ask a visitor to commit (the nav's
+ * call to action and the two forms). Pressing play commits to nothing.
  */
 .media-facade::before {
   content: '';
@@ -660,23 +683,14 @@ body { overflow-x: hidden; }
 
 /* ---------------------------------------------------------------------------
  * Footer -- not a `.section`: there is no room here, so it skips the pattern layout
- * entirely. Separated from Contact by space alone, not a rule.
+ * entirely. It sits on BARE GRADIENT, below the last panel, which is the page releasing
+ * back to the thing it opened on. Separated from Contact by space alone, not a rule.
  * ------------------------------------------------------------------------- */
 
 .section-footer {
   display: flex;
   align-items: center;
-  /*
-   * Left, not centred. Under normal motion this line has nothing behind it -- the object
-   * is at opacity 0 for the whole grid room -- but under REDUCED motion nothing ever
-   * fades: main.js parks the object at the hero room's position, at full opacity, and
-   * attaches no scroll timeline, so it is still sitting in the right-hand half when the
-   * footer arrives. Measured against live canvas pixels on that path, a centred line read
-   * 1.71:1 where it crossed the wireframe. Left-aligned it is in the same column every
-   * other room's text occupies, which is the half the object never holds -- the same
-   * reasoning as data-side, applied to the one element that has no data-side. It also
-   * simply matches the rest of the page, which is left-aligned throughout.
-   */
+  /* Left, matching the rest of the page, which is left-aligned throughout. */
   justify-content: flex-start;
   /* 40vh, down from 60: one line of text inside 20vh of padding measures 22vh at 375x812
      and 21vh at 1440x900, so 60 was two fifths of a screen of nothing after the last
@@ -686,19 +700,20 @@ body { overflow-x: hidden; }
   padding-inline: var(--gutter);
 }
 
+/* --ink, not --ink-dim. This line is one of exactly two things on the page sitting on
+   bare canvas (the hero's head is the other), and --ink-dim measures 2.19:1 against the
+   gradient's brightest pixel. Held quiet by size and tracking instead. */
 .footer-line {
   font-size: var(--type-micro);
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.14em;
-  color: var(--ink-dim);
+  color: var(--ink);
 }
 
 /* ---------------------------------------------------------------------------
- * Narrow screens.
- *
- * There is no 3D object any more (this branch strips it), so there is no band, no
- * overlap and nothing pinned: every panel simply collapses to one full-width column in
- * reading order and flows with the page like the rest of it.
+ * Narrow screens. Every panel collapses to one full-width column in reading order and
+ * flows with the page. Nothing is pinned, nothing overlaps, and the only thing that
+ * changes besides the column count is the type scale.
  * ------------------------------------------------------------------------- */
 
 @media (max-width: 767px) {
@@ -715,13 +730,12 @@ body { overflow-x: hidden; }
      for the obvious reason that their cards have to scroll. */
   [data-panel='hero'] .room,
   [data-panel='feature'] .room {
-    min-height: 60dvh;
+    min-height: 70dvh;
   }
 
   [data-panel='hero'] .room {
-    /* The hero is the one panel that still needs its own vertical rhythm: it opens the
-       page, so it gets less top padding than a panel lower down. */
-    padding-block: clamp(1.5rem, 4vh, 2.5rem) clamp(2.5rem, 7vh, 4rem);
+    /* The hero opens the page, so it gets less top padding than a panel lower down. */
+    padding-block: clamp(3.5rem, 9vh, 5rem) clamp(2.5rem, 7vh, 4rem);
   }
 
   [data-panel] .room-head,
@@ -730,7 +744,7 @@ body { overflow-x: hidden; }
     margin-top: 0;
   }
 
-  [data-panel] .room-body { margin-top: clamp(1.5rem, 4vh, 2.25rem); }
+  [data-panel] .room-body { margin-top: clamp(1.75rem, 5vh, 2.5rem); }
 
   [data-panel='hero'] h1 {
     font-size: clamp(2.9rem, 15vw, 4.5rem);

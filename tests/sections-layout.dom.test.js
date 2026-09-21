@@ -96,6 +96,13 @@ const STYLESHEETS = ['base.css', 'sections.css'].map((f) => ({
 /** Media conditions this guard knows how to evaluate for a 375px-wide phone. */
 const NARROW_CONDITIONS = new Map([
   ['(max-width: 767px)', true],
+  // The site nav's smallest breakpoint, where the chips give up a little more of their
+  // padding so the bar fits a 320px device without a scroll container (base.css). True
+  // at 375. Added here rather than worked around: this guard fails loudly on a condition
+  // it has not been taught precisely so that a new breakpoint cannot quietly shrink the
+  // set of rules it evaluates, and taking it as true widens that set rather than
+  // narrowing it -- every rule inside this block is now ranked for `position` too.
+  ['(max-width: 400px)', true],
   // Declares nothing positional, and true for a visitor who has not asked for less
   // motion -- which is the case this guard is about.
   ['(prefers-reduced-motion: no-preference)', true],

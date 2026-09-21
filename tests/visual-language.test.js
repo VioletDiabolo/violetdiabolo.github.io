@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+// Imported, not re-declared: "the gradient's luminance ceiling" below is the one guard
+// in this file that has to agree with what the shader actually emits, so it reads the
+// same stops gradient.js uploads as uniforms.
+import { PALETTE } from '../src/gradient/palette.js';
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 // stage.css was the 3D stage's own stylesheet and is gone with it (this branch strips
@@ -158,13 +162,40 @@ describe('the editorial pairing', () => {
     expect(read('../index.html')).not.toMatch(/Space\+Grotesk/);
   });
 
-  it('leaves mono loaded despite its one user being gone, pending a styling call', () => {
-    // Space Mono was the 3D part labels' and nothing else's (index.html's own comment
-    // said so); the object is gone (this branch strips it), so nothing on the page sets
-    // --font-mono any more. Left loaded rather than pulled here -- deciding whether it
-    // survives is a styling call for a later task, not this one.
-    expect(read('../index.html')).toMatch(/Space\+Mono/);
-    expect(read('../src/styles/sections.css')).not.toMatch(/Space Mono|monospace/i);
+  it('asks for no third family, now that the one that used mono is gone', () => {
+    // This test used to assert the OPPOSITE -- that Space Mono was still requested --
+    // and it was right to: the note beside it said deciding whether the family survives
+    // was "a styling call for a later task, not this one", and until the design pass
+    // there was no task that owned the call. The design pass owns it, and made it: Space
+    // Mono set the 3D object's part labels and nothing else, that object was deleted
+    // earlier on this branch, and --font-mono / --mono-2xs / --mono-xs have been sitting
+    // in base.css at zero uses ever since. A page should not request a webfont it has no
+    // glyph to set, so the family and the three dead tokens go together.
+    //
+    // Rewritten rather than deleted, because the claim worth keeping is the one that
+    // outlives either answer: whatever families index.html asks for, the stylesheets
+    // have to actually set them, and vice versa.
+    // Comments stripped from both sides first. base.css and index.html each explain in
+    // prose WHY the mono face went, naming it and its three tokens, and the first run of
+    // this guard failed on exactly that prose -- the same "a guard cannot tell a defect
+    // from its own obituary" trap the shader guards below hit.
+    const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+    const html = strip(read('../index.html'));
+    const css = strip(allCss());
+    expect(html, 'Space Mono is requested again; if something now sets it, say what')
+      .not.toMatch(/Space\+Mono/);
+    expect(css, 'a stylesheet sets a mono face that index.html no longer loads')
+      .not.toMatch(/Space Mono/);
+    expect(css, '--font-mono is back with no user')
+      .not.toMatch(/--font-mono|--mono-2xs|--mono-xs/);
+
+    // Every family the page DOES request is set by a token, and every token's family is
+    // requested. This is the part that cannot go stale.
+    const requested = [...html.matchAll(/family=([A-Za-z+]+)/g)].map((m) => m[1].replace(/\+/g, ' '));
+    expect(requested.sort()).toEqual(['Instrument Serif', 'Inter']);
+    for (const family of requested) {
+      expect(css, `${family} is loaded but no token sets it`).toMatch(new RegExp(`'${family}'`));
+    }
   });
 });
 
@@ -407,5 +438,244 @@ describe('the moving-background contrast guard', () => {
     // It is test and probe tooling. If main.js ever imports it, it starts costing
     // every visitor bytes they gain nothing from.
     expect(read('../src/main.js')).not.toMatch(/gradient\/contrast/);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The gradient's luminance ceiling.
+ *
+ * This is the load-bearing fact of the whole design pass and nothing in the suite knew
+ * about it. Every colour the fragment shader can emit is a component-wise mix along
+ * deep -> mid -> bright (src/gradient/shader.js mixes exactly those three, in that
+ * order), and each stop is component-wise greater than the one below it -- so `bright`
+ * is not a sampled maximum, it is an ARITHMETIC ceiling on what the canvas can draw.
+ *
+ * That ceiling is why the hero's headline and tagline sit on bare canvas with no plate,
+ * no scrim and no shader vignette, and why the panels' alphas are the numbers they are.
+ * Raise `bright` and every one of those decisions silently becomes wrong while the page
+ * still looks fine on the frames anyone happens to screenshot -- which is precisely how
+ * the shader this replaces shipped with a `bright` at luminance 0.542, where --ink
+ * measures 1.60:1 and the hero title was reported as "nearly invisible".
+ * ------------------------------------------------------------------------- */
+
+describe("the gradient's luminance ceiling", () => {
+  /** WCAG relative luminance of an [r, g, b] triple in 0-1, as the shader emits them. */
+  const lum01 = ([r, g, b]) => {
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  };
+  const ratio = (a, b) => {
+    const [hi, lo] = [a, b].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const hex01 = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+
+  it('orders the stops component-wise, so `bright` really is the ceiling', () => {
+    // Not the same claim as palette.test.js's "runs dark to light", which compares
+    // luminance. Luminance ordering permits a mix that is brighter in one channel than
+    // either endpoint; component-wise ordering is what makes "no output exceeds bright"
+    // true for every channel, and every contrast figure in base.css depends on it.
+    for (const [lower, upper] of [['deep', 'mid'], ['mid', 'bright']]) {
+      for (let c = 0; c < 3; c++) {
+        expect(PALETTE[upper][c], `${upper}[${c}] is below ${lower}[${c}], so a mix of ` +
+          'them can leave the range and the ceiling below means nothing')
+          .toBeGreaterThanOrEqual(PALETTE[lower][c]);
+      }
+    }
+  });
+
+  it('keeps --ink readable on the brightest pixel the shader can emit', () => {
+    // 4.5:1 is WCAG AA for body text, and body text is what sits out there: the hero's
+    // tagline at 13px and the footer line at 12.5px are both on bare canvas.
+    const ink = lum01(hex01(tokens()['--ink']));
+    const measured = ratio(ink, lum01(PALETTE.bright));
+    expect(measured, `--ink measures ${measured.toFixed(2)}:1 against the gradient's ` +
+      'brightest possible pixel. Below 4.5 the hero tagline and the footer line are no ' +
+      'longer AA on bare canvas, and nothing on the page plates them.')
+      .toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('is the reason dim text never goes on bare canvas', () => {
+    // The negative control. --ink-dim is the page's de-emphasis tone and it is fine on
+    // every surface; it is NOT fine on the gradient, which is why base.css states the
+    // rule and why the two bare-canvas text rules below take --ink instead. If this ever
+    // passes 4.5, the rule can be relaxed -- but it should be relaxed deliberately.
+    const dim = lum01(hex01(tokens()['--ink-dim']));
+    expect(ratio(dim, lum01(PALETTE.bright))).toBeLessThan(4.5);
+  });
+
+  it('puts --ink, not --ink-dim, on the two text blocks with no surface under them', () => {
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const [label, selector] of [
+      ['the hero tagline', "\\[data-panel='hero'\\] \\.room-head p"],
+      ['the footer line', '\\.footer-line'],
+    ]) {
+      const rule = css.match(new RegExp(`${selector}\\s*\\{[^}]*\\}`));
+      expect(rule, `${label} has no rule any more -- update this guard`).not.toBeNull();
+      expect(rule[0], `${label} sits on bare canvas and must take var(--ink)`)
+        .toMatch(/color:\s*var\(--ink\)\s*;/);
+    }
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The two shader defects, kept fixed.
+ *
+ * Neither is visible to the unit suite: tests/helpers/webgl-stub.js reports
+ * COMPILE_STATUS and LINK_STATUS true unconditionally, so the GLSL below could say
+ * anything at all and every other test in this repo would still pass. These two guards
+ * read the source text because that is the only thing available here; the real check is
+ * scripts/check-shader.html, which compiles it on a GPU.
+ * ------------------------------------------------------------------------- */
+
+describe('the shader defects this pass fixed', () => {
+  /**
+   * The GLSL itself: the body of the FRAGMENT_SHADER template literal, with its own //
+   * comments stripped.
+   *
+   * Scoped this narrowly because both guards below failed on their first run against the
+   * whole file, and both for the same reason: shader.js's header comment WRITES OUT the
+   * two defects it fixed, quoting `mat2(cos(a), -sin(a), sin(a), cos(a))` and "three
+   * `band +=` terms". A guard that greps the file cannot tell a defect from its own
+   * obituary — the same trap tests/sections-layout.dom.test.js records hitting twice.
+   */
+  const frag = () => {
+    const src = read('../src/gradient/shader.js');
+    const marker = 'FRAGMENT_SHADER = `';
+    const start = src.indexOf(marker);
+    expect(start, 'FRAGMENT_SHADER is no longer a template literal').toBeGreaterThan(-1);
+    const rest = src.slice(start + marker.length);
+    return rest.slice(0, rest.indexOf('`')).replace(/\/\/[^\n]*/g, '');
+  };
+
+  it('builds the rotation as a real R(a), reading mat2 as COLUMNS', () => {
+    // GLSL's mat2 constructor fills columns, so mat2(c0r0, c0r1, c1r0, c1r1) is the
+    // matrix [[c0r0, c1r0], [c0r1, c1r1]]. Written as mat2(cos, -sin, sin, cos) -- which
+    // reads like R(a) laid out in rows -- it is actually R(-a), and the shader rotated
+    // the ribbons the wrong way for the whole of this branch. R(a) as columns is
+    // mat2(cos(a), sin(a), -sin(a), cos(a)): the MINUS belongs on the third argument.
+    const args = frag().match(/mat2\(([^)]*\)[^)]*\)[^)]*\)[^)]*\))\s*\)/);
+    expect(args, 'no mat2 rotation literal found -- update this guard').not.toBeNull();
+    const parts = args[1].split(',').map((s) => s.trim());
+    expect(parts, 'the rotation is no longer four scalar arguments').toHaveLength(4);
+    expect(parts[0]).toMatch(/^cos\(/);
+    expect(parts[1], 'column 0 row 1 must be +sin(a); a minus here makes this R(-a)')
+      .toMatch(/^sin\(/);
+    expect(parts[2], 'column 1 row 0 must be -sin(a); no minus here makes this R(-a)')
+      .toMatch(/^-\s*sin\(/);
+    expect(parts[3]).toMatch(/^cos\(/);
+  });
+
+  it('combines the ribbons without a sum that has to be clamped back down', () => {
+    // The bands used to be three `band +=` terms weighted 1, 0.7 and 0.5, summing to as
+    // much as 2.2 before a single clamp(band, 0.0, 1.0). Every region where two bands
+    // overlapped flattened onto a plateau of unmixed u_mid, which is most of what made
+    // the frame read as violet with black gaps instead of black with ribbons. max()
+    // cannot exceed the largest single gain, so there is no plateau and no clamp.
+    const source = frag();
+    expect(source, 'the ribbons are summed again; a sum of weighted bands exceeds 1 ' +
+      'wherever two overlap and flattens onto a plateau').not.toMatch(/band\s*\+=/);
+    expect(source, 'a clamp on the combined band is the symptom of a sum that can ' +
+      'exceed 1 -- fix the combination, not the overflow').not.toMatch(/clamp\s*\(\s*band/);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * scripts/check-shader.html -- the GPU-side check the unit suite cannot be.
+ * ------------------------------------------------------------------------- */
+
+describe('the shader bench', () => {
+  const bench = () => read('../scripts/check-shader.html');
+
+  it('exists, because the suite cannot tell valid GLSL from broken', () => {
+    expect(existsSync(new URL('../scripts/check-shader.html', import.meta.url))).toBe(true);
+  });
+
+  it('imports the real shader instead of copying it', () => {
+    // Two throwaway versions of this page pasted the GLSL in, which makes it a check on
+    // a snapshot rather than on the file -- it would happily report OK for a shader the
+    // app no longer uses. The import is the entire point of committing it.
+    expect(bench()).toMatch(/import\s*\{[^}]*FRAGMENT_SHADER[^}]*\}\s*from\s*['"][^'"]*src\/gradient\/shader\.js['"]/);
+    expect(bench(), 'the bench has a copy of the GLSL pasted into it again')
+      .not.toMatch(/void\s+main\s*\(\s*\)/);
+  });
+
+  it('measures the frame cost against a zero-render control', () => {
+    // A previous measurement on this branch reported 0.0002 ms/frame and was measuring
+    // the cost of queueing a draw call. A control pass with no drawArrays is what tells
+    // those apart, and subtracting it is what makes the number mean anything.
+    expect(bench()).toMatch(/controlIsNegligible/);
+    expect(bench()).toMatch(/body\(false\)/);
+  });
+
+  it('stays out of the build', () => {
+    // Vite's only entry is index.html; nothing may pull scripts/ into dist/.
+    expect(read('../index.html')).not.toMatch(/check-shader/);
+    expect(read('../vite.config.js')).not.toMatch(/rollupOptions|input/);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The nav's pill row.
+ * ------------------------------------------------------------------------- */
+
+describe('the nav pill row', () => {
+  it('is not a scroll container, which is what clipped the pills', () => {
+    // Measured on the live page at 1440, where the row fits with room to spare and
+    // nothing needs to scroll: `overflow: auto hidden` on this row made it a scroll
+    // container, and a scroll container clips everything painted outside its padding
+    // box. The gap between the first pill's border box and the clip box was 0px on all
+    // four sides, so every pill lost its 2px --stage ring top and bottom, the first and
+    // last lost theirs on the outside edge, and the 7px :focus-visible ring was clipped
+    // on every pill on every side.
+    //
+    // Asserting the absence of `overflow` rather than of `overflow: hidden` on purpose:
+    // `auto`, `scroll` and `clip` all establish the same clip box, so banning one value
+    // would leave the defect one keystroke away.
+    const css = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const { selector, body } of leafRules(css)) {
+      if (!selector.split(',').some((s) => s.trim() === '.site-nav-links')) continue;
+      expect(body, '.site-nav-links declares overflow again -- that clips the pills\' ' +
+        'rings and their focus rings. Make the bar fit instead.')
+        .not.toMatch(/overflow(-x|-y)?\s*:/);
+    }
+  });
+
+  it('lets the bar wrap rather than cut, as the safety net', () => {
+    const css = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const nav = css.match(/(?:^|\n)\.site-nav\s*\{[^}]*\}/);
+    expect(nav, 'the .site-nav rule is gone').not.toBeNull();
+    expect(nav[0], 'a width nobody tested should push the call to action onto a second ' +
+      'line, not off the screen').toMatch(/flex-wrap:\s*wrap/);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The story panel's material.
+ * ------------------------------------------------------------------------- */
+
+describe('the story panel', () => {
+  it('is violet-tinted glass, not the clear glass every other glass panel gets', () => {
+    // The client's call, made after the spec: violet identity kept, gradient still
+    // moving behind it. Clear glass loses the identity; an opaque --accent sheet (what
+    // it was two revisions ago) loses the gradient and needs near-black ink that no
+    // longer suits a ground that moves. This asserts it has its own fill AND that the
+    // fill is not simply the shared glass token under another name.
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = css.match(/\[data-panel='story'\]\[data-surface='glass'\]\s*\{([^}]*)\}/);
+    expect(rule, 'the story panel has no material of its own any more').not.toBeNull();
+    const background = rule[1].match(/background:\s*var\((--[\w-]+)\)/);
+    expect(background, 'the story panel no longer sets its own background').not.toBeNull();
+    expect(background[1], 'the story panel is back on the shared glass token, so it is ' +
+      'not tinted at all').not.toBe('--glass');
+
+    // and the token it does use has to actually be violet: more blue than red, more red
+    // than green, which is the same shape palette.test.js pins for the gradient's mid.
+    const base = read('../src/styles/base.css');
+    const token = base.match(new RegExp(`${background[1]}:\\s*rgba?\\(([^)]*)\\)`));
+    expect(token, `${background[1]} is not declared as an rgba() token`).not.toBeNull();
+    const [r, g, b] = token[1].split(',').map((v) => parseFloat(v));
+    expect(b, 'the story tint is not violet').toBeGreaterThan(r);
+    expect(r, 'the story tint is not violet').toBeGreaterThan(g);
   });
 });

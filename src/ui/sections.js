@@ -114,7 +114,11 @@ export function renderSections(root) {
   const board = section('board', SECTION_HEADINGS.board, 'grid', 'solid');
   mountBoard(board.body);
 
-  const contact = section('contact', SECTION_HEADINGS.contact, 'grid', 'glass');
+  // Solid, not glass. Contact is the page's practical endpoint -- an address, the
+  // socials and a photograph -- and closing on a plate before the footer releases back to
+  // bare gradient is a firmer ending than fading out through a translucent panel. The
+  // surface map and the reasoning for each entry are at the top of src/styles/sections.css.
+  const contact = section('contact', SECTION_HEADINGS.contact, 'grid', 'solid');
   const mail = document.createElement('a');
   mail.href = `mailto:${CONTACT.email}`;
   mail.textContent = CONTACT.email;
