@@ -1,6 +1,6 @@
 /*
  * Foundation layer: design tokens, reset, atmosphere, global typography, links, and the
- * fixed site nav. Layout -- the four room patterns and component treatment -- lives in
+ * fixed site nav. Layout -- the four panel patterns and component treatment -- lives in
  * sections.css; this file only holds what is true everywhere.
  *
  * THE THESIS: the workbench and the one sheet on it.
@@ -106,10 +106,10 @@
   --type-lead:  clamp(1.05rem, 1.4vw, 1.3rem);
   --type-micro: 0.78rem;
 
-  /* ---- Measures. --text-col is the head of a hero/panel/showcase room, and 38% is not
+  /* ---- Measures. --text-col is the head of a hero/story/feature panel, and 38% is not
    *      a taste judgement: measured live at 46% the (now-removed) 3D object's own part
-   *      labels were already clipping the showcase's lead paragraph, which is why the
-   *      column stops well short of that. --label-col is gone: it sized the grid rooms'
+   *      labels were already clipping the feature's lead paragraph, which is why the
+   *      column stops well short of that. --label-col is gone: it sized the grid panels'
    *      sticky title column, a mechanism this task's "no position: sticky anywhere"
    *      constraint forbids outright, and nothing else in the tree ever read it. ---- */
   --text-col:  min(38%, 30rem);
@@ -161,7 +161,7 @@ body {
 
 /* ---------------------------------------------------------------------------
  * The gradient stage (src/gradient/gradient.js, mounted by src/main.js). A fullscreen
- * canvas fixed behind everything; #content is lifted above it so every room paints over
+ * canvas fixed behind everything; #content is lifted above it so every panel paints over
  * the canvas rather than under it.
  * ------------------------------------------------------------------------- */
 
@@ -240,12 +240,12 @@ a:hover {
 
 /* ---------------------------------------------------------------------------
  * The site nav. Fixed, above both the stage (z-index 0) and the content column
- * (z-index 1), so it survives the panel room sliding up underneath it.
+ * (z-index 1), so it survives every panel scrolling underneath it.
  *
  * Pills are filled in --surface rather than left translucent on purpose: a pill's label
- * has the moving object behind it for most of the page, and a translucent fill makes its
- * contrast a function of whatever the canvas happens to be drawing. Opaque, its label is
- * 16.63:1 everywhere, measurably and permanently.
+ * has the moving gradient behind it for most of the page, and a translucent fill makes
+ * its contrast a function of whatever the canvas happens to be drawing. Opaque, its
+ * label is 16.63:1 everywhere, measurably and permanently.
  * ------------------------------------------------------------------------- */
 
 .site-nav {
@@ -263,17 +263,22 @@ a:hover {
  * Every item in the nav is an opaque chip, the wordmark included, and every one of them
  * carries a 2px ring in the page's own ground colour.
  *
- * That ring is invisible for the whole page bar one room -- it is --stage on --stage --
- * and it exists entirely for the panel. The nav is fixed, the violet panel scrolls
- * underneath it, and on that ground a white wordmark measures 2.54:1 and the violet
- * call to action disappears into a field of its own colour. Neither is something the
- * nav can detect and react to without a scroll listener, so instead every chip carries
- * its own edge and the nav is correct on any ground it is ever laid over. Measured
- * against the panel: a dark chip's own label is 16.63:1 (--ink on --surface, and the
- * chip is opaque, so the panel behind it changes nothing), the chip itself stands off
- * the violet at 6.52:1 (--surface on --accent), and the ringed call to action is 7.05:1
- * for its label with a 7.14:1 edge marking the control. The single "dark chips 15.6:1"
- * this replaces was neither of the two real numbers and matched nothing in the file.
+ * That ring is invisible for most of the page -- it is --stage on --stage -- and it
+ * exists for the moments a chip's own fill would otherwise vanish into whatever is
+ * behind it. The story panel used to guarantee one such moment outright, as a full-bleed
+ * opaque --accent sheet: on that ground a white wordmark measured 2.54:1 and the violet
+ * call to action disappeared into a field of its own colour. That one guaranteed ground
+ * is gone -- the story panel is glass now (sections.css's `[data-surface='glass']`), a
+ * translucent mix over whatever the moving gradient is doing -- but the fix does not
+ * depend on it: the nav can't detect what is behind it anywhere, violet or otherwise,
+ * without a scroll listener, so every chip carries its own edge and the nav stays
+ * correct on any ground it is ever laid over. Measured against a flat --accent ground,
+ * the case the edge exists for: a dark chip's own label is 16.63:1 (--ink on --surface,
+ * and the chip is opaque, so what is behind it changes nothing), the chip itself stands
+ * off the violet at 6.52:1 (--surface on --accent), and the ringed call to action is
+ * 7.05:1 for its label with a 7.14:1 edge marking the control. The single "dark chips
+ * 15.6:1" this replaced was neither of the two real numbers and matched nothing in the
+ * file.
  */
 .site-nav-mark,
 .site-nav-links a,
@@ -380,29 +385,31 @@ a:hover {
  * is the page's mark of "attention has landed on a control", so it is the focus ring
  * too -- 7.14:1 against the near-black ground everywhere except the fixed nav.
  *
- * The nav is `position: fixed` at z-index 3 and is laid over whatever room has scrolled
- * underneath it -- the near-black ground for most of the page, but the panel room's own
- * violet sheet (--accent) for the whole of it. An accent-on-accent ring there is 1.00:1,
- * and on .site-nav-cta, whose FILL is also --accent, focused and unfocused are then
- * pixel-identical apart from the chip's own permanent edge.
+ * The nav is `position: fixed` at z-index 3 and is laid over whatever panel has scrolled
+ * underneath it, plus the animated gradient itself in the gaps between panels -- the
+ * near-black ground for most of the page, but --accent on the nav's own call-to-action
+ * chip and pill row, and unpredictably wherever a bright ribbon of the gradient shows
+ * through a glass panel behind it. An accent-on-accent ring on the nav's own accent-
+ * filled controls is 1.00:1, and on .site-nav-cta, whose FILL is also --accent, focused
+ * and unfocused are then pixel-identical apart from the chip's own permanent edge.
  *
- * `[data-room='panel'] :focus-visible { outline-color: var(--accent-ink) }` used to sit
- * here as the fix, on the theory that the nav's ring would inherit the panel's override
- * the way the panel's own text does. It never can: the nav is prepended straight to
- * <body> (main.js), a sibling of #content, never a descendant of `[data-room='panel']`
+ * `[data-panel='story'] :focus-visible { outline-color: var(--accent-ink) }` used to sit
+ * here as the fix, on the theory that the nav's ring would inherit the story panel's
+ * override the way its own text does. It never can: the nav is prepended straight to
+ * <body> (main.js), a sibling of #content, never a descendant of `[data-panel='story']`
  * -- so that selector cannot match anything the nav ever draws. That half of the
  * reasoning stands, and it is why the nav needs the treatment below.
  *
- * The other half went too far. It also concluded that `[data-room='panel']` has no
+ * The other half went too far. It also concluded that `[data-panel='story']` has no
  * focusable descendants of its own, so the selector could never reach anything either
- * way, and dropped it. True of today's markup and a bad reason to leave the room
- * undefended: the panel is the club's OWN STORY (content/index.js ABOUT.body), the one
- * place on the page where prose is likely to grow a link, and this room is 216vh of a
- * 1300vh page. A link added there today would take the global ring above -- --accent on
- * a full-bleed --accent sheet, 1.00:1 -- and be invisible to a keyboard user for a sixth
- * of the page, with nothing failing anywhere. "No element can trigger it" is a reason to
- * write a rule carefully, not a reason to leave the one room whose ground is known to
- * break the default ring with no rule at all.
+ * way, and dropped it. True of today's markup and a bad reason to leave the panel
+ * undefended: the story panel is the club's OWN STORY (content/index.js ABOUT.body), the
+ * one place on the page where prose is likely to grow a link. A link added there today
+ * would take the global ring above, against whatever the moving gradient happens to be
+ * doing behind the panel's glass at the time -- unmeasurable in advance, and as likely to
+ * land near 1.00:1 as anywhere readable, with nothing failing anywhere. "No element can
+ * trigger it" is a reason to write a rule carefully, not a reason to leave the one panel
+ * whose ground is least predictable with no rule at all.
  *
  * So both grounds are covered, by the same two tones rather than by two different ideas:
  *
@@ -410,11 +417,12 @@ a:hover {
  *   constraint its permanent stage-coloured edge ring exists for, in the comment above
  *   .site-nav-mark), so its ring is made correct on ANY ground;
  *
- *   the panel's ground is known -- its own violet sheet -- but not uniformly: the room
- *   also carries a photograph (PHOTOS.group), and a link wrapping one would sit on
- *   arbitrary pixels rather than on the sheet. A single tone picked for the violet would
- *   go quiet there, so the panel takes the same any-ground ring instead of a second,
- *   narrower answer that is right until the markup changes.
+ *   the story panel's ground used to be known -- its own opaque violet sheet -- but is
+ *   glass now (sections.css's `[data-surface='glass']`): a translucent mix over whatever
+ *   the gradient is doing behind it, blurred but not flattened, so the ground is
+ *   effectively unknown rather than merely non-uniform. The any-ground ring the nav
+ *   already needs is the right answer here for the same reason, not a second, narrower
+ *   one tuned to a single ground that no longer exists.
  *
  * Two tones, layered so the OUTER edge -- the one actually touching whatever is really
  * behind the element -- is always the tone that ground needs.
@@ -426,40 +434,38 @@ a:hover {
 }
 
 /*
- * --ink on --stage is 18.20:1 (root token comment above); on the panel's --accent it is
- * 2.55:1 -- the same figure task 5 measured for the white wordmark text and rejected.
- * --stage on the panel is 7.14:1 (the accent/stage pair, read the other way -- contrast
- * ratio does not care which is foreground); on --stage itself it is 1:1, same as the
- * chips' own resting edge. Neither token alone clears 3:1 on both grounds, so the ring
- * uses both, stage on the outside: outline-color: ink is the band that shows on the
+ * --ink on --stage is 18.20:1 (root token comment above); against --accent it is 2.55:1.
+ * --stage against --accent is 7.14:1 (the accent/stage pair, read the other way --
+ * contrast ratio does not care which is foreground); on --stage itself it is 1:1, same
+ * as the chips' own resting edge. Neither token alone clears 3:1 on both grounds, so the
+ * ring uses both, stage on the outside: outline-color: ink is the band that shows on the
  * near-black ground the page mostly is, and the box-shadow -- spread past the outline,
  * not just up to it -- repeats the chip's dark edge far enough out to read as a second,
- * separate ring specifically where the outline itself goes quiet. Measured against live
- * canvas/panel pixels: see .superpowers/sdd/task-5-fixes-report.md, finding 2.
+ * separate ring specifically where the outline itself goes quiet.
  *
  * The spread is 7px, not the 6px it shipped at, and the reason is worth a line because a
- * single pixel of it is doing all the work on the violet. Measured outward from the
+ * single pixel of it is doing all the work against violet. Measured outward from the
  * element's border box, with `outline: 2px` at `outline-offset: 3px` over a shadow spread
  * of S, the painted bands are:
  *
  *     stage [0, 3)      ink [3, 5)      stage [5, S)
  *
- * On the panel the ink band is 2.55:1 and fails 3:1 on its own, so that trailing stage
- * band -- 7.14:1 -- is the entire visible difference between focused and unfocused there.
- * At S = 6 it is ONE CSS pixel wide, and one pixel is not a margin: half a device pixel
- * of offset rounding, or anyone later widening the outline to 3px "to make focus clearer",
- * erases the only band that can be seen and makes the ring worse by trying to improve it.
- * S = 7 makes it 2px. Nothing else about the ring changes, and on the near-black ground
- * the page mostly is, the ink band was never the one at risk.
+ * Against --accent the ink band is 2.55:1 and fails 3:1 on its own, so that trailing
+ * stage band -- 7.14:1 -- is the entire visible difference between focused and unfocused
+ * there. At S = 6 it is ONE CSS pixel wide, and one pixel is not a margin: half a device
+ * pixel of offset rounding, or anyone later widening the outline to 3px "to make focus
+ * clearer", erases the only band that can be seen and makes the ring worse by trying to
+ * improve it. S = 7 makes it 2px. Nothing else about the ring changes, and on the
+ * near-black ground the page mostly is, the ink band was never the one at risk.
  */
 .site-nav :focus-visible,
 /*
- * The panel room joins the nav here rather than getting a violet-specific ring of its
- * own -- see the block comment above for why the room needs a rule at all today, and why
- * the same any-ground treatment is the right one for a room that is mostly a flat sheet
- * but also carries a photograph.
+ * The story panel joins the nav here rather than getting a glass-specific ring of its
+ * own -- see the block comment above for why it needs a rule at all today, and why the
+ * same any-ground treatment is the right one for a panel whose ground is now a blur over
+ * a moving gradient rather than one fixed, known sheet.
  */
-[data-room='panel'] :focus-visible {
+[data-panel='story'] :focus-visible {
   outline-color: var(--ink);
   box-shadow: 0 0 0 7px var(--stage);
 }

@@ -69,11 +69,15 @@ function leafRules(css) {
  * `[data-room` and `.room` joined the prefix list when the four room patterns landed:
  * every heading and paragraph on the page is now addressed through one of those two, so
  * a guard that still knew only the three older prefixes would have gone quietly vacuous
- * the moment the stylesheet was rewritten around rooms. The rule being enforced is about
- * WHERE a background may be declared, so its reach has to follow the text selectors.
+ * the moment the stylesheet was rewritten around rooms. `[data-room` became `[data-panel`
+ * when rooms were renamed to panels for the same reason: the rule being enforced is about
+ * WHERE a background may be declared, so its reach has to follow the text selectors,
+ * wherever the stylesheet moves them next. `[data-surface` joined alongside it for the
+ * same forward-looking reason, even though today's `[data-surface=...]` rules target the
+ * section itself rather than a heading or paragraph within it.
  */
 function targetsHeadingOrParagraph(selector) {
-  if (!/^(\.section\b|\[data-section\b|\[data-side\b|\[data-room\b|\.room\b)/.test(selector)) return false;
+  if (!/^(\.section\b|\[data-section\b|\[data-side\b|\[data-panel\b|\[data-surface\b|\.room\b)/.test(selector)) return false;
   const lastToken = selector.split(/[\s>+~]+/).filter(Boolean).pop() ?? '';
   const bareTag = lastToken.replace(/::?[\w-]+(\([^)]*\))?/g, '').replace(/\[[^\]]*\]/g, '');
   return bareTag === 'h1' || bareTag === 'h2' || bareTag === 'p';
@@ -114,16 +118,32 @@ describe('the technical-drawing language is gone', () => {
     expect(violations, JSON.stringify(violations)).toEqual([]);
   });
 
-  it('applies no backdrop-filter anywhere', () => {
-    expect(allCss()).not.toMatch(/backdrop-filter/i);
-  });
-
   it('numbers no section with a CSS counter', () => {
     expect(allCss()).not.toMatch(/counter-(reset|increment)|counter\(/);
   });
 
   it('outlines no text — a stroke is a symptom of text laid over the object', () => {
     expect(allCss()).not.toMatch(/-webkit-text-stroke/);
+  });
+});
+
+describe('glass', () => {
+  it('blurs only behind glass panels', () => {
+    // The blanket ban existed because backdrop-filter was being used to rescue text
+    // laid over the 3D object. That object is gone; glass panels are a deliberate
+    // surface. The ban is narrowed, not lifted: still nothing blurred behind plain text.
+    for (const rule of leafRules(allCss())) {
+      if (!/backdrop-filter/.test(rule.body)) continue;
+      expect(rule.selector, `${rule.selector} blurs without being glass`)
+        .toMatch(/\[data-surface=['"]?glass/);
+    }
+  });
+
+  it('styles both surfaces', () => {
+    const css = read('../src/styles/sections.css');
+    for (const surface of ['solid', 'glass']) {
+      expect(css).toMatch(new RegExp(`\\[data-surface=["']?${surface}`));
+    }
   });
 });
 
@@ -165,20 +185,17 @@ describe('the light spill is gone', () => {
   });
 });
 
-describe('the four room patterns', () => {
-  it('styles every room pattern', () => {
+describe('the four panel patterns', () => {
+  it('styles every panel pattern', () => {
+    // The old version of this test also asserted the story panel (then 'panel') carried
+    // an opaque background -- true when it was the one printed sheet covering the 3D
+    // object. It is glass now (`[data-surface='glass']`, deliberately, so the gradient
+    // shows through): that assertion is gone with the premise, not merely unported, and
+    // 'glass > styles both surfaces' below covers the surface system that replaced it.
     const css = read('../src/styles/sections.css');
-    for (const room of ['hero', 'panel', 'showcase', 'grid']) {
-      expect(css, `${room} has no styling`).toMatch(new RegExp(`\\[data-room=["']?${room}["']?\\]`));
+    for (const panel of ['hero', 'story', 'feature', 'grid']) {
+      expect(css, `${panel} has no styling`).toMatch(new RegExp(`\\[data-panel=["']?${panel}["']?\\]`));
     }
-  });
-
-  it('gives the panel an opaque background', () => {
-    // It used to cover a viewport-pinned 3D object for free; that object is gone (this
-    // branch strips it), but the panel stays opaque -- see sections.css's own comment.
-    const css = read('../src/styles/sections.css');
-    const panel = css.slice(css.search(/\[data-room=['"]?panel/));
-    expect(panel.slice(0, 600)).toMatch(/background/);
   });
 });
 
@@ -240,7 +257,7 @@ function contrast(a, b) {
 /**
  * base.css with its comments removed. Every match below has to run against this rather
  * than the raw file: base.css's accessibility block quotes a whole CSS rule in prose --
- * "`[data-room='panel'] :focus-visible { outline-color: var(--accent-ink) }` used to sit
+ * "`[data-panel='story'] :focus-visible { outline-color: var(--accent-ink) }` used to sit
  * here as the fix" -- and a greedy `[^{}]*` walks straight into it and captures the
  * COMMENT as if it were the live rule. Caught by running this once without the strip: it
  * reported a one-tone ring that does not exist anywhere in the file. The identical
@@ -263,21 +280,28 @@ describe('the focus ring on every ground it is laid over', () => {
 
   /**
    * The grounds a focus ring is drawn on, and why each one is in the list. Both are
-   * declared in the stylesheets, so a room that stopped being violet would show up here
-   * as a failure to find it rather than as a silently shorter list.
+   * declared in the stylesheets, so either one going stale would show up here as a
+   * failure to find it rather than as a silently shorter list.
+   *
+   * The violet ground used to be the story panel's own full-bleed --accent sheet; it is
+   * glass now (`[data-surface='glass']`, sections.css), a translucent mix over whatever
+   * the moving gradient is doing, which is not a fixed token this suite can sample. What
+   * is still a fixed, live --accent fill is the nav's own call-to-action chip and the
+   * feature panel's form buttons -- real opaque accent grounds the ring still has to
+   * work against, which is what the self-check below confirms still exists.
    */
   const grounds = () => {
     const t = tokens();
     const sections = read('../src/styles/sections.css');
-    expect(sections, "the panel room no longer fills itself with the accent, so this list of " +
-      'grounds is out of date').toMatch(/\[data-room='panel'\]\s*\{[^}]*background:\s*var\(--accent\)/);
+    expect(sections, 'the accent-filled form button no longer exists, so this list of ' +
+      'grounds is out of date').toMatch(/\.form-card button\s*\{[^}]*background:\s*var\(--accent\)/);
     return [
       ['the near-black page ground', t['--stage']],
-      ['the panel room\'s violet sheet', t['--accent']],
+      ['an opaque accent fill (the nav CTA, the form buttons)', t['--accent']],
     ];
   };
 
-  it('is invisible on the panel without an override, which is why the override exists', () => {
+  it('is invisible against accent without an override, which is why the override exists', () => {
     // The negative control. Without it the test below could pass on a page where the
     // default ring was already fine everywhere and the override was decoration.
     const t = tokens();
@@ -293,27 +317,30 @@ describe('the focus ring on every ground it is laid over', () => {
       .toBeLessThan(MIN);
   });
 
-  it('keeps a band that reads on the page ground AND on the panel, for the nav and the panel room', () => {
+  it('keeps a band that reads on the page ground AND against accent, for the nav and the story panel', () => {
     const t = tokens();
     const css = baseCss();
 
     // The one rule that carries the two-tone ring, whatever its selector list has grown to.
     const rule = css.match(/([^{}]*:focus-visible[^{}]*)\{([^}]*outline-color[^}]*)\}/);
-    expect(rule, 'nothing overrides the focus ring any more -- on the panel it is now ' +
-      'accent on accent, 1.00:1, and a keyboard user cannot see where they are')
+    expect(rule, 'nothing overrides the focus ring any more -- against the nav\'s own ' +
+      'accent-filled chips, or the feature panel\'s form buttons, it is accent on accent, ' +
+      '1.00:1, and a keyboard user cannot see where they are')
       .not.toBeNull();
 
     const selectors = rule[1].split(',').map((s) => s.trim()).filter(Boolean);
-    // Both contexts that are laid over the violet have to be covered. The nav is a sibling
-    // of #content (main.js prepends it to <body>), so a [data-room='panel'] selector can
-    // never reach it and it needs naming separately -- that is the trap the rule this
-    // replaced fell into.
+    // Both contexts that can end up on an opaque accent fill have to be covered. The nav
+    // is a sibling of #content (main.js prepends it to <body>), so a [data-panel='story']
+    // selector can never reach it and it needs naming separately -- that is the trap the
+    // rule this replaced fell into.
     expect(selectors.some((s) => /\.site-nav\b/.test(s)),
-      'the fixed nav is no longer covered, and it is over the violet sheet for 216vh')
+      "the fixed nav is no longer covered, and every one of its own chips is opaque " +
+      '--surface or --accent')
       .toBe(true);
-    expect(selectors.some((s) => /\[data-room='panel'\]/.test(s)),
-      "the panel room's own focusable content is no longer covered; a link in the club's " +
-      'story would get a 1.00:1 ring')
+    expect(selectors.some((s) => /\[data-panel='story'\]/.test(s)),
+      "the story panel's own focusable content is no longer covered; a link in the club's " +
+      'story sits on glass over an unpredictable, moving gradient -- the one ground this ' +
+      'ring cannot afford to assume is safe')
       .toBe(true);
 
     const body = rule[2];
@@ -334,14 +361,14 @@ describe('the focus ring on every ground it is laid over', () => {
     // the outline is visible: with outline 2px at offset 3px over a spread of S, the
     // painted bands are stage [0,3), ink [3,5), stage [5,S). At S = 6 that last band is
     // one CSS pixel, and one pixel is the whole of the difference between focused and
-    // unfocused on the panel. This keeps at least two.
+    // unfocused against violet. This keeps at least two.
     const css = baseCss();
     const width = Number(css.match(/:focus-visible\s*\{[^}]*outline:\s*(\d+)px/)[1]);
     const offset = Number(css.match(/:focus-visible\s*\{[^}]*outline-offset:\s*(\d+)px/)[1]);
     const spread = Number(css.match(/:focus-visible[^{}]*\{[^}]*box-shadow:[^;]*?(\d+)px\s+var\(/)[1]);
     expect(spread - (offset + width),
       `the outer band is ${spread - (offset + width)}px wide (outline ${width}px at offset ` +
-      `${offset}px under a ${spread}px spread) -- on the panel that band is the only part ` +
+      `${offset}px under a ${spread}px spread) -- against violet that band is the only part ` +
       'of the ring that contrasts at all, and at 1px any rounding erases it')
       .toBeGreaterThanOrEqual(2);
   });

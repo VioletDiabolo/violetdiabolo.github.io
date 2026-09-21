@@ -1,20 +1,26 @@
 /*
- * The four room patterns.
+ * The four panel patterns.
  *
- * Every section is one room, and every room is the same two boxes arranged differently
- * (src/ui/sections.js builds them):
+ * Every section is one self-contained panel, described by two attributes rather than a
+ * place in a scroll choreography (src/ui/sections.js stamps both):
  *
- *   <section data-room> <div class="room"> <div class="room-head">  reading text
- *                                         <div class="room-body">  everything else
+ *   <section data-panel="..." data-surface="..."> <div class="room">
+ *                                                    <div class="room-head">  reading text
+ *                                                    <div class="room-body">  everything else
+ *
+ * `data-panel` is the LAYOUT, one of the four patterns below. `data-surface` is the
+ * MATERIAL -- `solid` covers the animated gradient behind the page outright, `glass`
+ * blurs it through; see the surface rules below. The hero alone carries no surface: the
+ * gradient itself is the hero.
  *
  *   hero      full-bleed. Head bottom-left, teaser card bottom-right.
- *   panel     a solid violet sheet, full-bleed. Serif, near-black.
- *   showcase  head top-left, body bottom-left.
+ *   story     glass, full-bleed. Serif, the club's own story.
+ *   feature   head top-left, body bottom-left.
  *   grid      cards in a reading column. Media, board and contact.
  *
  * The 3D object these four patterns were built to leave half a screen clear for is gone
  * (this branch strips it): `data-side` and the --rc / --oc split it drove are gone with
- * it, and no room's layout is pinned to the viewport any more. --rc / --oc stay defined
+ * it, and no panel's layout is pinned to the viewport any more. --rc / --oc stay defined
  * below at their fixed defaults purely because `grid-column: var(--rc)` etc. still read
  * them -- there is no longer a second value either ever takes.
  *
@@ -32,7 +38,7 @@
  * #stage is gone (this branch strips the 3D system it drew), and taking those three
  * declarations with it is not optional cleanup: left in place, `margin-top: -100dvh`
  * pulls #content's own top edge one viewport above y=0 with nothing behind it to
- * compensate for any more, which parks roughly the first 100dvh of the hero room
+ * compensate for any more, which parks roughly the first 100dvh of the hero panel
  * off-screen, above the reachable scroll range, permanently -- exactly the kind of
  * "content is gated" regression this task's constraints rule out.
  */
@@ -42,6 +48,11 @@ body { overflow-x: hidden; }
 
 .section {
   padding-inline: var(--gutter);
+  /* The gap a section's now-deleted min-height used to leave incidentally: with no
+     scroll-choreography span to fill, panels would otherwise sit flush against each
+     other and the gradient would never show between them. A starting value, not a
+     final one -- Task 7 sets the real rhythm. */
+  margin-bottom: clamp(2rem, 6vh, 5rem);
   /* Fixed defaults -- there is no longer a second value either one ever takes (see the
      header comment above). */
   --rc: 1;
@@ -52,90 +63,55 @@ body { overflow-x: hidden; }
 .room-body { min-width: 0; }
 
 /*
- * Scroll length. These are not chosen, they are DERIVED, and the derivation is the whole
- * of the invariant: each section is exactly as long as the room that plays over it.
- *
- * The timeline is bound to #content with enter 'top top' / leave 'bottom bottom'
- * (src/scroll/choreography.js), so progress 1 is reached after (document height - one
- * viewport) of scrolling. Call that scrollable span S. A section whose top sits at a
- * cumulative height c reaches the top of the viewport at progress c / S -- so pinning a
- * room to a section means giving that section the room's share of S:
- *
- *     S = 1200vh   (total 1300vh, less the one viewport that is never scrolled past)
- *
- *     hero      0.00 -> 0.12    0.12 x 1200 = 144vh   hero
- *     panel     0.12 -> 0.30    0.18 x 1200 = 216vh   about
- *     showcase  0.30 -> 0.55    0.25 x 1200 = 300vh   events
- *     grid      0.55 -> 1.00    0.45 x 1200 = 540vh + the trailing viewport = 640vh,
- *                               split media 360 / board 150 / contact 90 / footer 40
- *
- * The three handovers are now exact rather than approximate: about's top reaches the
- * viewport at 144/1200 = 0.1200 against the hero room's end of 0.12, events at 360/1200 =
- * 0.3000 against the panel's 0.30, media at 660/1200 = 0.5500 against the showcase's 0.55.
- * The version this replaces ran to 2000vh and missed all three by a third to half a screen.
- *
- * Why S = 1200 rather than some other multiple of 100 (any multiple of 100 lands all three
- * boundaries on a whole vh): it is the smallest one where every section still clears the
- * tallest content it has to show, measured live at 1440x900, 768x1024 and 375x812. Media's
- * card column alone is 327vh on a phone -- ten 16:9 facades in a single track. Go below
- * what a section's content needs and the section grows past its min-height, which moves
- * every boundary after it and desynchronises the rooms silently, in the browser, with the
- * stylesheet still reading as though it were aligned.
- *
- * The grid room's four sections are sized against content rather than against a tween, and
- * the justification is narrower than it used to be written here. It said the grid room's
- * "own beat (reassemble, spin, fade) is over by progress 0.595". Only the FADE is over
- * there: objectOpacity rides OPACITY_SETTLE and reaches 0 at 0.59498, while the reassembly
- * runs on to f = 0.99 and spinRate does not reach its target until 1.00 (see
- * scroll/choreography.js's own note on ROOMS).
- *
- * What is true at 0.595 -- 714vh -- is the thing the heights actually rest on: the object
- * is INVISIBLE from there to the end of the page, still 97.55% apart when it goes. So
- * nothing after 714vh is showing an object, whatever the scene graph is still doing, and
- * everything after it is reading. That is why board and contact are now the two shortest
- * sections on the page and not, as they were, two of the three longest.
- *
- * tests/sections-layout.dom.test.js pins both halves of this: the handovers against ROOMS,
- * and each section against the content measured inside it.
+ * Section length. This used to be DERIVED -- each section's min-height was a fraction of
+ * a fixed scrollable span, so it would arrive at exactly the right progress against the
+ * (now-deleted) scroll choreography in src/scroll/choreography.js. That timeline is gone
+ * (this branch strips it, along with position: sticky), and with it the entire reason a
+ * section needed a height independent of its own content: there is no handover progress
+ * left to land on. Sections now simply size to whatever they contain, and the gaps
+ * between them (see the margin below each panel pattern) are where the animated gradient
+ * behind the page shows through undisturbed. Task 7 tunes the exact gap; this is a
+ * starting point, not a final one.
  */
-[data-section='hero']    { min-height: 144vh; }
-[data-section='about']   { min-height: 216vh; }
-[data-section='events']  { min-height: 300vh; }
-[data-section='media']   { min-height: 360vh; }
-[data-section='board']   { min-height: 150vh; }
-[data-section='contact'] { min-height: 90vh; }
 
 /* ---------------------------------------------------------------------------
- * The panel's surface, declared before any layout because it is not layout: it is the
- * one filled area on the page and the single most load-bearing declaration in this file.
+ * Panel surfaces, declared before any layout because they are not layout: `data-panel`
+ * is the arrangement, this is the MATERIAL -- whether the animated gradient behind the
+ * whole page (src/gradient/) is hidden behind a section or shows through it.
  *
- * It used to cover a viewport-pinned 3D object for free: the object's own layer stayed
- * fixed while the page scrolled over it, so an opaque panel simply rose and hid it, no
- * scroll listener needed. That object is gone (this branch strips it), and the free
- * cover-up goes with it, but the panel stays opaque regardless -- it is also the page's
- * single PRINTED surface (see base.css's header): the one place the accent is spent on
- * an area rather than a mark, and the only warm ground in the scroll. --accent-ink on
- * --accent measures 7.05:1, so this is a AAA reading surface -- which is the whole
- * reason the accent sits at this lightness and not at the crest's #57068c, where
- * near-black text would measure 1.66:1 and be unreadable.
+ * This used to be one rule: the (then only) panel pattern stayed permanently opaque, to
+ * cover a viewport-pinned 3D object for free. That object is gone (this branch strips
+ * it), and the free cover-up goes with it -- covering is now a deliberate per-section
+ * choice, `solid` where content is dense enough that readability wins outright, `glass`
+ * where the point is the gradient reading as atmosphere behind the panel. The hero alone
+ * takes neither: the gradient itself is the hero, so there is nothing to plate it
+ * against.
+ *
+ * Both are minimal starting treatments -- the gradient currently renders far brighter
+ * than its reference, so judging glass's exact opacity/blur against it today would be
+ * judging the wrong backdrop. Task 7 tunes both once the gradient itself is fixed.
  * ------------------------------------------------------------------------- */
-[data-room='panel'] {
-  background: var(--accent);
-  color: var(--accent-ink);
+[data-surface='solid'] {
+  background: var(--surface);
+}
+
+[data-surface='glass'] {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  backdrop-filter: blur(18px) saturate(1.1);
 }
 
 /* ---------------------------------------------------------------------------
- * Hero, panel and showcase share one composition: a two-track grid, the reading column
- * in one track and the rest of the room in the other, at least one full screen tall.
+ * Hero, story and feature share one composition: a two-track grid, the reading column
+ * in one track and the rest of the panel in the other, at least one full screen tall.
  * They used to each hold a sticky box pinned for the section's whole height, with the
  * 3D object filling the second track behind it -- that object, and every position:
  * sticky rule that pinned a composition over it, is gone (this branch strips it), so the
- * rooms now simply flow with the page like everything else.
+ * panels now simply flow with the page like everything else.
  * ------------------------------------------------------------------------- */
 
-[data-room='hero'] .room,
-[data-room='panel'] .room,
-[data-room='showcase'] .room {
+[data-panel='hero'] .room,
+[data-panel='story'] .room,
+[data-panel='feature'] .room {
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
@@ -146,13 +122,13 @@ body { overflow-x: hidden; }
  * Hero
  * ------------------------------------------------------------------------- */
 
-[data-room='hero'] .room {
+[data-panel='hero'] .room {
   align-content: end;
   align-items: end;
   padding-block: var(--nav-h) clamp(2rem, 7vh, 4.5rem);
 }
 
-[data-room='hero'] .room-head { grid-column: var(--rc); }
+[data-panel='hero'] .room-head { grid-column: var(--rc); }
 
 /*
  * flex + justify-content, not `justify-self: end` on the item. The item shrink-to-fit
@@ -162,7 +138,7 @@ body { overflow-x: hidden; }
  * against the headline's overflow instead of out at the margin. Stretching the box and
  * pushing the card inside it has no such cycle.
  */
-[data-room='hero'] .room-body {
+[data-panel='hero'] .room-body {
   grid-column: var(--oc);
   display: flex;
   justify-content: flex-end;
@@ -178,11 +154,11 @@ body { overflow-x: hidden; }
  * silently, and no layout rule anywhere notices. Measured at 768: "DIABOLO" set 80.6px
  * painted 322px of ink out of a 263px column and crossed 21px into the teaser card. At
  * 9.6vw the ink ends 92px clear of the card at 768, which is the narrowest width this
- * side-by-side composition is ever used at -- at 767 and below the room stacks (see the
+ * side-by-side composition is ever used at -- at 767 and below the panel stacks (see the
  * bottom of this file) and the card sits under the headline at full width. Desktop is
  * untouched in practice: 9.6vw reaches the 9rem ceiling at 1500px.
  */
-[data-room='hero'] h1 {
+[data-panel='hero'] h1 {
   font-size: var(--type-hero);
   font-weight: 200;
   line-height: 0.88;
@@ -190,7 +166,7 @@ body { overflow-x: hidden; }
   max-width: 9ch;
 }
 
-[data-room='hero'] .room-head p {
+[data-panel='hero'] .room-head p {
   margin-top: clamp(0.9rem, 2.2vh, 1.5rem);
   font-size: var(--type-micro);
   font-weight: 400;
@@ -243,12 +219,13 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Panel
+ * Story
  * ------------------------------------------------------------------------- */
 
-[data-room='panel'] .room {
-  /* Both tracks fluid here, unlike the other two pinned rooms: the object is covered,
-     so there is no half to keep clear and the text can have real width. */
+[data-panel='story'] .room {
+  /* Both tracks fluid here, unlike the other two pinned patterns: this panel is glass,
+     not solid, so there is no object-shaped half to keep clear and the text can have
+     real width. */
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   column-gap: clamp(1.5rem, 5vw, 5rem);
   align-content: center;
@@ -256,22 +233,29 @@ body { overflow-x: hidden; }
   padding-block: calc(var(--nav-h) + clamp(1rem, 3vh, 2rem)) clamp(2rem, 6vh, 4rem);
 }
 
-[data-room='panel'] .room-head { grid-column: var(--rc); }
-[data-room='panel'] .room-body { grid-column: var(--oc); }
+[data-panel='story'] .room-head { grid-column: var(--rc); }
+[data-panel='story'] .room-body { grid-column: var(--oc); }
 
-/* Instrument Serif's one job on the page. Set at real size, on the one surface that is
-   printed rather than drawn, it makes the panel a change of MATERIAL rather than just a
-   change of colour -- which is what stops a 4.4-screen violet block reading as a gap. */
-[data-room='panel'] h2 {
+/*
+ * Instrument Serif's one job on the page: set at real size on the club's own story, it
+ * marks this panel as a change of material even before glass and blur do. No colour
+ * override here any more -- this panel's ground used to be a fixed opaque `--accent`
+ * sheet, which is what `--accent-ink` was measured against for AAA contrast (7.05:1).
+ * It is glass now (`[data-surface='glass']` above): a translucent mix over whatever the
+ * moving gradient is doing behind it, not a fixed light violet, so a near-black ink
+ * tuned for that one fixed ground no longer describes what is actually behind this
+ * text. The panel takes the page's ordinary ink colour instead, the same as every other
+ * panel on a glass or solid surface.
+ */
+[data-panel='story'] h2 {
   font-family: var(--font-panel);
   font-weight: 400;
   font-size: var(--type-panel);
   line-height: 0.96;
   letter-spacing: -0.005em;
-  color: var(--accent-ink);
 }
 
-[data-room='panel'] p {
+[data-panel='story'] p {
   margin-top: clamp(1rem, 2.6vh, 1.9rem);
   font-family: var(--font-panel);
   font-size: clamp(1.15rem, 1.6vw, 1.7rem);
@@ -279,25 +263,24 @@ body { overflow-x: hidden; }
      measure: 48ch of Instrument Serif is about the same line length as 62ch of Inter. */
   line-height: 1.45;
   max-width: 48ch;
-  color: var(--accent-ink);
 }
 
 /* ---------------------------------------------------------------------------
- * Showcase. Title at the top of the reading column, copy and the two form pills at
+ * Feature. Title at the top of the reading column, copy and the two form pills at
  * the bottom of it.
  * ------------------------------------------------------------------------- */
 
-[data-room='showcase'] .room {
+[data-panel='feature'] .room {
   grid-template-rows: auto minmax(0, 1fr) auto;
   padding-block: calc(var(--nav-h) + clamp(1rem, 4vh, 2.5rem)) clamp(2rem, 7vh, 4.5rem);
 }
 
-[data-room='showcase'] .room-head {
+[data-panel='feature'] .room-head {
   grid-column: var(--rc);
   grid-row: 1;
 }
 
-[data-room='showcase'] .room-body {
+[data-panel='feature'] .room-body {
   grid-column: var(--rc);
   grid-row: 3;
   align-self: end;
@@ -308,23 +291,25 @@ body { overflow-x: hidden; }
 
 /* ---------------------------------------------------------------------------
  * Grid. Media, board and contact: a title column beside a column of cards, like every
- * other room's reading column.
+ * other panel's reading column.
  * ------------------------------------------------------------------------- */
 
 /*
- * The section itself becomes a one-cell grid purely so .room STRETCHES to fill it. A
- * grid room's content can be a fraction of its section's height -- board's roster measures
- * 98vh at 1440x900 inside a 150vh section -- so a plain block .room would end where its
- * content does and leave the rest of the section's height as bare background. Measured
- * live back when the section was 360vh: "BOARD" ended a fifth of the way down it, leaving
- * three screens of empty ground below. The section is now proportioned to the roster
- * instead, but this rule is still what makes .room fill whatever height the section has.
- * Hero, panel and showcase deliberately do NOT get this: their .room takes a 100dvh floor
- * of its own (see above) rather than stretching to a parent grid cell.
+ * The section itself becomes a one-cell grid purely so .room STRETCHES to fill it,
+ * rather than ending wherever its own content does and leaving the rest of the
+ * section's height as bare background. Sections size to content now -- there is no
+ * fixed min-height driving a grid panel taller than its own roster any more (see the
+ * note where that block used to sit, above) -- so today this rule is mostly latent: a
+ * grid panel's height and its .room's height are usually the same thing. It stays
+ * because that stops being true the moment a section gets taller than its content for
+ * any other reason (a future min-height, extra padding), and this is what keeps the
+ * title column full-height rather than a fraction of it when it does. Hero, story and
+ * feature deliberately do NOT get this: their .room takes a 100dvh floor of its own
+ * (see above) rather than stretching to a parent grid cell.
  */
-[data-room='grid'] { display: grid; }
+[data-panel='grid'] { display: grid; }
 
-[data-room='grid'] .room {
+[data-panel='grid'] .room {
   display: grid;
   grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
   column-gap: var(--gutter);
@@ -335,9 +320,9 @@ body { overflow-x: hidden; }
   align-content: start;
 }
 
-[data-room='grid'] .room-head { grid-column: var(--rc); }
+[data-panel='grid'] .room-head { grid-column: var(--rc); }
 
-[data-room='grid'] .room-body {
+[data-panel='grid'] .room-body {
   grid-column: var(--oc);
   display: flex;
   flex-direction: column;
@@ -356,30 +341,30 @@ body { overflow-x: hidden; }
 /* ---------------------------------------------------------------------------
  * Section titles and body copy.
  *
- * Showcase is the only room left to size here: hero sets its own h1 above, panel sets
+ * Feature is the only panel left to size here: hero sets its own h1 above, story sets
  * its own h2 above, and grid sets its own h2 below. This used to be written the other
- * way round -- `.section:not([data-section='hero']):not([data-room='panel']) h2`,
- * meant to size "every room but hero and panel" and trust the grid rule below to win
+ * way round -- `.section:not([data-section='hero']):not([data-panel='story']) h2`,
+ * meant to size "every panel but hero and story" and trust the grid rule below to win
  * for grid by coming later. :not() takes the specificity of its own argument, so that
  * selector was (0,3,1) against the grid rule's (0,1,1); the LESS specific grid rule
  * lost on font-size regardless of source order, and media/board/contact rendered at up
  * to 68px (--type-title's ceiling) inside a label column of at most 208px -- nearly
  * double the intended clamp(1.45rem, 2.4vw, 2.3rem), 36.8px at its own ceiling. Naming
- * the one room this rule is actually for removes the conflict instead of trying to
+ * the one panel this rule is actually for removes the conflict instead of trying to
  * out-rank a selector that was never competing on purpose.
  * ------------------------------------------------------------------------- */
 
-[data-room='showcase'] h2 {
+[data-panel='feature'] h2 {
   font-size: var(--type-title);
 }
 
-[data-room='grid'] h2 {
+[data-panel='grid'] h2 {
   font-size: clamp(1.45rem, 2.4vw, 2.3rem);
   letter-spacing: -0.02em;
 }
 
-[data-room='showcase'] .room-body p,
-[data-room='grid'] .room-head p {
+[data-panel='feature'] .room-body p,
+[data-panel='grid'] .room-head p {
   margin-top: 0.9rem;
   font-size: var(--type-lead);
   line-height: 1.55;
@@ -617,7 +602,7 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Form facades -- the showcase's pill buttons, and the second and third places the
+ * Form facades -- the feature panel's pill buttons, and the second and third places the
  * accent is spent. Both of these ask a visitor to actually do something.
  * ------------------------------------------------------------------------- */
 
@@ -695,8 +680,7 @@ body { overflow-x: hidden; }
   justify-content: flex-start;
   /* 40vh, down from 60: one line of text inside 20vh of padding measures 22vh at 375x812
      and 21vh at 1440x900, so 60 was two fifths of a screen of nothing after the last
-     thing on the page. It still counts towards the scrollable span the rooms are
-     proportioned against -- see the derivation at the top of this file. */
+     thing on the page. */
   min-height: 40vh;
   padding-block: clamp(4rem, 10vh, 7rem);
   padding-inline: var(--gutter);
@@ -713,47 +697,47 @@ body { overflow-x: hidden; }
  * Narrow screens.
  *
  * There is no 3D object any more (this branch strips it), so there is no band, no
- * overlap and nothing pinned: every room simply collapses to one full-width column in
+ * overlap and nothing pinned: every panel simply collapses to one full-width column in
  * reading order and flows with the page like the rest of it.
  * ------------------------------------------------------------------------- */
 
 @media (max-width: 767px) {
-  [data-room] .room {
+  [data-panel] .room {
     display: block;
     min-height: 0;
     padding-block: clamp(2.5rem, 7vh, 4rem);
   }
 
-  /* Hero and showcase alone keep a taller floor than the reset above -- a little
-     breathing room for a short composition on a phone. Panel is deliberately not in
+  /* Hero and feature alone keep a taller floor than the reset above -- a little
+     breathing room for a short composition on a phone. Story is deliberately not in
      this list; it is the club's own story and wants whatever space its serif and
-     photograph actually take, not a fixed floor. The grid rooms need no floor either,
+     photograph actually take, not a fixed floor. The grid panels need no floor either,
      for the obvious reason that their cards have to scroll. */
-  [data-room='hero'] .room,
-  [data-room='showcase'] .room {
+  [data-panel='hero'] .room,
+  [data-panel='feature'] .room {
     min-height: 60dvh;
   }
 
-  [data-room='hero'] .room {
-    /* The hero is the one room that still needs its own vertical rhythm: it opens the
-       page, so it gets less top padding than a room lower down. */
+  [data-panel='hero'] .room {
+    /* The hero is the one panel that still needs its own vertical rhythm: it opens the
+       page, so it gets less top padding than a panel lower down. */
     padding-block: clamp(1.5rem, 4vh, 2.5rem) clamp(2.5rem, 7vh, 4rem);
   }
 
-  [data-room] .room-head,
-  [data-room] .room-body {
+  [data-panel] .room-head,
+  [data-panel] .room-body {
     display: block;
     margin-top: 0;
   }
 
-  [data-room] .room-body { margin-top: clamp(1.5rem, 4vh, 2.25rem); }
+  [data-panel] .room-body { margin-top: clamp(1.5rem, 4vh, 2.25rem); }
 
-  [data-room='hero'] h1 {
+  [data-panel='hero'] h1 {
     font-size: clamp(2.9rem, 15vw, 4.5rem);
     max-width: none;
   }
 
-  [data-room='panel'] p { font-size: 1.15rem; }
+  [data-panel='story'] p { font-size: 1.15rem; }
 
   .teaser { width: 100%; }
 

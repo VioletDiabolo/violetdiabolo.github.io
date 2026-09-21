@@ -58,21 +58,8 @@ describe('buildNav', () => {
   });
 });
 
-describe('room patterns', () => {
-  it('assigns every section a room pattern', () => {
-    const content = document.getElementById('content');
-    renderSections(content);
-    for (const el of content.querySelectorAll('[data-section]')) {
-      if (el.dataset.section === 'footer') continue;
-      expect(['hero', 'panel', 'showcase', 'grid'], `${el.dataset.section}`)
-        .toContain(el.dataset.room);
-    }
-  });
-
-  it('uses each of the four patterns at least once', () => {
-    const content = document.getElementById('content');
-    renderSections(content);
-    const used = new Set([...content.querySelectorAll('[data-room]')].map((e) => e.dataset.room));
-    expect([...used].sort()).toEqual(['grid', 'hero', 'panel', 'showcase']);
-  });
-});
+// The old 'room patterns' coverage that lived here (every section gets a valid pattern;
+// all four patterns used) is superseded by tests/panels.dom.test.js, which asserts the
+// same facts under the current data-panel/data-surface names plus the surface coverage
+// and the absence of data-room. Keeping both would test the same claim under two
+// vocabularies, one of them stale.

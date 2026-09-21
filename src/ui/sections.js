@@ -7,10 +7,17 @@ import { mountForms } from './forms.js';
 import { buildPicture } from './picture.js';
 
 /**
- * Every section is one ROOM, and every room is the same two boxes arranged differently:
+ * Every section is a self-contained PANEL, described by two attributes rather than a
+ * place in a scroll choreography: `data-panel` names the LAYOUT (hero/story/feature/
+ * grid), `data-surface` names the MATERIAL (solid/glass — whether the animated gradient
+ * behind the page shows through). The hero carries no surface: the gradient itself is
+ * the hero, so there is nothing to plate it against.
  *
- *   <section data-room="..."> <div class="room"> <div class="room-head"> ...text...
- *                                                <div class="room-body"> ...everything else...
+ * Every panel is still the same two boxes arranged differently:
+ *
+ *   <section data-panel="..." data-surface="..."> <div class="room">
+ *                                                    <div class="room-head"> ...text...
+ *                                                    <div class="room-body"> ...everything else...
  *
  * The four patterns in src/styles/sections.css are nothing but four arrangements of that
  * pair, which is the whole reason the wrapper exists. The flat heading/paragraph/list
@@ -20,14 +27,15 @@ import { buildPicture } from './picture.js';
  * rather than three that each stick at a separately guessed offset and drift apart as the
  * heading rewraps. `.room` is also the single reveal unit per section (src/ui/reveal.js).
  *
- * data-section, data-room, the id and the class all stay on the <section> itself: the
- * nav's hrefs (src/ui/nav.js) key off the same id they always did.
+ * data-section, data-panel, data-surface, the id and the class all stay on the <section>
+ * itself: the nav's hrefs (src/ui/nav.js) key off the same id they always did.
  */
-function room(id, headingText, pattern, level = 'h2') {
+function section(id, headingText, panel, surface, level = 'h2') {
   const el = document.createElement('section');
   el.id = id;
   el.dataset.section = id;
-  if (pattern) el.dataset.room = pattern;
+  el.dataset.panel = panel;
+  if (surface) el.dataset.surface = surface;
   el.className = `section section-${id}`;
 
   const inner = document.createElement('div');
@@ -88,25 +96,25 @@ function teaser() {
 }
 
 export function renderSections(root) {
-  const hero = room('hero', SITE.name, 'hero', 'h1');
+  const hero = section('hero', SITE.name, 'hero', undefined, 'h1');
   hero.head.append(paragraph(SITE.tagline));
   hero.body.append(teaser());
 
-  const about = room('about', ABOUT.heading, 'panel');
+  const about = section('about', ABOUT.heading, 'story', 'glass');
   about.head.append(paragraph(ABOUT.body));
   about.body.append(figure(PHOTOS.group, '(max-width: 900px) 92vw, 46vw', 'lazy'));
 
-  const events = room('events', EVENTS.heading, 'showcase');
+  const events = section('events', EVENTS.heading, 'feature', 'glass');
   events.body.append(paragraph(EVENTS.body));
   mountForms(events.body);
 
-  const media = room('media', SECTION_HEADINGS.media, 'grid');
+  const media = section('media', SECTION_HEADINGS.media, 'grid', 'solid');
   mountMedia(media.body);
 
-  const board = room('board', SECTION_HEADINGS.board, 'grid');
+  const board = section('board', SECTION_HEADINGS.board, 'grid', 'solid');
   mountBoard(board.body);
 
-  const contact = room('contact', SECTION_HEADINGS.contact, 'grid');
+  const contact = section('contact', SECTION_HEADINGS.contact, 'grid', 'glass');
   const mail = document.createElement('a');
   mail.href = `mailto:${CONTACT.email}`;
   mail.textContent = CONTACT.email;
