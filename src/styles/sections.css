@@ -314,12 +314,13 @@ body { overflow-x: hidden; }
 /*
  * The section itself becomes a one-cell grid purely so .room STRETCHES to fill it. A
  * grid room's content can be a fraction of its section's height -- board's roster measures
- * 98vh at 1440x900 inside a 150vh section -- so a plain block .room ends where its content
- * does, and the sticky title below has only that much containing block to travel through.
- * Measured live back when the section was 360vh: "BOARD" held for a fifth of it and then
- * scrolled away, leaving three screens of nothing. The section is now proportioned to the
- * roster instead, but this rule is still what lets the title hold for all of it. The pinned rooms deliberately do NOT get this: their .room is
- * sticky at 100dvh and needs the section to be TALLER than it, not equal to it.
+ * 98vh at 1440x900 inside a 150vh section -- so a plain block .room would end where its
+ * content does and leave the rest of the section's height as bare background. Measured
+ * live back when the section was 360vh: "BOARD" ended a fifth of the way down it, leaving
+ * three screens of empty ground below. The section is now proportioned to the roster
+ * instead, but this rule is still what makes .room fill whatever height the section has.
+ * Hero, panel and showcase deliberately do NOT get this: their .room takes a 100dvh floor
+ * of its own (see above) rather than stretching to a parent grid cell.
  */
 [data-room='grid'] { display: grid; }
 
@@ -328,15 +329,16 @@ body { overflow-x: hidden; }
   grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
   column-gap: var(--gutter);
   padding-block: clamp(3rem, 9vh, 6rem);
-  /* Head and body stack in one column on this path, so the rows must size to content --
-     stretched, they would each take half the section and tear the heading off its copy. */
+  /* Head and body sit side by side in the two reading-column tracks below, so the row
+     still has to size to content rather than stretch -- stretched, it would take the
+     room's full height and tear the cards away from the top of the title. */
   align-content: start;
 }
 
-[data-room='grid'] .room-head,
-[data-room='grid'] .room-body { grid-column: var(--rc); }
+[data-room='grid'] .room-head { grid-column: var(--rc); }
 
 [data-room='grid'] .room-body {
+  grid-column: var(--oc);
   display: flex;
   flex-direction: column;
   align-items: flex-start;

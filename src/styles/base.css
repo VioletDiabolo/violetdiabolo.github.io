@@ -1,8 +1,7 @@
 /*
  * Foundation layer: design tokens, reset, atmosphere, global typography, links, and the
- * fixed site nav. Layout -- the sticky stage, the four room patterns, component
- * treatment -- lives in stage.css and sections.css; this file only holds what is true
- * everywhere.
+ * fixed site nav. Layout -- the four room patterns and component treatment -- lives in
+ * sections.css; this file only holds what is true everywhere.
  *
  * THE THESIS: the workbench and the one sheet on it.
  *
@@ -34,7 +33,7 @@
  *   as a MARK, small and on the near-black ground, where it reads as "this is live" --
  *     every link (`a` below), the focus ring, .board-position, .part-label-index on the
  *     object's own labels, and the hover/focus rings on .media-facade and
- *     .semester-select (all sections.css/stage.css).
+ *     .semester-select (all sections.css).
  *
  * The second list is not an erosion of the first; it is what an accent is for. But a
  * file that IS the design contract has to describe itself correctly, so it is written
@@ -87,8 +86,9 @@
    *      single printed surface on the page. Confining it there is what makes the panel
    *      feel like a different material instead of a different colour.
    *
-   *      --font-mono belongs to exactly one thing: the 3D object's own part labels
-   *      (.part-label, stage.css). Nothing in the reading column sets it. ---- */
+   *      --font-mono belonged to exactly one thing: the 3D object's own part labels
+   *      (.part-label), gone now with the rest of that system. Nothing sets it any
+   *      more, and nothing in the reading column ever did. ---- */
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-panel:   'Instrument Serif', 'Iowan Old Style', Georgia, serif;
@@ -107,14 +107,12 @@
   --type-micro: 0.78rem;
 
   /* ---- Measures. --text-col is the head of a hero/panel/showcase room, and 38% is not
-   *      a taste judgement: tests/choreography.dom.test.js sweeps 400 points of the scrub
-   *      asserting the object stays out of a column of exactly `COLUMN = 0.38`, so a
-   *      wider column here would silently stop being the thing that test is protecting.
-   *      Measured live at 46% the object's own part labels were already clipping the
-   *      showcase's lead paragraph. --label-col is the grid rooms' sticky title column,
-   *      which lives in the one room that has faded the object out. ---- */
+   *      a taste judgement: measured live at 46% the (now-removed) 3D object's own part
+   *      labels were already clipping the showcase's lead paragraph, which is why the
+   *      column stops well short of that. --label-col is gone: it sized the grid rooms'
+   *      sticky title column, a mechanism this task's "no position: sticky anywhere"
+   *      constraint forbids outright, and nothing else in the tree ever read it. ---- */
   --text-col:  min(38%, 30rem);
-  --label-col: clamp(6.5rem, 15vw, 13rem);
   --measure:   62ch;
 
   /* Two radii, because they mean different things: a card is a cut rectangle, a control
@@ -348,19 +346,6 @@ a:hover {
 /* A jump link lands the section's top edge at the viewport's top, which is underneath
    the fixed nav. Offsetting by the bar's height is what keeps the heading visible. */
 [data-section] { scroll-margin-top: var(--nav-h); }
-
-/*
- * Below 768px the obstruction over the top of the viewport is not the nav, it is the
- * object's own band (stage.css): #stage becomes a 40dvh band at z-index 2, ABOVE
- * #content's 1, opaque, and the nav (z-index 3, ~52-57px tall here) is laid on top of
- * that band rather than beside it -- the band is taller than the nav in every case, so
- * it is the band's height a jump link has to clear, not the nav's. --nav-h alone left a
- * landed section's heading and first paragraph roughly 268px behind the band: measured
- * live at 375x812, scroll-margin-top computed to 52-57px against a 324.8px band.
- */
-@media (max-width: 767px) {
-  [data-section] { scroll-margin-top: 40dvh; }
-}
 
 /* ---------------------------------------------------------------------------
  * Accessibility: a keyboard user must always be able to see where they are. The accent

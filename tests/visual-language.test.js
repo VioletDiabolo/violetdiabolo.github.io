@@ -364,8 +364,13 @@ describe('the 3D system is gone', () => {
     }
   });
 
-  it('sticks nothing to the viewport', () => {
-    // The locking headings and the about-section lock were the same mechanism.
-    expect(allCss()).not.toMatch(/position:\s*sticky/);
-  });
+  // 'sticks nothing to the viewport' moved to tests/sections-layout.dom.test.js. A
+  // source-text grep for the literal string is fooled in both directions -- it fails on
+  // the phrase merely appearing in a comment (this happened twice over during this
+  // branch's own history) and cannot see whether a matched declaration actually wins the
+  // cascade. The replacement resolves the real cascade over the real rendered DOM
+  // (Element.matches + specificity arithmetic), which needs jsdom; this file runs in the
+  // plain node environment (see `read()` above, which breaks under vitest's jsdom
+  // environment), so the guard now lives next to the other cascade-resolution guard
+  // built the same way ("the grid room title size").
 });
