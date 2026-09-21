@@ -359,8 +359,14 @@ What this run could **not** verify, and why:
 4. **The `prefers-reduced-motion` path.** `main.js`'s static branch, `applySectionSides({ staticAt })`,
    and the `labelOpacity = 1` still frame are untested here; the media query cannot be toggled in
    this host.
-5. **The unsupported-WebGL path.** `html[data-stage="unsupported"]` and the fallback SVG were not
-   exercised; WebGL was available throughout.
+5. **The unsupported-WebGL path.** Not exercised *in this run* — WebGL was available throughout.
+   It has since been exercised separately, at 1440x900, by denying `getContext('webgl'|'webgl2')`
+   before the bundle boots and measuring the resulting layout: `html[data-stage="unsupported"]`,
+   the canvas hidden, the fallback SVG shown at x 549.3-890.7 with its drawn ink at 583.5-856.5,
+   and the reading column at x 72-552 — a 31.5px gap. Geometry only, from the same
+   `getBoundingClientRect` / `getBBox` instruments as the rest of this document; still no
+   rendered image, and still no real browser without WebGL. See
+   `.superpowers/sdd/final-fixes-report.md`, finding I1.
 6. **Real mobile devices.** 375×812 was viewport emulation only — no real touch input, no real
    device pixel pipeline.
 7. **Lazy-loading in a visible tab.** Confirmed broken *only* by `document.hidden`; normal

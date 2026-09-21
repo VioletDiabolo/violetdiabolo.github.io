@@ -138,9 +138,14 @@ export function renderSections(root) {
   contact.head.append(socials);
   contact.body.append(figure(PHOTOS.wide, '(max-width: 900px) 92vw, 46vw'));
 
-  // The choreography (src/scroll/choreography.js) is one continuous animation that
-  // finishes back where it began -- assembled and face-on (the `settle` act) -- by the
-  // time scroll reaches here. Year is computed at render time, never hardcoded.
+  // The choreography (src/scroll/choreography.js) has finished by the time scroll reaches
+  // here, and it does NOT finish where it began: the last room is `grid`, which leaves the
+  // object reassembled but in PROFILE (tiltX: PROFILE_X, not the hero's face-on tilt) and
+  // faded to opacity 0. There is nothing behind the footer line at all under normal
+  // motion; sections.css's .section-footer comment covers the reduced-motion path, where
+  // there is. The sibling comment in that file was corrected when the four rooms landed
+  // and this one was missed -- it still described the six-act version's `settle` act,
+  // which no longer exists. Year is computed at render time, never hardcoded.
   const footer = document.createElement('footer');
   footer.dataset.section = 'footer';
   footer.className = 'section-footer';

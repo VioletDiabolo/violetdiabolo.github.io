@@ -32,11 +32,22 @@ export const SECTION_FOR_ROOM = Object.freeze({
  * sat, at full opacity, wherever the hero room's state left it.
  *
  * Driven entirely by `[data-room]`, which src/ui/sections.js stamps on every section but
- * the footer. SECTION_FOR_ROOM plays no part here: for the four sections it names, a
- * section's own data-room already reads back the same room SECTION_FOR_ROOM's lookup
- * would have produced (the two agree by construction), and board/contact never appear in
- * SECTION_FOR_ROOM at all -- so resolving every section from its own data-room covers
- * all six in one pass instead of two routes to the same value.
+ * the footer. SECTION_FOR_ROOM plays no part in THIS function: for the four sections it
+ * names, a section's own data-room already reads back the same room SECTION_FOR_ROOM's
+ * lookup would have produced (the two agree by construction), and board/contact never
+ * appear in SECTION_FOR_ROOM at all -- so resolving every section from its own data-room
+ * covers all six in one pass instead of two routes to the same value.
+ *
+ * That is not a reason to delete the table, and it reads like one, so: SECTION_FOR_ROOM is
+ * load-bearing somewhere else. It is the only statement anywhere of WHICH section each
+ * room is composed for, and tests/sections-layout.dom.test.js spends it on the invariant
+ * the whole page is proportioned around -- that each room begins as its own section
+ * reaches the top of the viewport, within half a viewport. That test computes each
+ * section's cumulative top from the stylesheet's min-heights and compares it against the
+ * room's `end` in ROOMS; without this table there is nothing to join the two sides on, and
+ * the derivation at the top of sections.css goes back to being a comment nobody checks.
+ * It is also what pins the bijection (four rooms, four distinct sections) and the reading
+ * order. Unused by the function below, not unused.
  *
  * Idempotent per call and safe to call repeatedly on the same rendered content (main.js
  * does exactly that: once unconditionally, then again with `staticAt` under reduced

@@ -83,8 +83,24 @@ const HERO_TILT = -0.42;
 
 /**
  * Four rooms, as target states reached at the END of each `end` fraction. Rooms have
- * edges: the explosion is contained in one of them rather than smeared across the page,
- * which is the substantive change from the six-act version this replaces.
+ * edges, and the explosion PLAYS in one of them rather than being smeared across the
+ * page, which is the substantive change from the six-act version this replaces.
+ *
+ * Said precisely, because the short version of it is not true and was written here for a
+ * while: what is confined to the showcase room is the exploded TARGET STATE. The tween
+ * out of it is not. Each room's tweens run its full duration, so the reassembly that
+ * starts at the showcase's end runs the whole grid room -- measured, cupTop leaves rest
+ * at f = 0.3014 and is still off it at f = 0.99, and spinRate only reaches its 1.6 at
+ * f = 1.00. What keeps that from being a four-tenths-of-a-page reassembly on screen is
+ * opacity, not position: objectOpacity rides OPACITY_SETTLE instead of the full room and
+ * reaches 0 at f = 0.595, where the object is still 97.55% apart. So the object is gone
+ * before any part of its reassembly can be seen, and everything after 0.595 is a scene
+ * graph still moving behind an opacity of zero.
+ *
+ * That distinction is not pedantry -- it is what the page's section heights are sized
+ * against (sections.css's derivation) and what docs/VERIFICATION.md reports as qualified
+ * rather than verified, having measured the same 97.5-100% window independently.
+ * tests/choreography.dom.test.js samples inside it rather than only at the endpoints.
  *
  * `explode` 0 = assembled, 1 = fully apart. `opacity` fades the whole object out (the
  * render loop reads it off `state`, see diabolo/stage.js). `textSide` records where the

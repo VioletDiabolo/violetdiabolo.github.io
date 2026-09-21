@@ -43,8 +43,13 @@ export const RADIAL_SEGMENTS = 12;
 /** Degrees: a boundary is only drawn where adjacent faces meet at more than this angle, so
  *  a flat span (e.g. the hub cone's now-linear taper, see profiles.js) draws no seam at its
  *  interior ring -- this is why the hub cone measures 48 lines, the low end of the range
- *  above, rather than a higher count from a spurious extra loop. Raising this further would
- *  start dropping real creases too, and a smooth lathe would lose its wireframe. */
+ *  above, rather than a higher count from a spurious extra loop. The number itself is not
+ *  sensitive: swept at 1, 5 and 10 degrees the hub cone measures 48 lines at all three, so
+ *  anything in that range is the same drawing. Where it does start to bite is above about
+ *  30 degrees, which is where the 12 radial creases of the lathe itself sit -- past that
+ *  this threshold stops suppressing a spurious interior ring and starts dropping the
+ *  object's real edges, and a smooth lathe loses its wireframe. 1 is kept as the value
+ *  furthest from that cliff rather than as a tuned figure. */
 export const EDGE_THRESHOLD = 1;
 
 export function buildDiabolo({ materials, segments = PROFILE_POINTS, radialSegments = RADIAL_SEGMENTS }) {
