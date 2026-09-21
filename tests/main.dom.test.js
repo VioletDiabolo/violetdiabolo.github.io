@@ -16,6 +16,33 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
   };
 }
 
+// jsdom implements neither matchMedia nor ResizeObserver, and Lenis (Task 4) uses both
+// unconditionally inside its own constructor -- window.matchMedia(...) to read
+// prefers-reduced-motion, and a ResizeObserver on its content element -- for every real
+// (non-stub) instance. main.js's animated path constructs a real Lenis via
+// createSmoothScroll() with no LenisCtor override, so these globals need to exist
+// whenever that path runs here. Minimal, inert stubs: matchMedia always reports
+// `matches: false` and the observer does nothing. Neither touches, wraps, or weakens
+// main.js or createSmoothScroll, which is what these tests measure.
+if (typeof globalThis.matchMedia === 'undefined') {
+  globalThis.matchMedia = () => ({
+    matches: false,
+    media: '',
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+    dispatchEvent() { return false; },
+  });
+}
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 const SECTION_IDS = ['hero', 'about', 'events', 'media', 'board', 'contact'];
 
 // Shared by every describe in this file: resets modules so each test's vi.doMock takes

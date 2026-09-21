@@ -5,6 +5,7 @@ import { supportsWebGL, prefersReducedMotion } from './fallback/detect.js';
 import { createGradient } from './gradient/gradient.js';
 import { createLifecycle } from './render/lifecycle.js';
 import { createFrameCap, renderSize } from './render/budget.js';
+import { createSmoothScroll } from './scroll/smooth.js';
 
 export const APP_NAME = 'violet-diabolo';
 
@@ -54,17 +55,26 @@ function boot() {
 
   window.addEventListener('resize', fit);
 
+  const smooth = createSmoothScroll({
+    reduced: false, // this branch is already past the reduced-motion return
+    onVelocity: (v) => gradient.setVelocity(v),
+  });
+
   const cap = createFrameCap();
   const lifecycle = createLifecycle({
     element: canvas,
     onFrame: (delta) => {
+      // Lenis is driven every frame, ahead of the cap below: the cap throttles only the
+      // gradient's draw call, and stepping Lenis at that same reduced rate would make the
+      // inertia stutter.
+      if (smooth) smooth.raf(performance.now());
       const elapsed = cap(delta);
       if (elapsed > 0) gradient.render(elapsed);
     },
   });
   lifecycle.start();
 
-  window.__vd = { ...(window.__vd ?? {}), gradient, lifecycle };
+  window.__vd = { ...(window.__vd ?? {}), gradient, lifecycle, smooth };
 }
 
 if (typeof document !== 'undefined') {
