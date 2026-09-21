@@ -401,3 +401,11 @@ describe('the 3D system is gone', () => {
   // environment), so the guard now lives next to the other cascade-resolution guard
   // built the same way ("the grid room title size").
 });
+
+describe('the moving-background contrast guard', () => {
+  it('keeps the contrast helper out of the shipped bundle', () => {
+    // It is test and probe tooling. If main.js ever imports it, it starts costing
+    // every visitor bytes they gain nothing from.
+    expect(read('../src/main.js')).not.toMatch(/gradient\/contrast/);
+  });
+});
