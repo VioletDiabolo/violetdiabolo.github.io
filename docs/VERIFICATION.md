@@ -28,7 +28,7 @@ Two things must be read before any number below:
 | Edge lines land in the predicted 48–204 / 780 range | **Verified** — 48–204, total **780** |
 | Four rooms, distinct states at every boundary | **Verified** — all five sampled points differ as specified |
 | `cupTop` at rest at 0.12, 0.30, 1.0; exploded only at 0.55 | **Verified** — 0.235 / 0.235 / 0.235 / 1.650 |
-| Explosion *begins* inside the showcase room | **Verified** — leaves rest at f = 0.3054 |
+| Explosion *begins* inside the showcase room | **Verified** — leaves rest at f = 0.3054 (see §below on why the source says 0.3014) |
 | Explosion *ends* inside the showcase room | **Qualified** — reassembly tween runs to f = 0.992; object invisible from f = 0.595 |
 | `OPACITY_SETTLE` lands well inside `LATERAL_SETTLE` | **Verified** — opacity 0 at f = 0.59498, x = 0 at f = 0.64893 |
 | Labels never outlive the object | **Verified** — DOM opacity 0 at f = 0.60 despite `labelOpacity` 0.9698 |
@@ -121,7 +121,10 @@ neighbour.
 
 ### Containment, by dense sampling rather than endpoints
 
-502 samples across the whole timeline. `cupTop` departs rest at **f = 0.3054** and returns at
+502 samples across the whole timeline. `cupTop` departs rest at **f = 0.3054** — the first
+sample past rest on this 502-point grid; `src/scroll/choreography.js`, `README.md` and
+`tests/choreography.dom.test.js` cite **f = 0.3014** for the same departure, resolved off a
+finer grid. Both describe one tween, not two measurements that disagree. It returns at
 **f = 0.992**.
 
 So the explosion *starts* inside the showcase room, but the **reassembly tween spans the entire grid
