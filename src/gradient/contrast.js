@@ -35,6 +35,13 @@ export function contrastRatio(a, b) {
  *
  * Deliberately not an average: a background that is dark for eleven frames and bright
  * for one still fails the reader on that frame.
+ *
+ * Throws on a non-finite ratio (NaN or Infinity) rather than skipping it. `r < ratio`
+ * alone would let a malformed sample — a negative or NaN component from a float
+ * framebuffer readback, or an RGB/RGBA-length mismatch destructuring to `undefined` —
+ * silently lose the comparison and vanish from consideration, which is worse than
+ * reporting nothing: it reports a *result*, just one that quietly excludes the corrupted
+ * frame instead of flagging it.
  */
 export function worstCase(backgroundSamples, textRgb) {
   if (!backgroundSamples?.length) {
@@ -44,6 +51,12 @@ export function worstCase(backgroundSamples, textRgb) {
   let index = -1;
   backgroundSamples.forEach((sample, i) => {
     const r = contrastRatio(sample, textRgb);
+    if (!Number.isFinite(r)) {
+      throw new Error(
+        `worstCase got a non-finite contrast ratio at sample index ${i}; refusing to ` +
+        'silently skip a malformed background sample',
+      );
+    }
     if (r < ratio) {
       ratio = r;
       index = i;
