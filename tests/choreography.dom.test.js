@@ -188,57 +188,48 @@ describe('rooms', () => {
   });
 });
 
-describe('the closing room clears its centred title', () => {
+describe('the closing room is empty for nearly all of its centred title', () => {
   const grid = ROOMS.at(-1);
   const gridStart = ROOMS.at(-2).end;
-  // The closing room's title is held at top: 18vh -- [data-room='grid'][data-side='center']
-  // .room-head in src/styles/sections.css -- so the object's bottom edge has to stay above
-  // that line: 100 - 18 = 82% of the viewport clear beneath it, measured from the bottom.
-  //
-  // This was 66 while that room's column was centred and its title sat in the lower third.
-  // The grid pattern moved the title to a sticky column at the top left, which makes the
-  // bar strictly harder to clear, not easier: every sample that violated at 66 still
-  // violates at 18, and samples that cleared 66 can now fail. It passes for the reason the
-  // assertion below states -- the object is GONE, not merely low -- which is also why the
-  // horizontal protection the left-hand column now gets (the object is right of centre for
-  // the whole fade) is a second line of defence rather than the one being measured here.
-  const TITLE_TOP_PCT = 18;
   /** Below this the object is a ghost, and there is genuinely nothing to lay text over. */
   const INVISIBLE = 0.05;
   const SAMPLES = 400;
-  const visibleHalfHeight = (z) => z * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180));
-  // The object's own top edge, read off the ANIMATED part positions rather than assumed
-  // assembled: cupTop's rim sits cupHeight above its group origin, so this is 1.095 when
-  // whole and 2.51 at full explode. The grid room opens fully exploded, so the assembled
-  // constant the endpoint tests use would understate the overlap by more than a unit.
-  const topEdge = ({ tilt, parts }) => tilt.position.y + parts.cupTop.position.y + DIMS.cupHeight;
 
-  it('is laid over that title only while it is fading out', () => {
-    // The vertical counterpart of the lateral sweep above, and the only test anywhere that
-    // samples the INTERIOR of a centred room. Its endpoint twin cannot do this job: grid's
-    // table entry is `opacity: 0`, which at the endpoint is true, so an endpoint test reads
-    // "no object to lay text over" and exempts itself. Across the room's interior the
-    // object is still fading, still exploded and still dead centre -- which is the state a
-    // visitor actually sees. Skipping is therefore keyed to the ANIMATED
-    // state.objectOpacity, never to the table's endpoint value.
+  // This block used to be "the closing room clears its centred title", built around a
+  // TITLE_TOP_PCT constant (66, later "tightened" to 18) meant to check the object stays
+  // clear of the title held at top: 18vh ([data-room='grid'][data-side='center']
+  // .room-head, sections.css). It did not check that. Across the room's fade window
+  // (state.objectOpacity >= INVISIBLE, which inOutSine ends at 8.56% into the room) camZ
+  // only moves 10 -> 9.93, so the object's measured clearance sits at essentially one
+  // constant value -- roughly 28% of the viewport clear below its top edge -- at every
+  // visible sample. That is below 100 - C for every C the constant was ever set to (66 or
+  // 18) and for every C up to ~72, so `violating` was always exactly equal to `visible`
+  // (≈35 of 400 samples, 8.75%), and above ~72 it was always exactly 0. Both are under the
+  // 0.12 bar the assertion checked -- the test passed for every value the constant could
+  // plausibly take, including the ones it never held, which means it was never measuring
+  // where the title sits. Lowering 66 to 18 did not make the check stronger; the comment
+  // that claimed it did ("samples that cleared 66 can now fail") was wrong -- no visible
+  // sample cleared 66 either.
+  //
+  // What follows checks the one thing the arithmetic above actually supports: the object
+  // is visible for only the front slice of the room and gone for the rest. Vertical
+  // clearance between the object and the held title is NOT covered by this or by anything
+  // else in this suite -- a real answer needs the object's projected on-screen silhouette
+  // intersected with the title's box, which is a materially bigger test than this file
+  // builds elsewhere, and building a cheap approximation of it is exactly how the removed
+  // constant ended up decorating an assertion it had no effect on. See
+  // .superpowers/sdd/task-5-fixes-report.md, finding 4.
+  it('leaves the object visible for only the front slice of the room, invisible for the rest', () => {
     const scene = setup();
     let visible = 0;
-    let violating = 0;
     for (let i = 0; i <= SAMPLES; i++) {
       const f = gridStart + (grid.end - gridStart) * (i / SAMPLES);
       scene.timeline.seek(scene.timeline.duration * f);
-      if (scene.state.objectOpacity < INVISIBLE) continue;
-      visible += 1;
-      const vh = visibleHalfHeight(scene.camera.position.z);
-      const clearBelowPct = 100 * ((vh - topEdge(scene)) / (2 * vh));
-      if (clearBelowPct <= 100 - TITLE_TOP_PCT) violating += 1;
+      if (scene.state.objectOpacity >= INVISIBLE) visible += 1;
     }
-    // Unlike the lateral sweep, the denominator is every sample in the room rather than
-    // only those examined: a skipped sample here means the object is GONE, which is the
-    // pass condition itself, not a sample another room's geometry excuses.
     expect(visible, 'every sample was skipped, so nothing was actually checked')
       .toBeGreaterThan(0);
-    expect(violating / SAMPLES, 'the object sits over the closing title for too long')
+    expect(visible / SAMPLES, 'the object stays visible for too much of the closing room')
       .toBeLessThan(0.12);
   });
 

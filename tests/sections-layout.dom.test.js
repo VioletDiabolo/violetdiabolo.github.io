@@ -196,6 +196,50 @@ describe('the grid room hands over from the object', () => {
   });
 });
 
+describe('the grid room title size', () => {
+  it("is not swallowed by the shared title-size rule (dead-by-specificity guard)", () => {
+    // The historical bug: `.section:not([data-section='hero']):not([data-room='panel'])
+    // h2` was meant to size every room's h2 except hero (its own h1, elsewhere) and panel
+    // (its own h2, above it in the file), trusting the grid room's OWN rule just below it
+    // to win for grid by coming later in the file. It never could: :not() takes the
+    // specificity of its own argument, so that selector was (0,3,1) against the grid
+    // rule's (0,1,1), and the LESS specific grid rule lost on font-size regardless of
+    // source order -- media, board and contact rendered at up to 68px (--type-title's
+    // ceiling) inside a label column of at most 208px. Fixed by naming the one room the
+    // shared rule is actually for ([data-room='showcase'] h2) instead of trying to
+    // out-rank a selector it was never meant to compete with.
+    //
+    // Checked with the real selector engine (Element.matches), not hand-rolled
+    // specificity arithmetic -- hand-rolled arithmetic is exactly what produced the bug.
+    // Whatever rule currently sets --type-title on a room's h2 must not ALSO match a
+    // grid room's h2, independent of which one the cascade would pick if it did.
+    // Comments stripped first: they contain no braces of their own, so left in, the
+    // greedy `[^{}]+` below walks straight through one and captures a comment's prose
+    // as if it were the selector -- caught by running this once with the comment left in.
+    const css = readFileSync(SECTIONS_CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = css.match(/([^{}]+)\{\s*font-size:\s*var\(--type-title\);?\s*\}/);
+    expect(rule, 'no rule sets --type-title on an h2 any more -- update this test to match')
+      .not.toBeNull();
+
+    document.body.innerHTML = `
+      <section class="section" data-section="media" data-room="grid" data-side="center">
+        <div class="room"><div class="room-head"><h2>Media</h2></div></div>
+      </section>`;
+    const h2 = document.querySelector('h2');
+    const selectors = rule[1].trim().split(',').map((s) => s.trim());
+    const leaking = selectors.filter((s) => h2.matches(s));
+    expect(leaking, "the shared title-size rule also matches a grid room's h2").toEqual([]);
+  });
+
+  it('gives the grid room its own, smaller h2 rule, so the guard above has something to protect', () => {
+    // Without this, the test above would pass just as well if the grid rule were ever
+    // deleted outright rather than merely shadowed -- "no shared rule matches" is not the
+    // same claim as "the grid room is sized correctly", and this is what tells them apart.
+    const css = readFileSync(SECTIONS_CSS, 'utf8');
+    expect(css).toMatch(/\[data-room='grid'\]\s*h2\s*\{[^}]*font-size:\s*clamp\(/);
+  });
+});
+
 /* ---------------------------------------------------------------------------
  * Scroll length.
  *

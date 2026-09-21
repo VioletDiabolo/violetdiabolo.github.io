@@ -187,8 +187,11 @@ describe('ROOMS', () => {
    *
    * The clearance now lives where the distinction can be made honestly -- against the
    * ANIMATED state.objectOpacity, sampled across the room's interior, in
-   * choreography.dom.test.js's 'the closing room clears its centred title'. Endpoint data
-   * cannot express "invisible before it arrives", so no endpoint test should pretend to.
+   * choreography.dom.test.js's 'the closing room is empty for nearly all of its centred
+   * title'. Endpoint data cannot express "invisible before it arrives", so no endpoint
+   * test should pretend to. That DOM test does not check where the title sits, only that
+   * the object is gone by the time it would matter -- see its own comment for why an
+   * earlier version of it claimed more than that.
    */
   it('fades a centred room out faster than it crosses to the centre', () => {
     // The table-level half of that invariant: the behavioural half is the DOM test above.

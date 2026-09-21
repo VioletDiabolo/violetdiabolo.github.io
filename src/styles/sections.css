@@ -471,10 +471,22 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Section titles and body copy, shared across the rooms that do not override them.
+ * Section titles and body copy.
+ *
+ * Showcase is the only room left to size here: hero sets its own h1 above, panel sets
+ * its own h2 above, and grid sets its own h2 below. This used to be written the other
+ * way round -- `.section:not([data-section='hero']):not([data-room='panel']) h2`,
+ * meant to size "every room but hero and panel" and trust the grid rule below to win
+ * for grid by coming later. :not() takes the specificity of its own argument, so that
+ * selector was (0,3,1) against the grid rule's (0,1,1); the LESS specific grid rule
+ * lost on font-size regardless of source order, and media/board/contact rendered at up
+ * to 68px (--type-title's ceiling) inside a label column of at most 208px -- nearly
+ * double the intended clamp(1.45rem, 2.4vw, 2.3rem), 36.8px at its own ceiling. Naming
+ * the one room this rule is actually for removes the conflict instead of trying to
+ * out-rank a selector that was never competing on purpose.
  * ------------------------------------------------------------------------- */
 
-.section:not([data-section='hero']):not([data-room='panel']) h2 {
+[data-room='showcase'] h2 {
   font-size: var(--type-title);
 }
 

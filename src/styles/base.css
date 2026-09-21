@@ -316,11 +316,45 @@ a:hover {
    the fixed nav. Offsetting by the bar's height is what keeps the heading visible. */
 [data-section] { scroll-margin-top: var(--nav-h); }
 
+/*
+ * Below 768px the obstruction over the top of the viewport is not the nav, it is the
+ * object's own band (stage.css): #stage becomes a 40dvh band at z-index 2, ABOVE
+ * #content's 1, opaque, and the nav (z-index 3, ~52-57px tall here) is laid on top of
+ * that band rather than beside it -- the band is taller than the nav in every case, so
+ * it is the band's height a jump link has to clear, not the nav's. --nav-h alone left a
+ * landed section's heading and first paragraph roughly 268px behind the band: measured
+ * live at 375x812, scroll-margin-top computed to 52-57px against a 324.8px band.
+ */
+@media (max-width: 767px) {
+  [data-section] { scroll-margin-top: 40dvh; }
+}
+
 /* ---------------------------------------------------------------------------
  * Accessibility: a keyboard user must always be able to see where they are. The accent
  * is the page's mark of "attention has landed on a control", so it is the focus ring
- * too -- 7.15:1 against the ground. The one place that fails is the panel, whose sheet
- * IS the accent; there the ring switches to the ink printed on it, 7.05:1 the other way.
+ * too -- 7.15:1 against the near-black ground everywhere except the fixed nav.
+ *
+ * The nav is `position: fixed` at z-index 3 and is laid over whatever room has scrolled
+ * underneath it -- the near-black ground for most of the page, but the panel room's own
+ * violet sheet (--accent) for the whole of it. An accent-on-accent ring there is 1.00:1,
+ * and on .site-nav-cta, whose FILL is also --accent, focused and unfocused are then
+ * pixel-identical apart from the chip's own permanent edge.
+ *
+ * `[data-room='panel'] :focus-visible { outline-color: var(--accent-ink) }` used to sit
+ * here as the fix, on the theory that the nav's ring would inherit the panel's override
+ * the way the panel's own text does. It never can: the nav is prepended straight to
+ * <body> (main.js), a sibling of #content, never a descendant of `[data-room='panel']`
+ * -- so that selector cannot match anything the nav ever draws. Checked the other
+ * direction too: `[data-room='panel']` (a heading, a paragraph, a photograph) has zero
+ * focusable descendants of its own, so the rule had no element it could ever reach
+ * either way and is removed rather than kept -- a rule nothing can trigger is not a
+ * defence, whatever it looks like sitting in the file.
+ *
+ * The nav can't detect which ground is behind it without a scroll listener (the same
+ * constraint its permanent stage-coloured edge ring exists for, in the comment above
+ * .site-nav-mark), so its focus ring is made correct on ANY ground instead, the same
+ * way that ring already is: two tones, layered so the OUTER edge -- the one actually
+ * touching whatever is really behind the chip -- is always the tone that ground needs.
  * ------------------------------------------------------------------------- */
 
 :focus-visible {
@@ -328,8 +362,21 @@ a:hover {
   outline-offset: 3px;
 }
 
-[data-room='panel'] :focus-visible {
-  outline-color: var(--accent-ink);
+/*
+ * --ink on --stage is 18.20:1 (root token comment above); on the panel's --accent it is
+ * 2.55:1 -- the same figure task 5 measured for the white wordmark text and rejected.
+ * --stage on the panel is 7.15:1 (the accent/stage pair, read the other way -- contrast
+ * ratio does not care which is foreground); on --stage itself it is 1:1, same as the
+ * chips' own resting edge. Neither token alone clears 3:1 on both grounds, so the ring
+ * uses both, stage on the outside: outline-color: ink is the band that shows on the
+ * near-black ground the page mostly is, and the box-shadow -- spread past the outline,
+ * not just up to it -- repeats the chip's dark edge far enough out to read as a second,
+ * separate ring specifically where the outline itself goes quiet. Measured against live
+ * canvas/panel pixels: see .superpowers/sdd/task-5-fixes-report.md, finding 2.
+ */
+.site-nav :focus-visible {
+  outline-color: var(--ink);
+  box-shadow: 0 0 0 6px var(--stage);
 }
 
 /* ---------------------------------------------------------------------------
