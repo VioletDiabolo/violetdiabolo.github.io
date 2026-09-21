@@ -20,9 +20,8 @@ import { buildPicture } from './picture.js';
  * rather than three that each stick at a separately guessed offset and drift apart as the
  * heading rewraps. `.room` is also the single reveal unit per section (src/ui/reveal.js).
  *
- * data-section, data-room, the id and the class all stay on the <section> itself:
- * src/ui/layout.js stamps data-side by querying [data-room], and the nav's hrefs and the
- * choreography's room pairing both key off the same element they always did.
+ * data-section, data-room, the id and the class all stay on the <section> itself: the
+ * nav's hrefs (src/ui/nav.js) key off the same id they always did.
  */
 function room(id, headingText, pattern, level = 'h2') {
   const el = document.createElement('section');
@@ -138,14 +137,11 @@ export function renderSections(root) {
   contact.head.append(socials);
   contact.body.append(figure(PHOTOS.wide, '(max-width: 900px) 92vw, 46vw'));
 
-  // The choreography (src/scroll/choreography.js) has finished by the time scroll reaches
-  // here, and it does NOT finish where it began: the last room is `grid`, which leaves the
-  // object reassembled but in PROFILE (tiltX: PROFILE_X, not the hero's face-on tilt) and
-  // faded to opacity 0. There is nothing behind the footer line at all under normal
-  // motion; sections.css's .section-footer comment covers the reduced-motion path, where
-  // there is. The sibling comment in that file was corrected when the four rooms landed
-  // and this one was missed -- it still described the six-act version's `settle` act,
-  // which no longer exists. Year is computed at render time, never hardcoded.
+  // No 3D object plays behind this line any more (this branch strips it) -- sections.css's
+  // .section-footer comment still walks through why it used to be left-aligned rather
+  // than centred there; the other reason it gives (matching the rest of the page, which
+  // is left-aligned throughout) is the one still live. Year is computed at render time,
+  // never hardcoded.
   const footer = document.createElement('footer');
   footer.dataset.section = 'footer';
   footer.className = 'section-footer';

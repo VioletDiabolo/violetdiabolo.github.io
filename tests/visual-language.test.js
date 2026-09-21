@@ -1,10 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+// stage.css was the 3D stage's own stylesheet and is gone with it (this branch strips
+// the object); only these two remain.
 const allCss = () =>
-  ['../src/styles/base.css', '../src/styles/sections.css', '../src/styles/stage.css']
+  ['../src/styles/base.css', '../src/styles/sections.css']
     .map(read).join('\n');
+
+/**
+ * Every `.js` path under src/, recursively. Mirrors tests/lifecycle.test.js's
+ * listJsFiles walk (readdirSync + statSync, recursing into directories), wrapped as a
+ * zero-arg function since that is how this file's own tests call it.
+ */
+function sourceFiles() {
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src');
+  const out = [];
+  const walk = (d) => {
+    for (const entry of readdirSync(d)) {
+      const full = path.join(d, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (entry.endsWith('.js')) out.push(full);
+    }
+  };
+  walk(dir);
+  return out;
+}
 
 /**
  * Splits a CSS source into its leaf declaration blocks — {selector, body} for every
@@ -99,10 +122,6 @@ describe('the technical-drawing language is gone', () => {
     expect(allCss()).not.toMatch(/counter-(reset|increment)|counter\(/);
   });
 
-  it('draws no leader lines from the labels', () => {
-    expect(read('../src/styles/stage.css')).not.toMatch(/\.part-label::before/);
-  });
-
   it('outlines no text — a stroke is a symptom of text laid over the object', () => {
     expect(allCss()).not.toMatch(/-webkit-text-stroke/);
   });
@@ -119,12 +138,12 @@ describe('the editorial pairing', () => {
     expect(read('../index.html')).not.toMatch(/Space\+Grotesk/);
   });
 
-  it('keeps mono loaded, because the 3D part labels still use it', () => {
+  it('leaves mono loaded despite its one user being gone, pending a styling call', () => {
+    // Space Mono was the 3D part labels' and nothing else's (index.html's own comment
+    // said so); the object is gone (this branch strips it), so nothing on the page sets
+    // --font-mono any more. Left loaded rather than pulled here -- deciding whether it
+    // survives is a styling call for a later task, not this one.
     expect(read('../index.html')).toMatch(/Space\+Mono/);
-  });
-
-  it('uses mono only on the object labels, never in the reading column', () => {
-    expect(read('../src/styles/stage.css')).toMatch(/\.part-label/);
     expect(read('../src/styles/sections.css')).not.toMatch(/Space Mono|monospace/i);
   });
 });
@@ -146,14 +165,6 @@ describe('the light spill is gone', () => {
   });
 });
 
-describe('the reading column', () => {
-  it('is placed by side, not run full width', () => {
-    const css = read('../src/styles/sections.css');
-    expect(css).toMatch(/\[data-side=["']?left["']?\]/);
-    expect(css).toMatch(/\[data-side=["']?right["']?\]/);
-  });
-});
-
 describe('the four room patterns', () => {
   it('styles every room pattern', () => {
     const css = read('../src/styles/sections.css');
@@ -162,9 +173,9 @@ describe('the four room patterns', () => {
     }
   });
 
-  it('gives the panel an opaque background, which is what makes it cover the object', () => {
-    // The slide-up is free: #stage is sticky and #content scrolls over it. A transparent
-    // panel would simply fail to cover anything.
+  it('gives the panel an opaque background', () => {
+    // It used to cover a viewport-pinned 3D object for free; that object is gone (this
+    // branch strips it), but the panel stays opaque -- see sections.css's own comment.
     const css = read('../src/styles/sections.css');
     const panel = css.slice(css.search(/\[data-room=['"]?panel/));
     expect(panel.slice(0, 600)).toMatch(/background/);
@@ -185,8 +196,6 @@ describe('the nav', () => {
 
 describe('accent discipline', () => {
   it('keeps the page accent as a named token', () => {
-    // The object's accent is the red gasket, set in materials.js; the page's is violet.
-    // They live at different scopes and must not be collapsed into one value.
     expect(read('../src/styles/base.css')).toMatch(/--accent/);
   });
 
@@ -195,57 +204,6 @@ describe('accent discipline', () => {
     // restyled control silently undoes it for that control alone, and nothing else on
     // the page would look any different. Cheap to assert, impossible to notice by eye.
     expect(allCss()).not.toMatch(/outline:\s*(none|0)\b/);
-  });
-});
-
-/** The object band's height on a phone, in dvh, read from the file that declares it. */
-function bandDvh() {
-  const css = read('../src/styles/stage.css');
-  const at = css.search(/@media\s*\(max-width:\s*767px\)/);
-  expect(at, 'no narrow-screen block at all').toBeGreaterThan(-1);
-  const band = css.slice(at).match(/#stage\s*\{[^}]*height:\s*(\d+)dvh/);
-  expect(band, 'the stage still spans the whole viewport on a phone').not.toBeNull();
-  return Number(band[1]);
-}
-
-describe('the narrow-screen composition', () => {
-  it('dims no canvas — the object holds a band of its own instead of hiding under text', () => {
-    // The rejected mitigation: fade the object to 30% and run text straight over it.
-    // The composition below replaces it, and this is what stops it coming back.
-    const offenders = leafRules(read('../src/styles/stage.css'))
-      .filter(({ selector, body }) => /canvas|#stage\b/.test(selector))
-      .filter(({ body }) => /(^|[;\s])opacity\s*:\s*0?\.\d/.test(body));
-    expect(offenders.map((r) => r.selector), 'the canvas is dimmed again').toEqual([]);
-  });
-
-  it('gives the object its own band, short enough to read beneath', () => {
-    expect(bandDvh(), 'the band leaves no room to read beneath it').toBeLessThan(60);
-  });
-
-  it('lands a jump link clear of the band, by reading the same number the band is set to', () => {
-    // Task 5 fixed this and left the two numbers coupled by a comment alone -- base.css's
-    // narrow-screen [data-section] { scroll-margin-top: 40dvh } claiming it "stays locked"
-    // to stage.css's #stage { height: 40dvh }. Nothing checked it. Retune the band and
-    // every jump link on a phone silently parks its heading behind it again: the nav's
-    // four section links are the main way anyone reaches the club's videos, roster and
-    // contact details on a phone, and the failure is invisible from the stylesheet, which
-    // still reads as though the two agreed.
-    //
-    // --nav-h is what this used to be, and it is the wrong obstruction below 768px: the
-    // nav is ~52-57px there and sits ON TOP of a 324.8px band, so it is the band's height
-    // a landing has to clear, not the bar's. Measured before the fix: a landed heading and
-    // its first paragraph sat roughly 268px up behind the band.
-    const css = read('../src/styles/base.css');
-    const at = css.search(/@media\s*\(max-width:\s*767px\)[^{]*\{[\s\S]*?\[data-section\]/);
-    expect(at, 'base.css no longer offsets a jump link at all on a phone').toBeGreaterThan(-1);
-    const offset = css.slice(at).match(/\[data-section\]\s*\{[^}]*scroll-margin-top:\s*(\d+)dvh/);
-    expect(offset, "the phone jump-link offset is no longer a dvh share of the viewport, so it " +
-      'cannot be compared with the band at all -- restate it in the band\'s own unit').not.toBeNull();
-    expect(Number(offset[1]),
-      'a jump link no longer lands clear of the object band: scroll-margin-top and #stage\'s ' +
-      'narrow-screen height have come apart, so a landed section\'s heading sits behind an ' +
-      'opaque band that also swallows its taps')
-      .toBe(bandDvh());
   });
 });
 
@@ -386,5 +344,28 @@ describe('the focus ring on every ground it is laid over', () => {
       `${offset}px under a ${spread}px spread) -- on the panel that band is the only part ` +
       'of the ring that contrasts at all, and at 1px any rounding erases it')
       .toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('the 3D system is gone', () => {
+  it('ships no three.js dependency', () => {
+    const pkg = JSON.parse(read('../package.json'));
+    expect(pkg.dependencies.three, 'three is still a dependency').toBeUndefined();
+  });
+
+  it('leaves no diabolo module behind', () => {
+    expect(existsSync(new URL('../src/diabolo', import.meta.url))).toBe(false);
+  });
+
+  it('imports three nowhere in src', () => {
+    // A stale import survives deletion of its subject and fails only at build time.
+    for (const file of sourceFiles()) {
+      expect(read(file), `${file} still imports three`).not.toMatch(/from ['"]three['"]/);
+    }
+  });
+
+  it('sticks nothing to the viewport', () => {
+    // The locking headings and the about-section lock were the same mechanism.
+    expect(allCss()).not.toMatch(/position:\s*sticky/);
   });
 });

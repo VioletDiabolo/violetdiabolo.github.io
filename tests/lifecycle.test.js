@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { createLifecycle } from '../src/diabolo/lifecycle.js';
+import { createLifecycle } from '../src/render/lifecycle.js';
 
 function listJsFiles(dir) {
   const out = [];

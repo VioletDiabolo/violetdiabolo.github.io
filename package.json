@@ -12,8 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "animejs": "^4.5.0",
-    "three": "^0.186.0"
+    "animejs": "^4.5.0"
   },
   "devDependencies": {
     "jsdom": "^25.0.1",
