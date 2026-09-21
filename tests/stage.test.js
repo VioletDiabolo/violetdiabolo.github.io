@@ -200,7 +200,10 @@ describe('overlay disposal', () => {
     // only route available. dispose() already frees geometry, materials and the
     // renderer but, unlike render() and resize() just above it (both of which already
     // loop `for (const overlay of overlays)`), never iterated overlays at all — leaking
-    // the CSS3D label subtree and the spill element's DOM node on every teardown.
+    // every registered overlay's DOM subtree on every teardown. That was two overlays when
+    // the defect was found; the light spill has since gone and the CSS3D label layer is
+    // the only one left, which is exactly why the assertion below is written against the
+    // LOOP rather than against a list of overlays that keeps changing.
     const source = readFileSync(new URL('../src/diabolo/stage.js', import.meta.url), 'utf8');
     expect(source).toMatch(/for\s*\(const overlay of overlays\)\s*overlay\.dispose\(\);/);
   });

@@ -216,19 +216,25 @@ describe('the grid room title size', () => {
     // Comments stripped first: they contain no braces of their own, so left in, the
     // greedy `[^{}]+` below walks straight through one and captures a comment's prose
     // as if it were the selector -- caught by running this once with the comment left in.
+    // matchAll, not match: without the /g flag this inspected the FIRST --type-title rule
+    // and nothing else, so the guard only ever covered a REPLACEMENT of that rule. Adding
+    // a second one further down the file -- which is the ordinary way a stylesheet grows,
+    // and exactly how the original defect arrived -- went unseen. The falsification that
+    // signed this off exercised a replacement and not an addition, so the gap survived it.
     const css = readFileSync(SECTIONS_CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-    const rule = css.match(/([^{}]+)\{\s*font-size:\s*var\(--type-title\);?\s*\}/);
-    expect(rule, 'no rule sets --type-title on an h2 any more -- update this test to match')
-      .not.toBeNull();
+    const rules = [...css.matchAll(/([^{}]+)\{\s*font-size:\s*var\(--type-title\);?\s*\}/g)];
+    expect(rules.length, 'no rule sets --type-title on an h2 any more -- update this test to match')
+      .toBeGreaterThan(0);
 
     document.body.innerHTML = `
       <section class="section" data-section="media" data-room="grid" data-side="center">
         <div class="room"><div class="room-head"><h2>Media</h2></div></div>
       </section>`;
     const h2 = document.querySelector('h2');
-    const selectors = rule[1].trim().split(',').map((s) => s.trim());
-    const leaking = selectors.filter((s) => h2.matches(s));
-    expect(leaking, "the shared title-size rule also matches a grid room's h2").toEqual([]);
+    const leaking = rules
+      .flatMap((rule) => rule[1].trim().split(',').map((s) => s.trim()))
+      .filter((s) => h2.matches(s));
+    expect(leaking, "a rule setting --type-title also matches a grid room's h2").toEqual([]);
   });
 
   it('gives the grid room its own, smaller h2 rule, so the guard above has something to protect', () => {
@@ -456,6 +462,234 @@ describe('scroll length against content', () => {
         `${id} is ${heights[id]}vh but its content measures ${tallest}vh at one of the three ` +
         `review widths, so the section will grow and every boundary below it will move`,
       ).toBeGreaterThanOrEqual(tallest);
+    }
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The object's band, and what may be held behind it.
+ *
+ * Below 768px #stage stops being a full-viewport backdrop and becomes an opaque 40dvh
+ * band at z-index 2 -- ABOVE #content -- with pointer-events: auto (stage.css). So the
+ * top 40% of a phone screen is not reading space: content there is covered, and the band
+ * takes the tap as well. Content SCROLLING through it is fine, because it arrives. HELD
+ * content never arrives, and that is the whole of this defect:
+ *
+ *   [data-room='grid'][data-side='center'] .room-head { position: sticky; top: 18vh }
+ *
+ * survived the narrow-screen block -- which resets `[data-room] .room` to static, but not
+ * the head, whose own rule is (0,3,0) -- and pinned MEDIA, BOARD and CONTACT's headings
+ * at 158.2-182.5px inside a 324.8px band, at every scroll position across their sections.
+ * Contact's whole head went with them: the sign-off (196.9-249), the club's email address
+ * (199.4-219.9), the Linktree (225.4-245.9) and all four socials (249-270.6). None of them
+ * visible, and none of them clickable either -- document.elementFromPoint at the centre of
+ * the mailto link returned #renderer, not the link.
+ *
+ * Nothing in this suite computes layout, so nothing saw it: 268 tests were green. What a
+ * jsdom test CAN see is the structural fact underneath -- which declaration actually wins
+ * for `position` and `top` on a phone. That is a cascade question, not a layout question,
+ * so it is answered here with the real selector engine (Element.matches) plus explicit
+ * specificity arithmetic, over the real rendered DOM.
+ *
+ * The arithmetic is deliberately narrow and refuses rather than guesses: a functional
+ * pseudo-class, an !important, a media condition or a `top` unit it was not built for
+ * fails this test with an instruction to extend it. Hand-rolled specificity that quietly
+ * gets an edge case wrong is how the --type-title bug above happened; a guard that stops
+ * at what it can prove cannot repeat it.
+ * ------------------------------------------------------------------------- */
+
+const STYLESHEETS = ['base.css', 'stage.css', 'sections.css'].map((f) => ({
+  name: f,
+  css: readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/styles/', f), 'utf8'),
+}));
+
+/** Media conditions this guard knows how to evaluate for a 375px-wide phone. */
+const NARROW_CONDITIONS = new Map([
+  ['(max-width: 767px)', true],
+  // Declares nothing positional, and true for a visitor who has not asked for less
+  // motion -- which is the case this guard is about.
+  ['(prefers-reduced-motion: no-preference)', true],
+]);
+
+/**
+ * Every leaf declaration block in source order, each tagged with the at-rule condition it
+ * sits under (null at the top level). One level of nesting is all these files use.
+ */
+function leafRulesWithMedia(css, sheet) {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [];
+  const scan = (source, condition) => {
+    let i = 0;
+    while (i < source.length) {
+      const brace = source.indexOf('{', i);
+      if (brace === -1) break;
+      const prelude = source.slice(i, brace).trim();
+      let depth = 1;
+      let j = brace + 1;
+      while (j < source.length && depth > 0) {
+        if (source[j] === '{') depth++;
+        else if (source[j] === '}') depth--;
+        j++;
+      }
+      const body = source.slice(brace + 1, j - 1);
+      if (body.includes('{')) scan(body, prelude.replace(/^@media\s*/, ''));
+      else rules.push({ sheet, condition, selector: prelude, body });
+      i = j;
+    }
+  };
+  scan(stripped, null);
+  return rules;
+}
+
+/**
+ * (a, b, c) for ONE compound/complex selector -- ids, then classes+attributes+
+ * pseudo-classes, then types+pseudo-elements. Throws on anything whose specificity is not
+ * this simple count, rather than returning a number that merely looks plausible: :not()
+ * taking its own argument's specificity is precisely the trap that shipped the
+ * --type-title defect this file also guards against.
+ */
+function specificity(selector) {
+  if (/:(?:not|is|where|has|nth-[\w-]+)\(/i.test(selector)) {
+    throw new Error(
+      `specificity(): "${selector}" uses a functional pseudo-class whose specificity is ` +
+      `not a plain token count. Extend this helper rather than trusting the count.`);
+  }
+  let s = ` ${selector} `;
+  const take = (re) => { const n = (s.match(re) || []).length; s = s.replace(re, ' '); return n; };
+  const attributes = take(/\[[^\]]*\]/g);
+  const pseudoElements = take(/::[\w-]+/g);
+  const pseudoClasses = take(/:[\w-]+/g);
+  const ids = take(/#[\w-]+/g);
+  const classes = take(/\.[\w-]+/g);
+  const types = take(/[a-zA-Z][\w-]*/g);
+  return [ids, classes + attributes + pseudoClasses, types + pseudoElements];
+}
+
+const beats = (a, b) => a[0] !== b[0] ? a[0] > b[0] : a[1] !== b[1] ? a[1] > b[1] : a[2] > b[2];
+
+/**
+ * The winning declaration of `property` on `element` at phone width, by the real cascade:
+ * every rule in effect below 768px whose selector actually matches, ranked by specificity
+ * and then by source order. Returns null when nothing sets it.
+ */
+function winningDeclaration(element, property, rules) {
+  let best = null;
+  rules.forEach((rule, order) => {
+    if (rule.condition !== null && !NARROW_CONDITIONS.get(rule.condition)) return;
+    const declaration = rule.body
+      .split(';')
+      .map((d) => d.trim())
+      .filter((d) => new RegExp(`^${property}\\s*:`).test(d))
+      .pop();
+    if (!declaration) return;
+    if (/!important/.test(declaration)) {
+      throw new Error(`winningDeclaration(): "${declaration}" is !important, which this ` +
+        `guard does not rank. Extend it rather than letting it mis-rank.`);
+    }
+    const value = declaration.slice(declaration.indexOf(':') + 1).trim();
+    for (const one of rule.selector.split(',').map((s) => s.trim()).filter(Boolean)) {
+      if (!element.matches(one)) continue;
+      const spec = specificity(one);
+      if (!best || !beats(best.spec, spec)) best = { spec, order, value, rule, selector: one };
+    }
+  });
+  return best;
+}
+
+/** A `top` offset as a percentage of the viewport height. Refuses units it cannot convert. */
+function topAsViewportPercent(value) {
+  const zero = /^0(\.0+)?$/.test(value.trim());
+  if (zero) return 0;
+  const match = value.trim().match(/^(-?[\d.]+)(dvh|svh|lvh|vh|%)$/);
+  if (!match) {
+    throw new Error(`topAsViewportPercent(): cannot convert "${value}" to a share of the ` +
+      `viewport. Extend this helper rather than skipping the offset.`);
+  }
+  return Number(match[1]);
+}
+
+describe('the object band on a phone', () => {
+  /** The band's own height, read from the file that declares it. */
+  const bandVh = () => {
+    const stage = STYLESHEETS.find((s) => s.name === 'stage.css').css;
+    const at = stage.search(/@media\s*\(max-width:\s*767px\)/);
+    expect(at, 'stage.css has no narrow-screen block at all').toBeGreaterThan(-1);
+    const band = stage.slice(at).match(/#stage\s*\{[^}]*height:\s*(\d+)dvh/);
+    expect(band, 'the stage no longer takes a band of its own on a phone').not.toBeNull();
+    return Number(band[1]);
+  };
+
+  /*
+   * The comparison runs the way that first reads as backwards, so it is spelled out: an
+   * offset is a distance DOWN from the top of the viewport, and the band occupies 0 to
+   * `band`. So a SMALLER offset is the dangerous one -- top: 18vh parks an element at 18%
+   * of the screen, inside a band that reaches 40%, while top: 40dvh sets it flush with
+   * the band's bottom edge and clear of it. Written the other way round this test passed
+   * against the unfixed stylesheet; it is only a guard because it was run against it.
+   */
+  it('holds nothing at an offset that parks it inside the band', () => {
+    const rules = STYLESHEETS.flatMap((s) => leafRulesWithMedia(s.css, s.name));
+
+    // Any condition this guard was not built to evaluate makes every answer below an
+    // under-approximation, so it fails here rather than passing on partial knowledge.
+    for (const rule of rules) {
+      if (rule.condition === null) continue;
+      expect(
+        NARROW_CONDITIONS.has(rule.condition),
+        `${rule.sheet} has an @media (${rule.condition}) this guard cannot evaluate -- ` +
+        `add it to NARROW_CONDITIONS with the value it takes on a 375px phone`,
+      ).toBe(true);
+    }
+
+    // The real page, not a hand-built fixture: a room, a head or a link added later is
+    // covered the day it is added rather than the day someone remembers to list it here.
+    const root = document.createElement('main');
+    renderSections(root);
+    applySectionSides(root);
+    document.body.replaceChildren(root);
+
+    const band = bandVh();
+    const held = [];
+    for (const element of root.querySelectorAll('*')) {
+      const position = winningDeclaration(element, 'position', rules);
+      if (!position || !/^(sticky|fixed)$/.test(position.value)) continue;
+      const top = winningDeclaration(element, 'top', rules);
+      const offset = top ? topAsViewportPercent(top.value) : 0;
+      if (offset >= band) continue;
+      const where = element.className || element.tagName.toLowerCase();
+      held.push(
+        `.${where} in [data-section=${element.closest('[data-section]')?.dataset.section}] is ` +
+        `held at top: ${top ? top.value : '0 (nothing sets it)'} -- ${offset}% of the viewport, ` +
+        `inside a ${band}dvh band -- by "${top ? top.selector : position.selector}" ` +
+        `(${(top ?? position).rule.sheet}` +
+        `${(top ?? position).rule.condition ? ` @media ${(top ?? position).rule.condition}` : ''}), ` +
+        `with position: ${position.value} from "${position.selector}". #stage is opaque and ` +
+        `above #content at this width, so this is parked out of sight for the whole of its ` +
+        `section, and the band swallows its taps too`);
+    }
+    expect(held, held.join('\n')).toEqual([]);
+  });
+
+  it('still pins the two rooms that are meant to be pinned, flush with the band', () => {
+    // Without this the test above passes just as well if every sticky rule on the page
+    // were deleted -- "nothing is held too high" is not the same claim as "the rooms that
+    // should hold, hold". Hero and showcase keep their composition on screen for the whole
+    // of their sections at this width; they sit at exactly the band's height, which is the
+    // smallest offset the rule above permits and the one that wastes no reading height.
+    const rules = STYLESHEETS.flatMap((s) => leafRulesWithMedia(s.css, s.name));
+    const root = document.createElement('main');
+    renderSections(root);
+    applySectionSides(root);
+    document.body.replaceChildren(root);
+
+    const band = bandVh();
+    for (const id of ['hero', 'events']) {
+      const room = root.querySelector(`[data-section='${id}'] .room`);
+      const position = winningDeclaration(room, 'position', rules);
+      expect(position?.value, `${id}'s room is no longer pinned on a phone`).toBe('sticky');
+      const top = winningDeclaration(room, 'top', rules);
+      expect(topAsViewportPercent(top.value), `${id}'s room is not flush with the band`)
+        .toBe(band);
     }
   });
 });

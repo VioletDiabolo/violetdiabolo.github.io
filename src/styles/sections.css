@@ -98,10 +98,18 @@ body { overflow-x: hidden; }
  * every boundary after it and desynchronises the rooms silently, in the browser, with the
  * stylesheet still reading as though it were aligned.
  *
- * The grid room's four sections are sized against content rather than against a tween: the
- * grid room's own beat (reassemble, spin, fade) is over by progress 0.595 -- 714vh -- and
- * everything after that is reading, not object. That is why board and contact are now the
- * two shortest sections on the page and not, as they were, two of the three longest.
+ * The grid room's four sections are sized against content rather than against a tween, and
+ * the justification is narrower than it used to be written here. It said the grid room's
+ * "own beat (reassemble, spin, fade) is over by progress 0.595". Only the FADE is over
+ * there: objectOpacity rides OPACITY_SETTLE and reaches 0 at 0.59498, while the reassembly
+ * runs on to f = 0.99 and spinRate does not reach its target until 1.00 (see
+ * scroll/choreography.js's own note on ROOMS).
+ *
+ * What is true at 0.595 -- 714vh -- is the thing the heights actually rest on: the object
+ * is INVISIBLE from there to the end of the page, still 97.55% apart when it goes. So
+ * nothing after 714vh is showing an object, whatever the scene graph is still doing, and
+ * everything after it is reading. That is why board and contact are now the two shortest
+ * sections on the page and not, as they were, two of the three longest.
  *
  * tests/sections-layout.dom.test.js pins both halves of this: the handovers against ROOMS,
  * and each section against the content measured inside it.
@@ -443,8 +451,21 @@ body { overflow-x: hidden; }
  * the requirement, the same proportion the old 240 held over its own 226 -- and it buys
  * the grid room the opening beat it wanted anyway: the title held at the left while the
  * object reassembles, spins up and goes. Measured against the new heights, the first card
- * becomes visible at 725vh, 11vh after the fade completes. Board and contact need
- * nothing: their cards arrive at progress 0.77 and 0.98, long after the object is gone.
+ * becomes visible at 734vh, 20vh after the fade completes at 714vh.
+ *
+ * That is measured at 1440x900 rather than derived, because the derivation this used to
+ * state -- "725vh, 11vh after the fade" from 660 + 165 - 100 -- leaves out .room's own
+ * padding-block, 81px at that height, which pushes the whole column down another 9vh.
+ * Measured resting top of the first card: 834vh, so it crosses the viewport's bottom edge
+ * at 734vh. (During the reveal it reads 735.3vh instead: .reveal-pending carries
+ * translateY(12px), and that is the state a card is in as it enters the viewport, before
+ * the observer fires. Same number, 1.3vh apart, depending which you mean.) The error was
+ * in the safe direction throughout -- the real margin over the fade is about twice what
+ * was claimed -- and the guarding test in tests/sections-layout.dom.test.js deliberately
+ * ignores the padding, which only ever makes it stricter, so only this prose was wrong.
+ *
+ * Board and contact need nothing: their cards arrive at progress 0.77 and 0.98, long
+ * after the object is gone.
  *
  * Scoped to data-side="center" deliberately. Under reduced motion src/ui/layout.js stamps
  * these sections 'left' instead, the whole section keeps to the reading column, and the
@@ -838,6 +859,18 @@ body { overflow-x: hidden; }
  * behind it -- which is the treatment the client rejected. Every room collapses to one
  * full-width column in reading order; the side anchoring and the pinned compositions
  * both only mean anything when there is a second half for the object to hold.
+ *
+ * The band costs something, though, and it is the one thing to keep in mind when editing
+ * anything below. #stage is opaque and sits at z-index 2, ABOVE #content (stage.css), so
+ * the top 40dvh of the viewport is not reading space at all: content there is not merely
+ * dim, it is covered, and the band takes the tap too (pointer-events: auto). Scrolling
+ * content simply passes behind it, which is the intended composition. HELD content does
+ * not pass: an element stuck at an offset above the band is parked out of sight for the
+ * whole of its section. That is why the two rooms still pinned here are pinned at
+ * exactly 40dvh, and why the grid rooms' title column is unpinned outright below --
+ * left at its desktop 18vh it held three headings, the club's email, the Linktree and
+ * every social link inside the band, unreadable and untappable, for the length of their
+ * sections. Any new offset at this width belongs at 40dvh or below it.
  * ------------------------------------------------------------------------- */
 
 @media (max-width: 767px) {
@@ -911,6 +944,41 @@ body { overflow-x: hidden; }
   [data-room] .room-body {
     display: block;
     margin-top: 0;
+  }
+
+  /*
+   * The grid rooms' sticky title column is UNPINNED here, and this is the one rule in
+   * this block that had to be written at full strength rather than at the strength that
+   * reads best.
+   *
+   * `[data-room] .room { position: static }` above resets the pinned rooms, but the grid
+   * head is pinned by its own rule -- [data-room='grid'][data-side='center'] .room-head,
+   * (0,3,0) -- and a reset written as `[data-room='grid'] .room-head` is (0,2,0) and
+   * simply loses to it, silently, in a block that reads as though it had won. Measured:
+   * with the short selector the head still computed `position: sticky; top: 146.16px` at
+   * 375x812. So the reset repeats the pinning selector exactly, which makes the two
+   * equally specific and lets source order -- this block is last in the file -- decide.
+   * tests/sections-layout.dom.test.js holds that pairing.
+   *
+   * Static rather than a smaller `top`, because at this width there is no second column
+   * for a held title to stand beside: `.room` is `display: block` above, so the head and
+   * the cards are one stack, and a head pinned anywhere is a head pinned OVER its own
+   * scrolling cards with nothing behind it. Measured at top: 40dvh, mid-media: the
+   * heading sat at 336.8-361.2 while a facade occupied 194.9-415.8, and
+   * elementFromPoint at the heading's own centre returned .media-facade -- the title
+   * laid over a photograph, which is the treatment this page does not use, plus a
+   * heading swallowing taps meant for the card beneath it.
+   *
+   * Left pinned at its desktop 18vh -- 146.16px of an 812px phone -- the head sat
+   * wholly inside the object's opaque 324.8px band (stage.css) for the entire length of
+   * its section: MEDIA and BOARD at 158.2-182.5 at every scroll position where they were
+   * held, and contact's whole head with them -- the sign-off, the club's email, the
+   * Linktree and all four socials, none of them ever visible while pinned and none of
+   * them clickable either (elementFromPoint at the email's centre returned #renderer;
+   * the band has pointer-events: auto and swallowed the tap).
+   */
+  [data-room='grid'][data-side='center'] .room-head {
+    position: static;
   }
 
   [data-room] .room-body { margin-top: clamp(1.5rem, 4vh, 2.25rem); }

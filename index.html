@@ -31,10 +31,21 @@
       Shown only when html[data-stage="unsupported"] (src/fallback/detect.js found no
       WebGL context). Built from the same two-mirrored-bowl / gasket-pair / hub-cone /
       axle assembly the 3D scene renders, and drawn the same way it is: near-black fills
-      from PART_COLORS and bright strokes from EDGE_COLORS (src/diabolo/materials.js),
-      so this reads as the same object rather than a placeholder for it. The gaskets keep
-      the object's one colour. The construction centreline that used to run down the
-      middle went with the technical-drawing language the page no longer speaks.
+      and bright strokes, so this reads as the same object rather than a placeholder for
+      it. The gaskets keep the object's one colour. The construction centreline that used
+      to run down the middle went with the technical-drawing language the page no longer
+      speaks.
+
+      The eight hexes below are a HAND-KEPT COPY of PART_COLORS and EDGE_COLORS
+      (src/diabolo/materials.js). Nothing derives them -- this is static markup with no
+      build step reaching into that module -- so they are a copy that has to be re-synced
+      by hand whenever the object's palette is retuned, which this branch did twice.
+      Editing one here without editing materials.js, or the reverse, is caught by
+      tests/materials.dom.test.js: it reads this SVG and asserts the two sets are equal
+      in both directions, so neither a palette change that missed this file nor a colour
+      invented here can pass. Do not treat that test as optional bookkeeping -- it is the
+      only thing connecting these two lists, and the visitors who see this drawing are
+      the ones least likely to be looked at.
     -->
     <!--
       No role/aria-label here: this SVG is purely decorative -- the page's text content

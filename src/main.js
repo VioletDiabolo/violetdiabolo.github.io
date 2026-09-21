@@ -25,6 +25,23 @@ function boot() {
 
   if (!supportsWebGL()) {
     document.documentElement.dataset.stage = 'unsupported';
+    // The same re-stamp the reduced-motion branch below does, and for the same reason
+    // one step further on: there is no object travelling through the rooms here either.
+    // stage.css swaps the canvas for a hand-built SVG of the same diabolo, pinned dead
+    // centre by `inset: 0; margin: auto` for the whole document -- ONE object position,
+    // so one correct reading side, exactly the case `staticAt` exists for.
+    //
+    // Left unstamped, media/board/contact kept the grid room's own 'center' and spread
+    // their cards across the full width, over a fallback the page has no way to fade or
+    // move: measured at 1440x900, the card column ran x 352-1368 against an SVG box at
+    // x 549-891, and the object's own drawn ink at 583-857 sat inside it. It also left
+    // media's 165vh hold-back in force -- 1485px of blank column held back for a fade
+    // that never happens -- because that rule is scoped to [data-side='center'] and so
+    // stops applying the moment this call stamps 'left'. Both halves, one line.
+    //
+    // HERO_ID rather than a literal 'hero': the same constant the reduced-motion branch
+    // and the choreography's own table use, so the three cannot drift apart.
+    applySectionSides(content, { staticAt: HERO_ID });
     return;
   }
 

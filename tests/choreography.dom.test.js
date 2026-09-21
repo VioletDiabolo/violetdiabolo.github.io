@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import {
-  createChoreography, ROOMS, PART_RANK, explodedY, LATERAL_SETTLE,
+  createChoreography, ROOMS, PART_RANK, explodedY, LATERAL_SETTLE, OPACITY_SETTLE,
 } from '../src/scroll/choreography.js';
 import { CAMERA_NEAR_Z, CAMERA_FOV } from '../src/diabolo/stage.js';
 import { buildDiabolo, HOME } from '../src/diabolo/build.js';
@@ -104,6 +104,53 @@ describe('the explosion is contained', () => {
     expect(first).toBeGreaterThan(0.05);
     expect(first).toBeLessThan(0.95);
     for (const id of moving) expect(progress(id), `${id} is out of step`).toBeCloseTo(first, 6);
+  });
+
+  it('is still almost fully apart inside the window this block is named for', () => {
+    // The four samples above are 0.10, 0.43, 0.55 and 1.0, and not one of them lands in
+    // f in [0.55, 0.595] -- the window where "contained" is actually decided. They check
+    // the ENDPOINTS: assembled before the showcase, apart at its end, assembled again at
+    // the end of the page. Every one of those passes on a page where the explosion is
+    // smeared across the grid room as well, which is what the page in fact does.
+    //
+    // So this samples inside it. What is contained is the exploded TARGET STATE, not the
+    // tween out of it: the reassembly runs the whole grid room (cupTop leaves rest at
+    // f = 0.3014 and is still off it at f = 0.99), and what stops any of it being seen is
+    // opacity. At f = 0.57 the object is 99.5% apart and already down to 0.59 opacity; by
+    // the time the fade completes at 0.595 it is still 97.6% apart. Both halves are
+    // asserted together, because either alone is the misleading one -- "still apart" on
+    // its own reads as a containment failure, and "already fading" on its own reads as
+    // though the reassembly had finished.
+    const { timeline, parts, state } = setup();
+    seekTo(timeline, 0.57);
+    const rest = HOME.cupTop.y, done = explodedY('cupTop');
+    const apart = (parts.cupTop.position.y - rest) / (done - rest);
+    expect(apart, 'the object has substantially reassembled by f = 0.57, so the grid room ' +
+      'now plays a visible reassembly rather than hiding one').toBeGreaterThan(0.9);
+    expect(state.objectOpacity, 'the object is still near-solid at f = 0.57 -- the fade is ' +
+      'what keeps the reassembly out of sight, and it is running late')
+      .toBeLessThan(0.7);
+    expect(state.objectOpacity, 'the object is already invisible at f = 0.57, so this sample ' +
+      'no longer sits inside the fade window it exists to measure').toBeGreaterThan(0);
+  });
+
+  it('is gone before the reassembly it is still in the middle of can be seen', () => {
+    // The claim the page's layout rests on, stated as a measurement rather than as the
+    // word "contained": at the moment the fade completes, the object is still almost
+    // entirely apart -- so nothing after that point is reading a reassembly, it is
+    // reading nothing at all. This is what lets board and contact be the two shortest
+    // sections on the page. Independently reproduced in docs/VERIFICATION.md, which
+    // measured 97.5-100% across the same window.
+    const { timeline, parts, state } = setup();
+    const gridStart = ROOMS.at(-2).end;
+    const fadeDone = gridStart + (ROOMS.at(-1).end - gridStart) * OPACITY_SETTLE;
+    seekTo(timeline, fadeDone);
+    expect(state.objectOpacity, 'the fade has not finished where OPACITY_SETTLE says it does')
+      .toBeCloseTo(0, 3);
+    const rest = HOME.cupTop.y, done = explodedY('cupTop');
+    const apart = (parts.cupTop.position.y - rest) / (done - rest);
+    expect(apart, 'the object is materially reassembled by the time it disappears, which ' +
+      'would mean the grid room shows part of the reassembly after all').toBeGreaterThan(0.95);
   });
 
   it('never writes the spinner, which the render loop owns', () => {

@@ -19,9 +19,28 @@
  * boldness is spent; everything around it stays quiet.
  *
  * Colour is rationed to two rings that never meet. The object's is the red gasket
- * (materials.js, object scope). The page's is --accent below, violet, and it appears in
- * four places only: the panel's sheet, the nav's call to action, the showcase's two form
- * pills, and a focus ring. Nothing else on the page is coloured.
+ * (materials.js, object scope). The page's is --accent below, violet. One page accent,
+ * one object accent, and they are never collapsed into each other -- that is the rule,
+ * and it holds.
+ *
+ * What does NOT hold, and used to be claimed here, is that the page accent "appears in
+ * four places only". It is spent on two kinds of thing, and the second kind is easy to
+ * forget when reading this file alone:
+ *
+ *   as an AREA, where it is the loudest thing on the page and is rationed hard --
+ *     the panel room's sheet, the nav's call to action, and the showcase's two form
+ *     pills. Three surfaces, all of them asking a visitor to turn up or press something.
+ *
+ *   as a MARK, small and on the near-black ground, where it reads as "this is live" --
+ *     every link (`a` below), the focus ring, .board-position, .part-label-index on the
+ *     object's own labels, and the hover/focus rings on .media-facade and
+ *     .semester-select (all sections.css/stage.css).
+ *
+ * The second list is not an erosion of the first; it is what an accent is for. But a
+ * file that IS the design contract has to describe itself correctly, so it is written
+ * out rather than undercounted. The constraint worth defending is the one above: the
+ * violet is the page's and the red is the object's, and nothing else on the page is
+ * coloured at all.
  */
 
 :root {
@@ -37,14 +56,25 @@
    *      crest's 276) taken up to a lightness that can carry near-black text: --accent-ink
    *      on --accent measures 7.05:1, so the panel is a AAA reading surface and the CTA
    *      pill's label clears AA with room to spare. The crest value itself, #57068c,
-   *      manages 1.66:1 against the same ink and cannot carry text at all. On the ground
-   *      it runs the other way: --accent on --stage is 7.15:1, which is what makes the
-   *      focus ring and the body links legible without a second colour. ---- */
+   *      manages 1.72:1 against the same ink and cannot carry text at all. On the ground
+   *      it runs the other way: --accent on --stage is 7.14:1, which is what makes the
+   *      focus ring and the body links legible without a second colour.
+   *
+   *      Every ratio in this file is WCAG 2.x relative luminance --
+   *      L = 0.2126R + 0.7152G + 0.0722B on linearised sRGB, (L1+0.05)/(L2+0.05) --
+   *      recomputed from the hexes beside it rather than carried forward. Three figures
+   *      that had been carried forward did not survive that: the crest's was 1.66 and is
+   *      1.7154; --accent/--stage was 7.15 in three places here and is 7.1355, so 7.14;
+   *      and --ink-dim's is below. ---- */
   --accent:     #c676ff;
   --accent-ink: #0a0810; /* the near-black that sits ON the accent, never on --stage */
 
   --ink:     #f5f2fa; /* 18.20:1 on --stage */
-  --ink-dim: #aaa2b8; /* 8.34:1 on --stage -- a de-emphasis, not a contrast compromise */
+  /* 8.22:1, not the 8.34 this said for most of the branch -- recomputed, and the same
+     figure docs/VERIFICATION.md measured against live pixels. Still a de-emphasis well
+     clear of AAA body text, not a contrast compromise; the wrong number was never
+     load-bearing, but a design contract that rounds in its own favour is not one. */
+  --ink-dim: #aaa2b8; /* 8.22:1 on --stage */
 
   /* ---- Type. The display voice is a HAIRLINE GROTESQUE, not a serif, and that is the
    *      one call in this pass worth stating outright: an Inter 200 headline set at 9rem
@@ -188,8 +218,8 @@ a:hover {
  *
  * Pills are filled in --surface rather than left translucent on purpose: a pill's label
  * has the moving object behind it for most of the page, and a translucent fill makes its
- * contrast a function of whatever the canvas happens to be drawing. Opaque, it is 16.5:1
- * everywhere, measurably and permanently.
+ * contrast a function of whatever the canvas happens to be drawing. Opaque, its label is
+ * 16.63:1 everywhere, measurably and permanently.
  * ------------------------------------------------------------------------- */
 
 .site-nav {
@@ -213,8 +243,11 @@ a:hover {
  * call to action disappears into a field of its own colour. Neither is something the
  * nav can detect and react to without a scroll listener, so instead every chip carries
  * its own edge and the nav is correct on any ground it is ever laid over. Measured
- * against the panel: dark chips 15.6:1, the ringed call to action 7.05:1 for its label
- * with a 7.15:1 edge marking the control itself.
+ * against the panel: a dark chip's own label is 16.63:1 (--ink on --surface, and the
+ * chip is opaque, so the panel behind it changes nothing), the chip itself stands off
+ * the violet at 6.52:1 (--surface on --accent), and the ringed call to action is 7.05:1
+ * for its label with a 7.14:1 edge marking the control. The single "dark chips 15.6:1"
+ * this replaces was neither of the two real numbers and matched nothing in the file.
  */
 .site-nav-mark,
 .site-nav-links a,
@@ -332,7 +365,7 @@ a:hover {
 /* ---------------------------------------------------------------------------
  * Accessibility: a keyboard user must always be able to see where they are. The accent
  * is the page's mark of "attention has landed on a control", so it is the focus ring
- * too -- 7.15:1 against the near-black ground everywhere except the fixed nav.
+ * too -- 7.14:1 against the near-black ground everywhere except the fixed nav.
  *
  * The nav is `position: fixed` at z-index 3 and is laid over whatever room has scrolled
  * underneath it -- the near-black ground for most of the page, but the panel room's own
@@ -344,17 +377,34 @@ a:hover {
  * here as the fix, on the theory that the nav's ring would inherit the panel's override
  * the way the panel's own text does. It never can: the nav is prepended straight to
  * <body> (main.js), a sibling of #content, never a descendant of `[data-room='panel']`
- * -- so that selector cannot match anything the nav ever draws. Checked the other
- * direction too: `[data-room='panel']` (a heading, a paragraph, a photograph) has zero
- * focusable descendants of its own, so the rule had no element it could ever reach
- * either way and is removed rather than kept -- a rule nothing can trigger is not a
- * defence, whatever it looks like sitting in the file.
+ * -- so that selector cannot match anything the nav ever draws. That half of the
+ * reasoning stands, and it is why the nav needs the treatment below.
  *
- * The nav can't detect which ground is behind it without a scroll listener (the same
- * constraint its permanent stage-coloured edge ring exists for, in the comment above
- * .site-nav-mark), so its focus ring is made correct on ANY ground instead, the same
- * way that ring already is: two tones, layered so the OUTER edge -- the one actually
- * touching whatever is really behind the chip -- is always the tone that ground needs.
+ * The other half went too far. It also concluded that `[data-room='panel']` has no
+ * focusable descendants of its own, so the selector could never reach anything either
+ * way, and dropped it. True of today's markup and a bad reason to leave the room
+ * undefended: the panel is the club's OWN STORY (content/index.js ABOUT.body), the one
+ * place on the page where prose is likely to grow a link, and this room is 216vh of a
+ * 1300vh page. A link added there today would take the global ring above -- --accent on
+ * a full-bleed --accent sheet, 1.00:1 -- and be invisible to a keyboard user for a sixth
+ * of the page, with nothing failing anywhere. "No element can trigger it" is a reason to
+ * write a rule carefully, not a reason to leave the one room whose ground is known to
+ * break the default ring with no rule at all.
+ *
+ * So both grounds are covered, by the same two tones rather than by two different ideas:
+ *
+ *   the nav can't detect which ground is behind it without a scroll listener (the same
+ *   constraint its permanent stage-coloured edge ring exists for, in the comment above
+ *   .site-nav-mark), so its ring is made correct on ANY ground;
+ *
+ *   the panel's ground is known -- its own violet sheet -- but not uniformly: the room
+ *   also carries a photograph (PHOTOS.group), and a link wrapping one would sit on
+ *   arbitrary pixels rather than on the sheet. A single tone picked for the violet would
+ *   go quiet there, so the panel takes the same any-ground ring instead of a second,
+ *   narrower answer that is right until the markup changes.
+ *
+ * Two tones, layered so the OUTER edge -- the one actually touching whatever is really
+ * behind the element -- is always the tone that ground needs.
  * ------------------------------------------------------------------------- */
 
 :focus-visible {
@@ -365,7 +415,7 @@ a:hover {
 /*
  * --ink on --stage is 18.20:1 (root token comment above); on the panel's --accent it is
  * 2.55:1 -- the same figure task 5 measured for the white wordmark text and rejected.
- * --stage on the panel is 7.15:1 (the accent/stage pair, read the other way -- contrast
+ * --stage on the panel is 7.14:1 (the accent/stage pair, read the other way -- contrast
  * ratio does not care which is foreground); on --stage itself it is 1:1, same as the
  * chips' own resting edge. Neither token alone clears 3:1 on both grounds, so the ring
  * uses both, stage on the outside: outline-color: ink is the band that shows on the
@@ -373,10 +423,32 @@ a:hover {
  * not just up to it -- repeats the chip's dark edge far enough out to read as a second,
  * separate ring specifically where the outline itself goes quiet. Measured against live
  * canvas/panel pixels: see .superpowers/sdd/task-5-fixes-report.md, finding 2.
+ *
+ * The spread is 7px, not the 6px it shipped at, and the reason is worth a line because a
+ * single pixel of it is doing all the work on the violet. Measured outward from the
+ * element's border box, with `outline: 2px` at `outline-offset: 3px` over a shadow spread
+ * of S, the painted bands are:
+ *
+ *     stage [0, 3)      ink [3, 5)      stage [5, S)
+ *
+ * On the panel the ink band is 2.55:1 and fails 3:1 on its own, so that trailing stage
+ * band -- 7.14:1 -- is the entire visible difference between focused and unfocused there.
+ * At S = 6 it is ONE CSS pixel wide, and one pixel is not a margin: half a device pixel
+ * of offset rounding, or anyone later widening the outline to 3px "to make focus clearer",
+ * erases the only band that can be seen and makes the ring worse by trying to improve it.
+ * S = 7 makes it 2px. Nothing else about the ring changes, and on the near-black ground
+ * the page mostly is, the ink band was never the one at risk.
  */
-.site-nav :focus-visible {
+.site-nav :focus-visible,
+/*
+ * The panel room joins the nav here rather than getting a violet-specific ring of its
+ * own -- see the block comment above for why the room needs a rule at all today, and why
+ * the same any-ground treatment is the right one for a room that is mostly a flat sheet
+ * but also carries a photograph.
+ */
+[data-room='panel'] :focus-visible {
   outline-color: var(--ink);
-  box-shadow: 0 0 0 6px var(--stage);
+  box-shadow: 0 0 0 7px var(--stage);
 }
 
 /* ---------------------------------------------------------------------------

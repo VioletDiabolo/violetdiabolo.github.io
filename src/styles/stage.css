@@ -73,6 +73,18 @@ html[data-stage='unsupported'] .stage-fallback {
  * pointer-events returns to auto so a tap in the band is swallowed by the band rather
  * than reaching whatever content happens to be hidden behind it.
  *
+ * Read that last clause as the constraint it is, not as reassurance. Text SCROLLING
+ * behind the band is fine -- it is on its way somewhere and it arrives. Text HELD behind
+ * it never arrives: a sticky offset smaller than this height parks an element inside an
+ * opaque box that also eats its clicks, for as long as the offset holds it there. So
+ * every held offset below 768px has to be at or below this height, and sections.css's
+ * own narrow-screen block is where they all live -- its two pinned rooms sit at exactly
+ * 40dvh, and the grid rooms' title column is unpinned there rather than given a smaller
+ * one. The cost of getting that wrong is measured, not hypothetical: at the desktop
+ * 18vh, three section headings and every contact link on the page sat inside this band
+ * at 158-271px for the whole of their sections, invisible, with elementFromPoint at the
+ * club's own email address returning #renderer.
+ *
  * The third declaration is not here. #content's -100dvh pull-up has to be cancelled at
  * this width too -- with the stage no longer a full viewport tall it would drag the hero
  * up UNDER the band -- but that property belongs to sections.css, which loads after this

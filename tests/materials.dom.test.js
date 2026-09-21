@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { LineBasicMaterial, MeshBasicMaterial } from 'three';
 import {
   PART_COLORS, EDGE_COLORS, ACCENT, createMaterials, disposeMaterials, flattenMaterials,
@@ -204,5 +207,64 @@ describe('flattenMaterials', () => {
     for (const mat of flattenMaterials(m)) mat.dispose = () => disposed.push(mat);
     disposeMaterials(m);
     expect(disposed).toEqual(flattenMaterials(m));
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The unsupported-WebGL fallback, which draws the same object in hand-written SVG.
+ *
+ * index.html's comment says its colours are "near-black fills from PART_COLORS and bright
+ * strokes from EDGE_COLORS (src/diabolo/materials.js)". Nothing derived them: eight hexes
+ * are typed into the markup. They were correct, and that is not the same as being safe --
+ * this branch restyled the object's palette twice, each time needing a manual re-sync
+ * nothing checked, and the failure mode is a fallback drawn in a palette the page stopped
+ * using, seen only by visitors with no WebGL, who are the least likely to be reviewed.
+ *
+ * Both directions are asserted, because each catches what the other cannot: forwards, that
+ * every palette value reached the markup (a retuned colour that was not copied across);
+ * backwards, that the markup invents none of its own (a hand-picked hex that no longer
+ * corresponds to any part). Either direction alone is satisfiable by a stale file.
+ * ------------------------------------------------------------------------- */
+describe('the fallback SVG really is drawn in the object palette', () => {
+  // A plain path, not `new URL(..., import.meta.url)`: under this file's jsdom
+  // environment Vitest's global URL shim resolves relative file: URLs against
+  // http://localhost:3000 instead of the filesystem, so readFileSync(url) throws
+  // "The URL must be of scheme file". Same workaround, same reason, as
+  // tests/sections-layout.dom.test.js and tests/ui.dom.test.js.
+  const INDEX_HTML = path.join(path.dirname(fileURLToPath(import.meta.url)), '../index.html');
+
+  const fallbackSvg = () => {
+    const html = readFileSync(INDEX_HTML, 'utf8');
+    const svg = html.match(/<svg class="stage-fallback"[\s\S]*?<\/svg>/);
+    expect(svg, 'index.html no longer carries a .stage-fallback SVG at all').not.toBeNull();
+    return svg[0];
+  };
+
+  const palette = () => [
+    ...Object.entries(PART_COLORS).map(([part, hex]) => [`PART_COLORS.${part}`, hex]),
+    ...Object.entries(EDGE_COLORS).map(([part, hex]) => [`EDGE_COLORS.${part}`, hex]),
+  ];
+
+  it('uses every fill and every edge colour the object is built from', () => {
+    const svg = fallbackSvg().toLowerCase();
+    const missing = palette()
+      .filter(([, hex]) => !svg.includes(hex.toLowerCase()))
+      .map(([name, hex]) => `${name} (${hex})`);
+    expect(missing,
+      `the fallback SVG in index.html has fallen behind materials.js: ${missing.join(', ')} ` +
+      'appears nowhere in it. Those hexes are hand-copied, not derived, so retuning the ' +
+      'palette leaves the no-WebGL fallback drawn in the old one.').toEqual([]);
+  });
+
+  it('invents no colour of its own', () => {
+    const known = new Set(palette().map(([, hex]) => hex.toLowerCase()));
+    const used = [...fallbackSvg().toLowerCase().matchAll(/#[0-9a-f]{3,8}\b/g)].map((m) => m[0]);
+    expect(used.length, 'the fallback SVG declares no colours at all any more')
+      .toBeGreaterThanOrEqual(known.size);
+    const strays = [...new Set(used)].filter((hex) => !known.has(hex));
+    expect(strays,
+      `the fallback SVG uses ${strays.join(', ')}, which is not any part's fill or edge in ` +
+      'materials.js -- either the palette moved on without it, or the fallback has grown a ' +
+      'colour of its own and stopped being the same object').toEqual([]);
   });
 });

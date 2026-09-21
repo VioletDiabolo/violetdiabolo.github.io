@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { HOME } from '../src/diabolo/build.js';
 // Read once, from the real module, before it gets wholesale-mocked below — so the
 // mock re-exports the same camera constants entrance.js and choreography.js import,
@@ -164,5 +167,113 @@ describe('reduced motion boot path', () => {
     for (const id of ['board', 'contact']) {
       expect(document.querySelector(`[data-section="${id}"]`).dataset.side, id).toBe(hero.textSide);
     }
+  });
+});
+
+// jsdom implements no IntersectionObserver. The reduced-motion block above never needs
+// one -- initReveal returns early when prefersReducedMotion() is true (src/ui/reveal.js)
+// -- but this path deliberately leaves that preference FALSE, because "no WebGL" and
+// "wants less motion" are independent, and conflating them would test the wrong branch.
+// So boot() reaches initReveal's real observerFactory and needs the global to exist. The
+// stub supplies a missing jsdom global and nothing more: it does not touch, wrap or
+// weaken main.js, initReveal or applySectionSides, which is what these tests measure.
+if (typeof globalThis.IntersectionObserver === 'undefined') {
+  globalThis.IntersectionObserver = class IntersectionObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
+describe('unsupported-WebGL boot path', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    document.documentElement.removeAttribute('data-stage');
+    document.body.innerHTML = '';
+  });
+
+  /**
+   * Same wiring as the block above, with supportsWebGL false instead of
+   * prefersReducedMotion true. createStage is still stubbed even though this path never
+   * calls it: main.js imports diabolo/stage.js statically, so the module is evaluated
+   * either way, and stubbing it keeps this block independent of three.js exactly as the
+   * reduced-motion block is.
+   */
+  const boot = async () => {
+    vi.doMock('../src/fallback/detect.js', () => ({
+      supportsWebGL: () => false,
+      prefersReducedMotion: () => false,
+    }));
+    vi.doMock('../src/diabolo/stage.js', () => ({
+      resolveQualityTier: () => 'base',
+      readSignals: () => ({}),
+      createStage: () => stubStage(),
+      CAMERA_FOV,
+      CAMERA_NEAR_Z,
+      CAMERA_FAR_Z,
+    }));
+    document.body.innerHTML =
+      '<div id="stage"><canvas id="renderer"></canvas><div id="label-layer"></div></div>' +
+      '<main id="content"></main>';
+    await import('../src/main.js');
+  };
+
+  it('reads every section against the one place the fallback object is drawn', async () => {
+    // The sibling of the reduced-motion test above, and it was missing for the same
+    // reason that one was needed: this path has no travelling object either. stage.css
+    // hides the canvas and shows a hand-built SVG of the same diabolo pinned dead centre
+    // (`position: absolute; inset: 0; margin: auto` inside a sticky #stage), so it holds
+    // the middle of the viewport for the entire document and nothing ever fades or moves
+    // it. One object position means one correct reading side.
+    //
+    // Before this, boot() returned before any re-stamp, media/board/contact kept the grid
+    // room's own 'center', and their card columns ran the full width straight across the
+    // fallback: measured at 1440x900, cards x 352-1368 against an SVG box at x 549-891
+    // whose drawn ink runs 583-857 -- the object entirely inside the card column, with no
+    // opacity to take it away. Stamped 'left' the column ends at x 552 and the ink starts
+    // at 583.5, a 31.5px gap.
+    await boot();
+
+    expect(document.documentElement.dataset.stage).toBe('unsupported');
+    const hero = ROOMS.find((r) => r.id === HERO_ID);
+    for (const room of ROOMS) {
+      const el = document.querySelector(`[data-section="${SECTION_FOR_ROOM[room.id]}"]`);
+      expect(el.dataset.side, SECTION_FOR_ROOM[room.id]).toBe(hero.textSide);
+    }
+    // The grid room's own side differs, so this is a real re-stamp and not the default
+    // path happening to agree.
+    expect(document.querySelector('[data-section="media"]').dataset.side)
+      .not.toBe(ROOMS.at(-1).textSide);
+    // board and contact are outside SECTION_FOR_ROOM -- media is the grid room's one
+    // canonical section -- but sections.js stamps them data-room="grid" too, so
+    // applySectionSides' fallback pass has to reach them as well.
+    for (const id of ['board', 'contact']) {
+      expect(document.querySelector(`[data-section="${id}"]`).dataset.side, id).toBe(hero.textSide);
+    }
+  });
+
+  it('lets media\'s hold-back lapse, rather than holding a column back for a fade that never comes', async () => {
+    // The second half of the same defect, and the half that would have survived a test
+    // written only against data-side. sections.css holds media's card column back by
+    // 165vh so its first row clears the object's fade -- 1485px at 1440x900. There is no
+    // fade on this path and nothing to wait for, so that is 1.65 screens of blank column
+    // in front of the club's videos. The stylesheet already argues this in its own words
+    // and already scopes the rule to [data-side='center']; what was missing was anything
+    // making this path stop being 'center'. Asserting the SELECTOR no longer matches, not
+    // a pixel value, is what ties the two halves together: stamp 'center' here again and
+    // this fails even though the stylesheet is untouched.
+    await boot();
+
+    const media = document.querySelector('[data-section="media"]');
+    expect(media.matches("[data-section='media'][data-side='center']"),
+      'media still matches the hold-back selector, so 165vh of blank column applies to a ' +
+      'path with no object fade to wait for').toBe(false);
+
+    // And the rule really is the one scoped that way -- otherwise the assertion above
+    // would be checking a selector the stylesheet no longer uses.
+    const css = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/styles/sections.css'), 'utf8');
+    expect(css, 'the hold-back is no longer scoped to the centred column')
+      .toMatch(/\[data-section='media'\]\[data-side='center'\]\s*\.room-body\s*\{[^}]*margin-top:\s*\d+vh/);
   });
 });

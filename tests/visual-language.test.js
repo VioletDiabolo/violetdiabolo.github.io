@@ -198,6 +198,16 @@ describe('accent discipline', () => {
   });
 });
 
+/** The object band's height on a phone, in dvh, read from the file that declares it. */
+function bandDvh() {
+  const css = read('../src/styles/stage.css');
+  const at = css.search(/@media\s*\(max-width:\s*767px\)/);
+  expect(at, 'no narrow-screen block at all').toBeGreaterThan(-1);
+  const band = css.slice(at).match(/#stage\s*\{[^}]*height:\s*(\d+)dvh/);
+  expect(band, 'the stage still spans the whole viewport on a phone').not.toBeNull();
+  return Number(band[1]);
+}
+
 describe('the narrow-screen composition', () => {
   it('dims no canvas — the object holds a band of its own instead of hiding under text', () => {
     // The rejected mitigation: fade the object to 30% and run text straight over it.
@@ -209,11 +219,172 @@ describe('the narrow-screen composition', () => {
   });
 
   it('gives the object its own band, short enough to read beneath', () => {
-    const css = read('../src/styles/stage.css');
-    const at = css.search(/@media\s*\(max-width:\s*767px\)/);
-    expect(at, 'no narrow-screen block at all').toBeGreaterThan(-1);
-    const band = css.slice(at).match(/#stage\s*\{[^}]*height:\s*(\d+)dvh/);
-    expect(band, 'the stage still spans the whole viewport on a phone').not.toBeNull();
-    expect(Number(band[1]), 'the band leaves no room to read beneath it').toBeLessThan(60);
+    expect(bandDvh(), 'the band leaves no room to read beneath it').toBeLessThan(60);
+  });
+
+  it('lands a jump link clear of the band, by reading the same number the band is set to', () => {
+    // Task 5 fixed this and left the two numbers coupled by a comment alone -- base.css's
+    // narrow-screen [data-section] { scroll-margin-top: 40dvh } claiming it "stays locked"
+    // to stage.css's #stage { height: 40dvh }. Nothing checked it. Retune the band and
+    // every jump link on a phone silently parks its heading behind it again: the nav's
+    // four section links are the main way anyone reaches the club's videos, roster and
+    // contact details on a phone, and the failure is invisible from the stylesheet, which
+    // still reads as though the two agreed.
+    //
+    // --nav-h is what this used to be, and it is the wrong obstruction below 768px: the
+    // nav is ~52-57px there and sits ON TOP of a 324.8px band, so it is the band's height
+    // a landing has to clear, not the bar's. Measured before the fix: a landed heading and
+    // its first paragraph sat roughly 268px up behind the band.
+    const css = read('../src/styles/base.css');
+    const at = css.search(/@media\s*\(max-width:\s*767px\)[^{]*\{[\s\S]*?\[data-section\]/);
+    expect(at, 'base.css no longer offsets a jump link at all on a phone').toBeGreaterThan(-1);
+    const offset = css.slice(at).match(/\[data-section\]\s*\{[^}]*scroll-margin-top:\s*(\d+)dvh/);
+    expect(offset, "the phone jump-link offset is no longer a dvh share of the viewport, so it " +
+      'cannot be compared with the band at all -- restate it in the band\'s own unit').not.toBeNull();
+    expect(Number(offset[1]),
+      'a jump link no longer lands clear of the object band: scroll-margin-top and #stage\'s ' +
+      'narrow-screen height have come apart, so a landed section\'s heading sits behind an ' +
+      'opaque band that also swallows its taps')
+      .toBe(bandDvh());
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The focus ring, on both grounds it is ever laid over.
+ *
+ * `:focus-visible { outline: 2px solid var(--accent) }` is 7.14:1 on the near-black ground
+ * the page mostly is, and 1.00:1 on the panel room's full-bleed --accent sheet -- accent
+ * on accent, literally no ring. Two things sit on that sheet: the fixed nav, which scrolls
+ * over the whole 216vh of it, and anything focusable inside the room itself. The override
+ * that rescues both is a single rule, and until now nothing in this suite mentioned it:
+ * delete it and keyboard focus is invisible for a sixth of the page with a green suite.
+ *
+ * Asserting the rule EXISTS would be the weak version of this -- it would pass on a rule
+ * that set the ring to another invisible colour. What is asserted instead is the property
+ * the two tones exist to provide: between them, some band of the ring clears 3:1 against
+ * every ground the ring is laid over. The ratios are recomputed here from the tokens in
+ * base.css by the WCAG formula, so changing a token to something that no longer works
+ * fails this too, not just deleting the rule.
+ * ------------------------------------------------------------------------- */
+
+/** WCAG 2.x relative luminance of a #rrggbb colour. */
+function luminance(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * base.css with its comments removed. Every match below has to run against this rather
+ * than the raw file: base.css's accessibility block quotes a whole CSS rule in prose --
+ * "`[data-room='panel'] :focus-visible { outline-color: var(--accent-ink) }` used to sit
+ * here as the fix" -- and a greedy `[^{}]*` walks straight into it and captures the
+ * COMMENT as if it were the live rule. Caught by running this once without the strip: it
+ * reported a one-tone ring that does not exist anywhere in the file. The identical
+ * workaround, for the identical reason, is in tests/sections-layout.dom.test.js.
+ */
+const baseCss = () => read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+
+/** The :root colour tokens, read from the file that declares them. */
+function tokens() {
+  const css = baseCss();
+  const root = css.slice(css.indexOf(':root'), css.indexOf('}', css.indexOf(':root')));
+  return Object.fromEntries(
+    [...root.matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\s*;/gi)].map((m) => [m[1], m[2].toLowerCase()]),
+  );
+}
+
+describe('the focus ring on every ground it is laid over', () => {
+  /** Contrast a ring band must reach to read as a band at all (WCAG non-text, 1.4.11). */
+  const MIN = 3;
+
+  /**
+   * The grounds a focus ring is drawn on, and why each one is in the list. Both are
+   * declared in the stylesheets, so a room that stopped being violet would show up here
+   * as a failure to find it rather than as a silently shorter list.
+   */
+  const grounds = () => {
+    const t = tokens();
+    const sections = read('../src/styles/sections.css');
+    expect(sections, "the panel room no longer fills itself with the accent, so this list of " +
+      'grounds is out of date').toMatch(/\[data-room='panel'\]\s*\{[^}]*background:\s*var\(--accent\)/);
+    return [
+      ['the near-black page ground', t['--stage']],
+      ['the panel room\'s violet sheet', t['--accent']],
+    ];
+  };
+
+  it('is invisible on the panel without an override, which is why the override exists', () => {
+    // The negative control. Without it the test below could pass on a page where the
+    // default ring was already fine everywhere and the override was decoration.
+    const t = tokens();
+    const css = baseCss();
+    const global = css.match(/(?:^|\n):focus-visible\s*\{[^}]*outline:\s*[^;]*var\((--[\w-]+)\)/);
+    expect(global, 'there is no global focus ring at all any more').not.toBeNull();
+    const ring = t[global[1]];
+    expect(contrast(ring, t['--stage']), 'the global ring stopped working on the page ground')
+      .toBeGreaterThanOrEqual(MIN);
+    expect(contrast(ring, t['--accent']),
+      'the global ring now works on the violet too -- if that is deliberate, this whole ' +
+      'block and the override it guards can go')
+      .toBeLessThan(MIN);
+  });
+
+  it('keeps a band that reads on the page ground AND on the panel, for the nav and the panel room', () => {
+    const t = tokens();
+    const css = baseCss();
+
+    // The one rule that carries the two-tone ring, whatever its selector list has grown to.
+    const rule = css.match(/([^{}]*:focus-visible[^{}]*)\{([^}]*outline-color[^}]*)\}/);
+    expect(rule, 'nothing overrides the focus ring any more -- on the panel it is now ' +
+      'accent on accent, 1.00:1, and a keyboard user cannot see where they are')
+      .not.toBeNull();
+
+    const selectors = rule[1].split(',').map((s) => s.trim()).filter(Boolean);
+    // Both contexts that are laid over the violet have to be covered. The nav is a sibling
+    // of #content (main.js prepends it to <body>), so a [data-room='panel'] selector can
+    // never reach it and it needs naming separately -- that is the trap the rule this
+    // replaced fell into.
+    expect(selectors.some((s) => /\.site-nav\b/.test(s)),
+      'the fixed nav is no longer covered, and it is over the violet sheet for 216vh')
+      .toBe(true);
+    expect(selectors.some((s) => /\[data-room='panel'\]/.test(s)),
+      "the panel room's own focusable content is no longer covered; a link in the club's " +
+      'story would get a 1.00:1 ring')
+      .toBe(true);
+
+    const body = rule[2];
+    const bands = [...body.matchAll(/var\((--[\w-]+)\)/g)].map((m) => t[m[1]]);
+    expect(bands.filter(Boolean).length,
+      'the ring is down to one tone, so it cannot be correct on two different grounds')
+      .toBeGreaterThanOrEqual(2);
+
+    for (const [name, ground] of grounds()) {
+      const best = Math.max(...bands.map((band) => contrast(band, ground)));
+      expect(best, `no band of the focus ring reaches ${MIN}:1 on ${name} -- best is ` +
+        `${best.toFixed(2)}:1, so focus is invisible there`).toBeGreaterThanOrEqual(MIN);
+    }
+  });
+
+  it('spreads the outer band wider than the outline it has to show past', () => {
+    // The band that carries the violet is the shadow's, and only the part of it OUTSIDE
+    // the outline is visible: with outline 2px at offset 3px over a spread of S, the
+    // painted bands are stage [0,3), ink [3,5), stage [5,S). At S = 6 that last band is
+    // one CSS pixel, and one pixel is the whole of the difference between focused and
+    // unfocused on the panel. This keeps at least two.
+    const css = baseCss();
+    const width = Number(css.match(/:focus-visible\s*\{[^}]*outline:\s*(\d+)px/)[1]);
+    const offset = Number(css.match(/:focus-visible\s*\{[^}]*outline-offset:\s*(\d+)px/)[1]);
+    const spread = Number(css.match(/:focus-visible[^{}]*\{[^}]*box-shadow:[^;]*?(\d+)px\s+var\(/)[1]);
+    expect(spread - (offset + width),
+      `the outer band is ${spread - (offset + width)}px wide (outline ${width}px at offset ` +
+      `${offset}px under a ${spread}px spread) -- on the panel that band is the only part ` +
+      'of the ring that contrasts at all, and at 1px any rounding erases it')
+      .toBeGreaterThanOrEqual(2);
   });
 });
