@@ -24,6 +24,10 @@ export function createSmoothScroll({
   // Lenis owns the scroll position, so a native anchor jump would fight it and land
   // at the wrong offset. Intercept in-page links and hand them to Lenis instead.
   const onClick = (event) => {
+    // A modified click (new tab/window/download) or a non-primary button is the
+    // visitor opting out of an in-page jump; preventDefault() below would otherwise
+    // swallow that gesture regardless of the modifier. Leave these to the browser.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target.closest?.('a[href^="#"]');
     if (!link) return;
     const id = link.getAttribute('href').slice(1);

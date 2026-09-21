@@ -95,7 +95,8 @@ No WebGL → a static CSS gradient approximating the shader's resting state, und
 
 ## 4. Scroll
 
-**Lenis** (~3 KB gzipped) provides inertia.
+**Lenis** (~5.4 KB gzipped — the installed 1.3.26's actual bundle delta, measured
+before/after) provides inertia.
 
 - **Disabled entirely under `prefers-reduced-motion`** — native scrolling, no interception.
 - Nav anchors route through `lenis.scrollTo` so in-page links still work.

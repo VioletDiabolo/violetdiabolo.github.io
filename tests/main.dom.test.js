@@ -187,6 +187,9 @@ describe('the gradient mount, with a working GL context', () => {
     expect(window.__vd?.gradient).toBeDefined();
     expect(window.__vd?.lifecycle).toBeDefined();
     expect(typeof window.__vd.lifecycle.start).toBe('function');
+    // main.js (Task 4) assigns smooth into window.__vd alongside gradient and
+    // lifecycle; nothing here previously asserted it actually lands there.
+    expect(window.__vd?.smooth).toBeDefined();
     // The initial fit() reached the GL layer (confirms the mount really ran against
     // this stub, not a short-circuited path). No draw call is expected here: jsdom's
     // IntersectionObserver stub never reports an intersection, so createLifecycle's
