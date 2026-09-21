@@ -20,21 +20,39 @@ function compile(gl, type, source) {
  * Owns the WebGL state for one fullscreen gradient and nothing else — no scroll
  * knowledge, no DOM beyond the canvas it was handed.
  *
- * Returns null rather than throwing when WebGL is unavailable, so the caller can fall
- * back without a try/catch: content is never gated behind the graphics.
+ * Returns null rather than throwing on any failure — no WebGL context, a shader that
+ * fails to compile, or a program that fails to link — so the caller can fall back
+ * without a try/catch: content is never gated behind the graphics. Every GL object
+ * created before the failure is deleted before returning, so a failed attempt leaves
+ * nothing orphaned on the context. Compile and link failures are still reported via
+ * `console.error` with the driver's info log, so a bad shader stays loud in the
+ * console even though it is quiet to the caller.
  */
 export function createGradient({ canvas, palette = PALETTE }) {
   const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
   if (!gl) return null;
 
-  const vs = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fs = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-  const program = gl.createProgram();
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error(`program failed to link: ${gl.getProgramInfoLog(program)}`);
+  let vs;
+  let fs;
+  let program;
+  try {
+    vs = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+    fs = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+    program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error(`program failed to link: ${gl.getProgramInfoLog(program)}`);
+    }
+  } catch (err) {
+    // Loud on purpose: a swallowed compile/link error would make the next shader
+    // edit (Task 7's job) miserable to debug.
+    console.error('[gradient]', err.message);
+    if (vs) gl.deleteShader(vs);
+    if (fs) gl.deleteShader(fs);
+    if (program) gl.deleteProgram(program);
+    return null;
   }
   gl.deleteShader(vs);
   gl.deleteShader(fs);
@@ -68,6 +86,9 @@ export function createGradient({ canvas, palette = PALETTE }) {
   let height = canvas.height;
 
   return {
+    // Assumes the useProgram/buffer/attribute state bound above stays current for
+    // this module's lifetime — true only because each instance owns its canvas
+    // exclusively; a second instance sharing one canvas would need to re-bind.
     render(delta = 0) {
       time += delta;
       gl.uniform1f(uTime, time);
