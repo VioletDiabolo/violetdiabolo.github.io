@@ -32,13 +32,27 @@ function boot() {
     gradient.resize(width, height);
   };
   fit();
-  window.addEventListener('resize', fit);
 
   if (prefersReducedMotion()) {
-    // Exactly one frame. No lifecycle, so nothing is ever scheduled again.
+    // One frame, repainted after every resize instead of scheduled just once.
+    // gradient.resize() reassigns canvas.width/height, which clears the WebGL drawing
+    // buffer as a side effect; with no lifecycle running to draw a next frame, reusing
+    // the animated path's bare `fit` listener here would leave the canvas permanently
+    // transparent after the first resize (a mobile orientation change fires one). This
+    // handler is self-contained instead -- it re-fits AND re-renders -- and it only
+    // ever runs synchronously in direct response to the browser's own resize event:
+    // not a lifecycle, not a rAF loop, not a timer. Nothing is scheduled here that the
+    // browser didn't already schedule by firing the event.
+    const paintAfterResize = () => {
+      fit();
+      gradient.render(0);
+    };
     gradient.render(0);
+    window.addEventListener('resize', paintAfterResize);
     return;
   }
+
+  window.addEventListener('resize', fit);
 
   const cap = createFrameCap();
   const lifecycle = createLifecycle({
