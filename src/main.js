@@ -1,118 +1,112 @@
 import { buildNav } from './ui/nav.js';
 import { renderSections } from './ui/sections.js';
-import { applySectionSides } from './ui/layout.js';
 import { initReveal } from './ui/reveal.js';
-import { createStage, resolveQualityTier, readSignals } from './diabolo/stage.js';
-import { createLabels } from './diabolo/labels.js';
-import { createLifecycle } from './diabolo/lifecycle.js';
-import { createChoreography, PROFILE_X, HERO_ID } from './scroll/choreography.js';
-import { createEntrance } from './scroll/entrance.js';
 import { supportsWebGL, prefersReducedMotion } from './fallback/detect.js';
+import { createGradient } from './gradient/gradient.js';
+import { createLifecycle } from './render/lifecycle.js';
+import { createFrameCap, renderSize } from './render/budget.js';
+import { createSmoothScroll } from './scroll/smooth.js';
 
 export const APP_NAME = 'violet-diabolo';
 
 function boot() {
   const content = document.getElementById('content');
-  document.body.prepend(buildNav());
   renderSections(content);
-  applySectionSides(content);
-  // Mounted unconditionally, before the WebGL branch below, so every section fades
-  // into place the same way regardless of stage state (live, static, or unsupported).
+  document.body.prepend(buildNav());
+  // Mounted before any graphics branch: content must never wait on WebGL.
   initReveal();
-
-  const stageEl = document.getElementById('stage');
-  const canvas = document.getElementById('renderer');
 
   if (!supportsWebGL()) {
     document.documentElement.dataset.stage = 'unsupported';
-    // The same re-stamp the reduced-motion branch below does, and for the same reason
-    // one step further on: there is no object travelling through the rooms here either.
-    // stage.css swaps the canvas for a hand-built SVG of the same diabolo, pinned dead
-    // centre by `inset: 0; margin: auto` for the whole document -- ONE object position,
-    // so one correct reading side, exactly the case `staticAt` exists for.
-    //
-    // Left unstamped, media/board/contact kept the grid room's own 'center' and spread
-    // their cards across the full width, over a fallback the page has no way to fade or
-    // move: measured at 1440x900, the card column ran x 352-1368 against an SVG box at
-    // x 549-891, and the object's own drawn ink at 583-857 sat inside it. It also left
-    // media's 165vh hold-back in force -- 1485px of blank column held back for a fade
-    // that never happens -- because that rule is scoped to [data-side='center'] and so
-    // stops applying the moment this call stamps 'left'. Both halves, one line.
-    //
-    // HERO_ID rather than a literal 'hero': the same constant the reduced-motion branch
-    // and the choreography's own table use, so the three cannot drift apart.
-    applySectionSides(content, { staticAt: HERO_ID });
     return;
   }
 
-  const tier = resolveQualityTier(readSignals());
-  const stage = createStage({ canvas, tier });
-  // Registered after construction, not inside createStage: labels need stage.parts,
-  // and the stage needs the labels as an overlay — constructor-time wiring would be
-  // circular. See stage.js's addOverlay for the seam this uses.
-  const labels = createLabels({
-    parts: stage.parts,
-    tilt: stage.tilt,
-    container: document.getElementById('label-layer'),
-    state: stage.state,
-  });
-  stage.addOverlay(labels);
-  window.addEventListener('resize', stage.resize);
-
-  const reducedMotion = prefersReducedMotion();
-  document.documentElement.dataset.stage = reducedMotion ? 'static' : 'live';
-
-  // Exposed for external verification tooling.
-  window.__vd = { stage, lifecycle: null, choreography: null, entrance: null };
-
-  const attachScroll = () => {
-    // Created here, not earlier: the entrance and the scroll timeline both write part
-    // positions, and two live timelines on one property fight.
-    // #content, not #stage: the stage is position:sticky and its rect never travels,
-    // so a ScrollObserver watching it would sit at progress 0 forever.
-    window.__vd.choreography = createChoreography({
-      parts: stage.parts,
-      tilt: stage.tilt,
-      state: stage.state,
-      camera: stage.camera,
-      scrollTarget: content,
-    });
-  };
-
-  const entrance = createEntrance({
-    parts: stage.parts,
-    tilt: stage.tilt,
-    camera: stage.camera,
-    // Under reduced motion nothing drives a repaint, so attaching the scroll timeline
-    // would mutate part positions against a canvas that never redraws — the scene data
-    // and the pixels would diverge. Assembled and face-on is the whole experience.
-    onComplete: reducedMotion ? () => {} : attachScroll,
-  });
-  window.__vd.entrance = entrance;
-
-  if (reducedMotion) {
-    // Re-stamped for the static object below. The call in boot()'s opening lines gives
-    // each section its own room's side, which is right only while the object travels
-    // through those rooms. Here it never does: entrance.skip() parks it at the hero
-    // room's position, at full opacity, and no scroll timeline is ever attached, so one
-    // object position has to serve every section. Without this the media section keeps
-    // the grid room's centred column and reads straight through an object that is
-    // sitting, permanently and undimmed, where the hero left it.
-    applySectionSides(content, { staticAt: HERO_ID });
-    // No lifecycle: its render loop applies a continuous idle spin every frame purely
-    // from elapsed time (diabolo/stage.js's rotationDeltas), with no user input driving
-    // it. That is exactly the autoplaying motion reduced-motion users must not get.
-    // entrance.skip() resolves the object to its assembled, face-on state with no scroll
-    // timeline attached (see onComplete above), so nothing ever mutates it again.
-    entrance.skip();
-    // A static face-on view hides the labels and shows the parts stacked inside each
-    // other. Profile with labels visible is the readable still of the same diagram.
-    stage.tilt.rotation.x = PROFILE_X;
-    stage.state.labelOpacity = 1;
-    stage.render(0);
-  } else {
-    window.__vd.lifecycle = createLifecycle({ element: stageEl, onFrame: stage.render });
+  const canvas = document.getElementById('gradient');
+  const gradient = createGradient({ canvas });
+  if (!gradient) {
+    document.documentElement.dataset.stage = 'unsupported';
+    return;
   }
+
+  const fit = () => {
+    const { width, height } = renderSize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
+    gradient.resize(width, height);
+  };
+  fit();
+
+  if (prefersReducedMotion()) {
+    // One frame, repainted after every resize instead of scheduled just once.
+    // gradient.resize() reassigns canvas.width/height, which clears the WebGL drawing
+    // buffer as a side effect; with no lifecycle running to draw a next frame, reusing
+    // the animated path's bare `fit` listener here would leave the canvas permanently
+    // transparent after the first resize (a mobile orientation change fires one). This
+    // handler is self-contained instead -- it re-fits AND re-renders -- and it only
+    // ever runs synchronously in direct response to the browser's own resize event:
+    // not a lifecycle, not a rAF loop, not a timer. Nothing is scheduled here that the
+    // browser didn't already schedule by firing the event.
+    const paintAfterResize = () => {
+      fit();
+      gradient.render(0);
+    };
+    gradient.render(0);
+    window.addEventListener('resize', paintAfterResize);
+    return;
+  }
+
+  // Without IntersectionObserver, createLifecycle's default observerFactory throws a
+  // ReferenceError the moment it is called (`new IntersectionObserver(...)`) -- but only
+  // once it IS called, which happens well after createSmoothScroll has already wired up
+  // Lenis below. Lenis installs a `wheel` listener and calls preventDefault() on every
+  // cancelable one as soon as smoothWheel is on, regardless of whether anything ever pumps
+  // its raf() to turn that into an actual scroll -- and with no lifecycle to drive onFrame,
+  // nothing here would. The visible result would be worse than the thrown error: a wheel
+  // that does nothing and nav links (also intercepted by Lenis's own click handler) that
+  // go dead, on a page that looks loaded.
+  //
+  // Returning here, before either constructor runs, avoids both failures at once instead
+  // of guarding one and leaving the other: Lenis is never constructed, so the wheel and
+  // nav clicks fall through to the browser's native handling, and createLifecycle is never
+  // constructed either, so there is nothing left to throw.
+  //
+  // Placed BELOW the reduced-motion branch deliberately. Above it, a visitor who has
+  // both reduced motion and a browser without IntersectionObserver took this path and
+  // lost paintAfterResize -- gradient.resize() is never called here, so the boot frame
+  // persists and CSS stretches it on rotate. That is milder than the transparent canvas
+  // that bug once caused, but it is still strictly less than the reduced-motion branch
+  // gives. This path is that branch MINUS the resize repaint, not the same shape as it.
+  if (typeof IntersectionObserver === 'undefined') {
+    gradient.render(0);
+    return;
+  }
+
+  window.addEventListener('resize', fit);
+
+  const smooth = createSmoothScroll({
+    reduced: false, // this branch is already past the reduced-motion return
+    onVelocity: (v) => gradient.setVelocity(v),
+  });
+
+  const cap = createFrameCap();
+  const lifecycle = createLifecycle({
+    element: canvas,
+    onFrame: (delta) => {
+      // Lenis is driven every frame, ahead of the cap below: the cap throttles only the
+      // gradient's draw call, and stepping Lenis at that same reduced rate would make the
+      // inertia stutter.
+      //
+      // Unconditional, and provably safe to be: createSmoothScroll returns null for
+      // exactly one input, `reduced: true` (src/scroll/smooth.js), and the call above
+      // passes the literal `false` because this branch already returned for a
+      // reduced-motion visitor. An `if (smooth)` here read as a real fallback and was
+      // not one.
+      smooth.raf(performance.now());
+      const elapsed = cap(delta);
+      if (elapsed > 0) gradient.render(elapsed);
+    },
+  });
+  lifecycle.start();
+
+  window.__vd = { ...(window.__vd ?? {}), gradient, lifecycle, smooth };
 }
 
 if (typeof document !== 'undefined') {

@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Contrast probe</title>
+<!--
+  WHY THIS FILE EXISTS, AND WHY IT IS COMMITTED RATHER THAN THROWN AWAY.
+
+  Task 7's report published a table of 26 text blocks with their worst-case contrast
+  ratios and claimed "26 of 26 pass, tightest margin 1.17x". The probe that produced it
+  was a scratch artifact and was deleted, which made the table unverifiable and
+  un-rerunnable -- the third time on this branch a measurement was reported from a page
+  that no longer existed. scripts/check-shader.html was committed because a reviewer
+  asked for exactly that pattern to stop. This is the same fix for the same habit.
+
+  It also closes the specific gap that cost the design pass its acceptance: five
+  hand-written "composite" figures in base.css and sections.css were NOT source-over
+  composites of the shipped tokens (every one overstated the composite's green channel,
+  and so understated the contrast). Those numbers now have a machine that recomputes
+  them from the tokens on disk.
+
+  WHAT IT DERIVES RATHER THAN ASSUMES. Nothing here is typed in twice:
+
+    * the gradient's three stops come from `PALETTE` (src/gradient/palette.js);
+    * the arithmetic comes from `relativeLuminance` / `contrastRatio` / `worstCase` /
+      `TIME_STEPS` (src/gradient/contrast.js) -- the same exports the unit suite pins;
+    * the shader comes from `VERTEX_SHADER` / `FRAGMENT_SHADER` (src/gradient/shader.js);
+    * every text colour, font size, font weight and SURFACE CHAIN is read with
+      getComputedStyle off the real page, loaded in an iframe. The block list below is a
+      list of SELECTORS, not of colours: if a rule changes, this page reports the change
+      instead of repeating last month's number.
+
+  The only thing it states rather than measures is WHICH 26 blocks matter, and that is
+  the design contract itself.
+
+  TWO COLUMNS, because they answer different questions:
+
+    measured -- the brightest gradient pixel inside each block's own viewport band at
+      its natural resting scroll position, per time step, composited through that
+      block's surface chain, minimised by worstCase(). What the page actually reaches.
+
+    bound -- the same chain composited over each of the gradient's three arithmetic
+      extremes (deep, mid, bright), minimised. Because every colour the shader emits is
+      a component-wise mix along those stops, this is a GUARANTEE over every frame and
+      every scroll position, not a sample. It is the number the design is certified
+      against, and it is the one that has to clear the requirement.
+
+  The bound is not always at the bright end: near-black ink on a translucent LIGHT pill
+  (the nav CTA, the form buttons) has the DARKEST gradient as its worst ground, which is
+  why all three stops are evaluated rather than just the ceiling.
+
+  backdrop-filter is deliberately ignored: blurring averages, so the blurred value lies
+  between the band's min and its max, and taking the max is strictly conservative for
+  light text on a dark surface. It is NOT conservative for the near-black-on-light
+  pills, which is exactly why those are bounded at `deep` as well.
+
+  SECTION 4 IS A DIFFERENT KIND OF CHECK, added after a reviewer found the nav a second
+  time: the contact panel's mailto: link and the nav's own pill row both painted content
+  outside the viewport at a 32px root font (200% text zoom), silently, because
+  sections.css sets `body { overflow-x: hidden }` -- no scrollbar, just missing content.
+  That combination is exactly what `document.documentElement.scrollWidth >
+  document.documentElement.clientWidth` means, so it is asserted directly at the two
+  narrow widths those fixes were measured against (375 and 280, both 812 tall) rather
+  than trusted to stay fixed. The pass/fail is which of the real page's OWN elements
+  (under #content or .site-nav, including those two themselves, not only their
+  descendants) paint past clientWidth, measuring each one's OWN painted ink via a Range
+  as well as its box -- both were real gaps found writing this section, not hypothetical
+  ones: the nav bar's own unpinned width (base.css's `.site-nav`) is invisible to a scan
+  that only walks descendants, and a heading's overlong single word (base.css's shared
+  `h1, h2, h3` rule) can paint past a box that never itself grows, which a scan of
+  `getBoundingClientRect()` alone cannot see. `scrollWidth`/`clientWidth` are printed
+  alongside for the literal claim the brief asked for, and -- as of fix pass 3 -- checked
+  directly as well: pass requires BOTH zero named offenders AND scrollWidth ===
+  clientWidth exactly. The raw pair is asserted, not just printed, because a fixed
+  decorative canvas (`#gradient`) sits outside both scanned subtrees (#content,
+  .site-nav) and could in principle move that pair on its own with nothing an
+  offender-scan would ever name -- which is exactly what its old `width: 100vw; height:
+  100vh` risked reintroducing (see base.css). Equality holds exactly at both widths with
+  every fix in this file's own list applied, so asserting it costs nothing.
+
+  RUN IT:  npm run dev  ->  http://localhost:5173/scripts/check-contrast.html
+           ?width=1440&height=900&steps=12   (defaults; all three are overridable, so
+           the phone case can be re-run without editing this file)
+
+  Not part of the build: Vite's only entry is index.html, and vite.config.js declares no
+  rollupOptions.input. Not a CI gate -- the unit suite cannot run WebGL and cannot
+  resolve getComputedStyle against real layout, which is the whole reason this is a page.
+
+  Results land on window.__contrastProbe.result once `ready` resolves, so a headless
+  driver reads the same numbers this page prints.
+-->
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 1.5rem;
+    background: #08060d; color: #f5f2fa;
+    font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  h1 { font-size: 1rem; font-weight: 600; margin: 0 0 1rem; letter-spacing: 0.02em; }
+  h2 { font-size: 0.8rem; font-weight: 600; margin: 1.5rem 0 0.4rem; color: #aaa2b8; letter-spacing: 0.08em; }
+  pre { margin: 0; white-space: pre; overflow-x: auto; }
+  .ok { color: #7ee787; }
+  .bad { color: #ff7b72; }
+  .wait { color: #d8b45a; }
+  /* The page under test has to lay out at its real width, so the frame keeps its real
+     size and is scaled only for display. transform does not change the layout viewport. */
+  #stage { width: 100%; height: 340px; overflow: hidden; border-radius: 6px; margin-top: 0.5rem; }
+  #page { border: 0; transform-origin: top left; }
+</style>
+</head>
+<body>
+<h1>Contrast probe &mdash; the page's text blocks over a moving gradient</h1>
+
+<h2>1 &middot; tokens and stops, read off disk</h2>
+<pre id="tokens" class="wait">loading the page…</pre>
+
+<h2>2 &middot; surface composites (source-over, sRGB)</h2>
+<pre id="surfaces" class="wait">waiting…</pre>
+
+<h2>3 &middot; every text block, measured and bounded</h2>
+<pre id="blocks" class="wait">waiting…</pre>
+
+<h2>4 &middot; horizontal overflow at 200% text zoom</h2>
+<pre id="overflow" class="wait">waiting…</pre>
+
+<h2>5 &middot; the page under test</h2>
+<div id="stage"><iframe id="page" src="../index.html" title="Violet Diabolo"></iframe></div>
+
+<script type="module">
+import { PALETTE } from '../src/gradient/palette.js';
+import { VERTEX_SHADER, FRAGMENT_SHADER } from '../src/gradient/shader.js';
+import {
+  TIME_STEPS, relativeLuminance, contrastRatio, worstCase,
+} from '../src/gradient/contrast.js';
+
+const $ = (id) => document.getElementById(id);
+const say = (id, text, cls) => { const el = $(id); el.textContent = text; el.className = cls ?? ''; };
+
+const params = new URLSearchParams(location.search);
+const int = (name, fallback, lo, hi) => {
+  const v = Number.parseInt(params.get(name) ?? '', 10);
+  return Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
+};
+const W = int('width', 1440, 240, 4096);
+const H = int('height', 900, 320, 4096);
+// Defaults to contrast.js's own TIME_STEPS so the sample count and the module agree
+// unless the caller deliberately says otherwise.
+const STEPS = int('steps', TIME_STEPS, 1, 64);
+const STEP_SECONDS = 5.5; // 12 x 5.5s = a 66s window, wider than one noise cycle
+
+/* ---------------------------------------------------------------------------
+ * Colour plumbing. Everything is 0-255 integers, because that is what the framebuffer
+ * hands back and what the browser composites in.
+ * ------------------------------------------------------------------------- */
+
+/** `rgb(1, 2, 3)` / `rgba(1, 2, 3, 0.8)` / `rgb(1 2 3 / 80%)` -> { rgb, a }, or null. */
+function parseColor(value) {
+  const m = /rgba?\(([^)]+)\)/.exec(value ?? '');
+  if (!m) return null;
+  const parts = m[1].split(/[,\s/]+/).filter(Boolean);
+  const n = parts.map((p) => (p.endsWith('%') ? parseFloat(p) / 100 : parseFloat(p)));
+  if (n.length < 3 || n.slice(0, 3).some((v) => !Number.isFinite(v))) return null;
+  const a = n.length > 3 && Number.isFinite(n[3]) ? n[3] : 1;
+  return { rgb: n.slice(0, 3).map((v) => Math.round(v)), a };
+}
+
+/** #rrggbb -> [r, g, b]. Tokens are hexes; computed colours come back as rgb() strings. */
+const hexToRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const anyColor = (v) => (v.trim().startsWith('#') ? hexToRgb(v.trim()) : parseColor(v)?.rgb);
+
+/**
+ * Plain source-over in sRGB, per channel, rounded to 8 bits: the composite the browser
+ * actually paints. NOT a linear-light blend and not a luminance mix -- the five figures
+ * this probe replaces in base.css were neither, and that is the entire defect.
+ */
+const over = (src, alpha, dst) => src.map((c, i) => Math.round(alpha * c + (1 - alpha) * dst[i]));
+
+/** Apply a surface chain (outermost first) to a ground colour. */
+const composite = (ground, chain) => chain.reduce((g, layer) => over(layer.rgb, layer.a, g), ground);
+
+const stop255 = (stop) => stop.map((c) => Math.round(c * 255));
+const rgbText = (c) => `rgb(${c.map((v) => String(v).padStart(3)).join(',')})`;
+
+const STOPS = {
+  deep: stop255(PALETTE.deep),
+  mid: stop255(PALETTE.mid),
+  bright: stop255(PALETTE.bright),
+};
+const STOP_NAMES = Object.keys(STOPS);
+
+/* ---------------------------------------------------------------------------
+ * The design contract: which blocks have to be readable. Selectors only -- colour,
+ * size, weight and surface chain all come off the live page.
+ * ------------------------------------------------------------------------- */
+const BLOCKS = [
+  ['nav wordmark', '.site-nav-mark'],
+  ['nav pill', '.site-nav-links a'],
+  ['nav CTA "Join us"', '.site-nav-cta'],
+  ['hero h1', '#hero h1'],
+  ['hero tagline', '#hero .room-head p'],
+  ['teaser heading', '.teaser-when'],
+  ['teaser detail', '.teaser-where'],
+  ['teaser link', '.teaser-link'],
+  ['story h2 (ABOUT US)', '#about h2'],
+  ['story body (serif)', '#about .room-head p'],
+  ['feature h2 (EVENTS)', '#events h2'],
+  ['feature body', '#events .room-body > p'],
+  ['form card label', '.form-card h3'],
+  ['form button label', '.form-card button'],
+  ['grid h2 (MEDIA)', '#media h2'],
+  ['media card title', '.media-card h3'],
+  ['grid h2 (BOARD)', '#board h2'],
+  ['semester select', '.semester-select'],
+  ['board name', '.board-card h3'],
+  ['board position', '.board-position'],
+  ['board bio', '.board-card p:not(.board-position)'],
+  ['grid h2 (CONTACT US)', '#contact h2'],
+  ['contact line', '#contact .room-head > p'],
+  ['contact email link', '#contact .room-head > p a'],
+  ['socials link', '.socials a'],
+  ['footer line', '.footer-line'],
+];
+
+/** WCAG 1.4.3: 18pt (24px), or 14pt bold (18.66px), drops the requirement to 3:1. */
+const requirement = (px, weight) => (px >= 24 || (px >= 18.66 && weight >= 700) ? 3 : 4.5);
+
+/* ---------------------------------------------------------------------------
+ * The page under test.
+ * ------------------------------------------------------------------------- */
+const settle = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function loadPage() {
+  const frame = $('page');
+  frame.width = W;
+  frame.height = H;
+  frame.style.transform = `scale(${Math.min(1, (document.body.clientWidth - 48) / W)})`;
+  await new Promise((resolve) => {
+    if (frame.contentDocument?.readyState === 'complete') resolve();
+    else frame.addEventListener('load', resolve, { once: true });
+  });
+  const doc = frame.contentDocument;
+  const win = frame.contentWindow;
+  // main.js boots on DOMContentLoaded and renders synchronously; give the font loader
+  // and a layout pass a chance before anything is measured.
+  //
+  // setTimeout, NOT requestAnimationFrame. rAF is throttled to near zero in a hidden or
+  // backgrounded tab, which is exactly where this page tends to run -- a preview pane
+  // reports document.hidden === true -- and a probe that waits on a frame that never
+  // comes hangs instead of reporting. check-shader.html's live preview makes the same
+  // call for the same reason.
+  if (doc.fonts?.ready) await Promise.race([doc.fonts.ready, settle(500)]);
+  await settle(120);
+  // Scroll reveal starts panels at opacity 0 / translateY(12px). That is a transform on
+  // the boxes about to be measured, so it is cleared first -- the probe measures the
+  // page at rest, not mid-animation.
+  for (const el of doc.querySelectorAll('.reveal-pending')) {
+    el.classList.remove('reveal-pending', 'reveal-visible');
+  }
+  // Reading a geometry property flushes the style and layout the line above dirtied,
+  // so the rects below are the cleared page's, not the revealing one's.
+  void doc.documentElement.scrollHeight;
+  await settle(120);
+  return { doc, win };
+}
+
+/**
+ * Every painted layer between a block's text and the canvas, outermost first.
+ *
+ * The walk stops at <body> on purpose. body's background IS opaque --stage, but
+ * #gradient is `position: fixed; z-index: 0` and paints ON TOP of it, with #content at
+ * z-index 1 painting on top of that. So the canvas -- not the body -- is the ground
+ * every panel composites over, and including body here would turn every translucent
+ * surface into an opaque one and hide the entire question.
+ */
+function surfaceChain(el, doc) {
+  const chain = [];
+  for (let n = el; n && n !== doc.body && n !== doc.documentElement; n = n.parentElement) {
+    const bg = parseColor(getComputedStyle(n).backgroundColor);
+    if (bg && bg.a > 0) chain.push(bg);
+  }
+  return chain.reverse();
+}
+
+/** True if this element (or an ancestor) is fixed, so scrolling does not move it. */
+function isFixed(el, doc) {
+  for (let n = el; n && n !== doc.documentElement; n = n.parentElement) {
+    if (getComputedStyle(n).position === 'fixed') return true;
+  }
+  return false;
+}
+
+function clampBand(x0, y0, x1, y1) {
+  const band = {
+    x0: Math.max(0, Math.floor(x0)),
+    y0: Math.max(0, Math.floor(y0)),
+    x1: Math.min(W, Math.ceil(x1)),
+    y1: Math.min(H, Math.ceil(y1)),
+  };
+  // A band clipped to nothing would sample no pixels and hand worstCase() an empty
+  // array, which it throws on -- correctly. Widening to the whole viewport keeps the
+  // reading conservative (more pixels can only make the brightest one brighter).
+  if (band.x1 <= band.x0) { band.x0 = 0; band.x1 = W; }
+  if (band.y1 <= band.y0) { band.y0 = 0; band.y1 = H; }
+  return band;
+}
+
+/**
+ * The strip of viewport the block covers when it is the thing you are reading.
+ *
+ * Computed arithmetically from the un-scrolled rect rather than by actually scrolling:
+ * the page runs Lenis, and driving its scroll from outside would fight the library and
+ * settle somewhere unrepeatable. A fixed element's band is simply its rect, because
+ * scrolling does not move it -- and the canvas is fixed too, so the pair never slide
+ * apart.
+ */
+function viewportBand(el, doc, win) {
+  const rect = el.getBoundingClientRect();
+  if (isFixed(el, doc)) return clampBand(rect.left, rect.top, rect.right, rect.bottom);
+  const docTop = rect.top + win.scrollY;
+  const maxScroll = Math.max(0, doc.documentElement.scrollHeight - H);
+  const centred = docTop - (H - rect.height) / 2;
+  const scroll = Math.min(Math.max(centred, 0), maxScroll);
+  return clampBand(rect.left, docTop - scroll, rect.right, docTop + rect.height - scroll);
+}
+
+/* ---------------------------------------------------------------------------
+ * The gradient, rendered offscreen from the real shader.
+ * ------------------------------------------------------------------------- */
+function buildGradient() {
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const options = { preserveDrawingBuffer: true, antialias: false };
+  const gl = canvas.getContext('webgl2', options) || canvas.getContext('webgl', options);
+  if (!gl) return null;
+
+  const make = (type, src) => {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      throw new Error(`shader failed to compile: ${gl.getShaderInfoLog(sh)}`);
+    }
+    return sh;
+  };
+  const program = gl.createProgram();
+  gl.attachShader(program, make(gl.VERTEX_SHADER, VERTEX_SHADER));
+  gl.attachShader(program, make(gl.FRAGMENT_SHADER, FRAGMENT_SHADER));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    throw new Error(`program failed to link: ${gl.getProgramInfoLog(program)}`);
+  }
+  gl.useProgram(program);
+
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+  const aPosition = gl.getAttribLocation(program, 'a_position');
+  gl.enableVertexAttribArray(aPosition);
+  gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+
+  const u = (name) => gl.getUniformLocation(program, name);
+  gl.uniform3f(u('u_deep'), ...PALETTE.deep);
+  gl.uniform3f(u('u_mid'), ...PALETTE.mid);
+  gl.uniform3f(u('u_bright'), ...PALETTE.bright);
+  gl.uniform2f(u('u_resolution'), W, H);
+  gl.uniform1f(u('u_velocity'), 0);
+  gl.viewport(0, 0, W, H);
+  return { gl, uTime: u('u_time') };
+}
+
+/**
+ * The brightest pixel inside a band, by WCAG relative luminance -- not the mean.
+ * A band that is dark almost everywhere still fails its reader on the ribbon core
+ * crossing it, which is the same reason worstCase() is a minimum rather than an average.
+ */
+function brightestIn(pixels, band) {
+  let best = null;
+  let bestL = -1;
+  for (let y = band.y0; y < band.y1; y++) {
+    // readPixels' origin is bottom-left; the viewport's is top-left.
+    const row = (H - 1 - y) * W * 4;
+    for (let x = band.x0; x < band.x1; x++) {
+      const i = row + x * 4;
+      const L = relativeLuminance([pixels[i], pixels[i + 1], pixels[i + 2]]);
+      if (L > bestL) { bestL = L; best = [pixels[i], pixels[i + 1], pixels[i + 2]]; }
+    }
+  }
+  return best;
+}
+
+/* ---------------------------------------------------------------------------
+ * Horizontal overflow at 200% text zoom (section 4). See the header comment for why this
+ * is a page rather than a jsdom unit test: jsdom has no layout, and `document.
+ * documentElement.scrollWidth` is meaningless without one.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * `root` and every element under it whose right edge paints past `clientWidth`.
+ *
+ * `root` itself, not just its descendants: `.site-nav` is `position: fixed` with only
+ * `inset: 0 0 auto 0` and no explicit width failed by its OWN box measuring wider than
+ * the viewport (411px against 375 at 32px root), independent of whether any pill inside
+ * it also overflowed. `root.querySelectorAll('*')` alone -- the first version of this
+ * function -- cannot see that: it walks descendants only, the exact gap this file's own
+ * nav-pill-row guard (tests/visual-language.test.js) was rewritten to close after a
+ * reviewer found path D inspecting zero rules and reporting green.
+ */
+function overflowingElements(root, clientWidth) {
+  const offenders = [];
+  const range = root.ownerDocument.createRange();
+  for (const el of [root, ...root.querySelectorAll('*')]) {
+    const boxRight = el.getBoundingClientRect().right;
+    // The hero h1's own defect, found writing this guard: a long unbreakable word can
+    // paint past its element's box WITHOUT the box itself growing -- "the h1's BOX stays
+    // inside its column while the ink runs out the side, silently" (sections.css's own
+    // comment on --type-hero). getBoundingClientRect() on the ELEMENT reports the box,
+    // not the ink, and reported zero offenders here right up until this Range check was
+    // added: a Range over the element's own children measures what actually painted.
+    // Leaf text nodes only need this once; walking every element's own Range as well
+    // catches it regardless of which level the overflowing text node sits at.
+    range.selectNodeContents(el);
+    const inkRight = el.childNodes.length ? range.getBoundingClientRect().right : 0;
+    const right = Math.max(boxRight, inkRight);
+    // 0.05px, not 0.5: this is the tolerance the report claims ("0.05px tolerance") for
+    // the exhaustive scan it describes, and a 0.5px window is wide enough to hide a real
+    // half-pixel overflow -- exactly the kind of residual this file exists to catch
+    // rather than paper over.
+    if (right > clientWidth + 0.05) {
+      offenders.push({
+        selector: el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : el.tagName.toLowerCase(),
+        right: Math.round(right * 10) / 10,
+        viaInk: inkRight > boxRight + 0.05,
+      });
+    }
+  }
+  return offenders;
+}
+
+/**
+ * Doubles the root font size on the already-loaded page (the same 32px-at-16px-default
+ * stand-in for 200% text zoom the rest of this branch uses) at each of NARROW_WIDTHS, and
+ * reports whether anything a visitor would actually reach paints past the viewport.
+ *
+ * Resizes the iframe element's own width/height attributes rather than reloading it --
+ * `doc`/`win` in main() are long-lived references into this same document, and a second
+ * navigation would leave both dangling. A resize alone is enough: reading a geometry
+ * property after each change (the same `void ...scrollHeight` trick loadPage() uses)
+ * flushes it into a real layout pass, and this was verified live, at each width, against
+ * the real dev server before being written into this probe.
+ */
+async function checkOverflow(frameEl, doc) {
+  const NARROW_WIDTHS = [375, 280];
+  const originalWidth = frameEl.width;
+  const originalHeight = frameEl.height;
+  const rows = [];
+  for (const width of NARROW_WIDTHS) {
+    frameEl.width = width;
+    frameEl.height = 812;
+    void doc.documentElement.scrollHeight;
+    // eslint-disable-next-line no-await-in-loop
+    await settle(50);
+    doc.documentElement.style.fontSize = '32px';
+    void doc.documentElement.scrollHeight;
+    // eslint-disable-next-line no-await-in-loop
+    await settle(50);
+
+    const clientWidth = doc.documentElement.clientWidth;
+    const scrollWidth = doc.documentElement.scrollWidth;
+    const content = doc.getElementById('content');
+    const nav = doc.querySelector('.site-nav');
+    const offenders = [
+      ...(content ? overflowingElements(content, clientWidth) : []),
+      ...(nav ? overflowingElements(nav, clientWidth) : []),
+    ];
+    rows.push({
+      width, clientWidth, scrollWidth,
+      offenders,
+      // Two signals, both required. offenders.length === 0 catches real content under
+      // #content or .site-nav painting past clientWidth, named and measured. scrollWidth
+      // === clientWidth catches everything else -- chiefly #gradient, which sits outside
+      // both scanned subtrees and is exactly what moved this raw pair on its own before
+      // fix pass 3 removed its explicit vw/vh width (see base.css). Equality holds
+      // exactly at both widths with every fix in this pass applied, so asserting it
+      // costs nothing, and it is the one check that catches that symptom class directly
+      // instead of printing a note beside a result this file still called green.
+      pass: offenders.length === 0 && scrollWidth === clientWidth,
+    });
+
+    doc.documentElement.style.fontSize = '';
+  }
+  // Back to what the rest of the probe wants to measure against.
+  frameEl.width = originalWidth;
+  frameEl.height = originalHeight;
+  void doc.documentElement.scrollHeight;
+  await settle(120);
+  return rows;
+}
+
+/* ------------------------------------------------------------------------- */
+
+async function main() {
+  const { doc, win } = await loadPage();
+
+  say('overflow', 'resizing the page under test to check for horizontal overflow…', 'wait');
+  const overflowRows = await checkOverflow($('page'), doc);
+  const overflowFails = overflowRows.filter((r) => !r.pass);
+  say('overflow', [
+    'Real content (#content, .site-nav) painting outside the viewport at a 32px root',
+    'font (200% text zoom), at each width. PASS requires BOTH zero named offenders AND',
+    'scrollWidth === clientWidth exactly -- the second catches anything outside the two',
+    'scanned subtrees (chiefly the fixed #gradient canvas) that the offender scan below',
+    'was never going to name. Each offender is measured two ways, box and ink; "(ink)"',
+    'means only a Range over the element\'s contents caught it -- see the header comment.',
+    '',
+    `${'width'.padStart(6)}${'scrollWidth'.padStart(13)}${'clientWidth'.padStart(13)}  verdict`,
+    '-'.repeat(50),
+    ...overflowRows.map((r) => `${String(r.width).padStart(6)}${String(r.scrollWidth).padStart(13)}`
+      + `${String(r.clientWidth).padStart(13)}  ${r.pass ? 'PASS' : 'FAIL'}`),
+    ...overflowFails.flatMap((r) => [
+      `  width ${r.width}: scrollWidth ${r.scrollWidth} vs clientWidth ${r.clientWidth}:`,
+      ...r.offenders.map((o) => `    ${o.selector.padEnd(28)} right edge ${o.right}px  ${o.viaInk ? '(ink escapes box)' : '(box)'}`),
+      ...(r.offenders.length === 0
+        ? ['    (no scanned element accounts for it -- likely #gradient or another element'
+          + ' outside #content/.site-nav; see the header comment)']
+        : []),
+    ]),
+  ].join('\n'), overflowFails.length ? 'bad' : 'ok');
+
+  // Tokens come off the live :root, so a renamed or retuned token shows up here rather
+  // than being read from a copy kept in this file.
+  const rootStyle = getComputedStyle(doc.documentElement);
+  const token = (name) => rootStyle.getPropertyValue(name).trim();
+  const tokenNames = ['--stage', '--surface', '--accent', '--accent-ink', '--ink', '--ink-dim',
+    '--glass', '--story-tint', '--chip', '--chip-cta'];
+  const tokens = Object.fromEntries(tokenNames.map((n) => [n, token(n)]));
+  const ink = anyColor(tokens['--ink']);
+  const inkDim = anyColor(tokens['--ink-dim']);
+  const accentInk = anyColor(tokens['--accent-ink']);
+
+  say('tokens', [
+    `viewport under test    : ${W}x${H}   time steps: ${STEPS} x ${STEP_SECONDS}s`,
+    `contrast.js TIME_STEPS : ${TIME_STEPS}`,
+    '',
+    'gradient stops (PALETTE, src/gradient/palette.js):',
+    ...STOP_NAMES.map((k) =>
+      `  ${k.padEnd(7)} ${rgbText(STOPS[k])}   L = ${relativeLuminance(STOPS[k]).toFixed(5)}`),
+    '',
+    'tokens (:root on the live page):',
+    ...tokenNames.map((n) => `  ${n.padEnd(13)} ${tokens[n]}`),
+  ].join('\n'), 'ok');
+
+  /* --- 2. the surface composites, which is what base.css's token comment claims --- */
+  const surfaceTokens = ['--glass', '--story-tint', '--chip', '--chip-cta'];
+  const surfaceResult = {};
+  const surfaceRows = [];
+  for (const name of surfaceTokens) {
+    const layer = parseColor(tokens[name]);
+    surfaceResult[name] = {};
+    for (const stopName of STOP_NAMES) {
+      const c = over(layer.rgb, layer.a, STOPS[stopName]);
+      surfaceResult[name][stopName] = {
+        rgb: c,
+        luminance: relativeLuminance(c),
+        ink: contrastRatio(ink, c),
+        inkDim: contrastRatio(inkDim, c),
+        accentInk: contrastRatio(accentInk, c),
+      };
+      surfaceRows.push([
+        `  ${name.padEnd(13)} a=${layer.a.toFixed(2)} over ${stopName.padEnd(6)} -> ${rgbText(c)}`,
+        `L=${relativeLuminance(c).toFixed(4)}`,
+        `--ink ${contrastRatio(ink, c).toFixed(2)}`,
+        `--ink-dim ${contrastRatio(inkDim, c).toFixed(2)}`,
+        `--accent-ink ${contrastRatio(accentInk, c).toFixed(2)}`,
+      ].join('  '));
+    }
+    surfaceRows.push('');
+  }
+  say('surfaces', [
+    'Every alpha fill on the page, composited source-over onto each gradient stop.',
+    'These are the figures base.css quotes beside the tokens.',
+    '',
+    ...surfaceRows,
+  ].join('\n'), 'ok');
+
+  /* --- 3. the blocks --- */
+  say('blocks', 'rendering the shader and sampling each block’s band…', 'wait');
+  const gradient = buildGradient();
+  if (!gradient) {
+    say('blocks', 'NO WEBGL CONTEXT — the measured column cannot run.', 'bad');
+    return { error: 'no-webgl', tokens, surfaces: surfaceResult };
+  }
+
+  // Every block is resolved first, so a selector that has stopped matching is a loud
+  // failure rather than a silently shorter table.
+  const resolved = [];
+  const missing = [];
+  for (const [label, selector] of BLOCKS) {
+    const el = doc.querySelector(selector);
+    if (!el) { missing.push(`${label}  (${selector})`); continue; }
+    const cs = getComputedStyle(el);
+    resolved.push({
+      label,
+      selector,
+      text: parseColor(cs.color).rgb,
+      px: parseFloat(cs.fontSize),
+      weight: parseInt(cs.fontWeight, 10) || 400,
+      chain: surfaceChain(el, doc),
+      band: viewportBand(el, doc, win),
+    });
+  }
+
+  // Measured: the brightest pixel in each band, per time step.
+  const { gl, uTime } = gradient;
+  const pixels = new Uint8Array(W * H * 4);
+  const samples = resolved.map(() => []);
+  for (let step = 0; step < STEPS; step++) {
+    gl.uniform1f(uTime, step * STEP_SECONDS);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    resolved.forEach((b, i) => samples[i].push(brightestIn(pixels, b.band)));
+  }
+
+  const rows = resolved.map((b, i) => {
+    const needs = requirement(b.px, b.weight);
+    // worstCase() from src/gradient/contrast.js does the minimisation in BOTH columns,
+    // including its refusal to silently skip a non-finite ratio.
+    const measured = worstCase(samples[i].map((g) => composite(g, b.chain)), b.text);
+    const bound = worstCase(STOP_NAMES.map((s) => composite(STOPS[s], b.chain)), b.text);
+    return {
+      label: b.label,
+      selector: b.selector,
+      px: b.px,
+      weight: b.weight,
+      needs,
+      layers: b.chain.length,
+      measuredRatio: measured.ratio,
+      measuredStep: measured.index,
+      brightestUnder: samples[i][measured.index],
+      boundRatio: bound.ratio,
+      boundAt: STOP_NAMES[bound.index],
+      margin: bound.ratio / needs,
+      pass: bound.ratio >= needs,
+    };
+  }).sort((a, b) => a.margin - b.margin);
+
+  const fails = rows.filter((r) => !r.pass);
+  const pad = (s, n) => String(s).padEnd(n);
+  const lpad = (s, n) => String(s).padStart(n);
+  const tightest = rows[0];
+  say('blocks', [
+    ...(missing.length
+      ? ['SELECTORS THAT MATCHED NOTHING — the table below is incomplete:',
+        ...missing.map((m) => `  ${m}`), '']
+      : []),
+    `${pad('block', 24)}${lpad('px', 6)}${lpad('wt', 4)}${lpad('needs', 7)}${lpad('measured', 10)}${lpad('bound', 8)}${lpad('at', 8)}${lpad('margin', 8)}  layers`,
+    '-'.repeat(86),
+    ...rows.map((r) => pad(r.label, 24)
+      + lpad(r.px.toFixed(1), 6)
+      + lpad(r.weight, 4)
+      + lpad(r.needs, 7)
+      + lpad(r.measuredRatio.toFixed(2), 10)
+      + lpad(r.boundRatio.toFixed(2), 8)
+      + lpad(r.boundAt, 8)
+      + lpad(`${r.margin.toFixed(2)}x`, 8)
+      + `  ${r.layers}${r.pass ? '' : '   <-- FAILS'}`),
+    '',
+    `${rows.length} of ${BLOCKS.length} blocks resolved; ${rows.length - fails.length} of ${rows.length} pass on the BOUND.`,
+    `tightest margin : ${tightest.margin.toFixed(2)}x  (${tightest.label}, ${tightest.boundRatio.toFixed(2)}:1 against ${tightest.needs})`,
+    `lowest measured : ${Math.min(...rows.map((r) => r.measuredRatio)).toFixed(2)}:1`,
+  ].join('\n'), fails.length || missing.length ? 'bad' : 'ok');
+
+  return {
+    viewport: { width: W, height: H, steps: STEPS, stepSeconds: STEP_SECONDS },
+    tokens,
+    stops: STOPS,
+    surfaces: surfaceResult,
+    blocks: rows,
+    missing,
+    passed: rows.length - fails.length,
+    total: rows.length,
+    tightestMargin: tightest.margin,
+    overflow: overflowRows,
+    overflowPassed: overflowFails.length === 0,
+  };
+}
+
+window.__contrastProbe = {};
+window.__contrastProbe.ready = main().then(
+  (r) => { window.__contrastProbe.result = r; return r; },
+  (e) => {
+    say('blocks', `probe threw: ${e && e.stack ? e.stack : e}`, 'bad');
+    window.__contrastProbe.result = { error: String(e) };
+    throw e;
+  },
+);
+</script>
+</body>
+</html>

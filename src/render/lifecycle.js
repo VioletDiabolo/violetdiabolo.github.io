@@ -2,15 +2,27 @@
 const MAX_DELTA = 0.1;
 
 /**
- * Owns the 3D render loop's existence.
+ * Owns the gradient render loop's existence.
  *
- * Runs only while the stage intersects the viewport AND the document is visible.
- * When either fails, the pending frame is CANCELLED and no further frame is
+ * Runs only while the observed element intersects the viewport AND the document is
+ * visible. When either fails, the pending frame is CANCELLED and no further frame is
  * scheduled — a no-op frame that still gets scheduled is not a pause.
  *
- * Deliberately does not touch anime.js's global engine: `engine.pauseOnDocumentHidden`
- * already defaults to true, the engine self-idles with no active children, and other
- * visible content timelines share it.
+ * ONE OF THOSE TWO GATES IS INERT IN PRODUCTION, and it is worth knowing which. main.js
+ * observes `#gradient`, which is `position: fixed; inset: 0` — it covers the viewport at
+ * every scroll position and can never stop intersecting, so the IntersectionObserver
+ * reports `isIntersecting: true` at first delivery and never flips. `doc.hidden` is the
+ * only gate that fires live. The observer half is defensive depth: it is exercised only
+ * through an injected `observerFactory` in tests, and it is kept because `element` is a
+ * parameter rather than a hardcoded `#gradient`. That last reason is SPECULATIVE, not
+ * load-bearing: no caller passing something that actually scrolls away exists on this
+ * branch, and no test exercises that shape — tests exercise only the injected-factory
+ * shape, which says nothing about a real intersection change. It costs nothing to keep,
+ * and nothing today needs it; both are true at once.
+ *
+ * (The 3D object this loop was written for is gone, and so is the animation engine that
+ * used to share a ticker with it. There is no global engine left to coordinate with:
+ * `tests/lifecycle.test.js` pins that nothing under `src/` imports one.)
  */
 export function createLifecycle({
   element,

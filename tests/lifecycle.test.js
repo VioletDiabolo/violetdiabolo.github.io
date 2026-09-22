@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { createLifecycle } from '../src/diabolo/lifecycle.js';
+import { createLifecycle } from '../src/render/lifecycle.js';
 
 function listJsFiles(dir) {
   const out = [];
@@ -170,44 +170,84 @@ describe('lifecycle', () => {
   });
 });
 
-describe('engine independence', () => {
+/* ---------------------------------------------------------------------------
+ * No animation engine, anywhere.
+ *
+ * WHAT THIS USED TO SAY, AND WHY IT STOPPED BEING TRUE. Until this branch, anime.js was
+ * the page's scroll choreographer and this block policed a boundary: exactly two modules
+ * (`src/scroll/choreography.js` and `src/scroll/entrance.js`) were allowed to import it,
+ * every other file was not, and nobody at all could touch its GLOBAL engine -- pausing
+ * that would have frozen every other timeline riding the same ticker.
+ *
+ * Both owners were deleted at 15901a9 when the 3D object went. The guard was left with an
+ * exception set naming two files that no longer exist, so its `continue` was unreachable,
+ * the set was an inert constant, and its name and failure messages described a subject
+ * that was gone. It passed -- but for a reason unrelated to what it claimed.
+ *
+ * What is true now is simpler and worth pinning, because it is the shape of the branch:
+ * NOTHING imports an animation engine. The gradient is driven by `createLifecycle` above
+ * plus `createFrameCap`; the only motion library left in the tree is Lenis, and it owns
+ * scroll position, not timelines. So the exception set is gone rather than re-pointed --
+ * there is no owner to except.
+ *
+ * The second test is the same claim one level up, at the manifest. It is what actually
+ * keeps `three` out of `node_modules`: animejs declares a `three` adapter as an OPTIONAL
+ * PEER and npm installs optional peers by default, so `three@0.186.0` sat in the tree of a
+ * branch whose entire point was deleting Three.js, reachable only by
+ * `violet-diabolo -> animejs -> three`. Dropping the dependency dropped both. A source
+ * grep alone would not have caught that: no file imported animejs either, and the package
+ * was still installed.
+ * ------------------------------------------------------------------------- */
+
+describe('no animation engine', () => {
   // Built from a plain path, not `new URL(..., import.meta.url)`: some sibling test
   // files run under `@vitest-environment jsdom`, whose global URL shim resolves relative
   // file: URLs against http://localhost:3000 instead of the filesystem. This file does
   // not opt into that environment, but resolving by plain path costs nothing and stays
   // safe regardless.
-  const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src');
-  // The only two modules that own anime.js timelines: choreography.js (the scroll-
-  // scrubbed explosion/turn) and entrance.js (the load-in convergence, Task 4). Both
-  // write the same tilt.rotation.x / part .position properties at different points in
-  // the object's lifecycle, never simultaneously (main.js creates the scroll timeline
-  // only inside entrance's onComplete) — see the Task 4 ordering requirement.
-  const ANIME_OWNERS = new Set([
-    path.join(SRC, 'scroll', 'choreography.js'),
-    path.join(SRC, 'scroll', 'entrance.js'),
-  ]);
+  const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const SRC = path.join(ROOT, 'src');
 
-  it('keeps anime.js confined to the modules that own the scrubbed and entrance timelines', () => {
-    for (const file of listJsFiles(SRC)) {
-      if (ANIME_OWNERS.has(file)) continue;
+  it('imports animejs in no module under src/ -- there is no longer an owner to except', () => {
+    const files = listJsFiles(SRC);
+    // Non-vacuity: a guard that walks an empty list passes without reading anything.
+    expect(files.length, 'listJsFiles found no sources to check').toBeGreaterThan(5);
+
+    for (const file of files) {
       const source = readFileSync(file, 'utf8');
       const rel = path.relative(SRC, file);
-      expect(source, `src/${rel} imports animejs; only scroll/choreography.js and scroll/entrance.js should`).not.toMatch(/from\s+['"]animejs['"]/);
-      expect(source, `src/${rel} requires animejs; only scroll/choreography.js and scroll/entrance.js should`).not.toMatch(/require\(\s*['"]animejs['"]\s*\)/);
+      expect(source, `src/${rel} imports animejs; nothing on this branch may`)
+        .not.toMatch(/from\s+['"]animejs['"]/);
+      expect(source, `src/${rel} requires animejs; nothing on this branch may`)
+        .not.toMatch(/require\(\s*['"]animejs['"]\s*\)/);
     }
   });
 
-  it("never imports or calls animejs's global engine anywhere, not even in choreography.js", () => {
-    // Pausing/resuming the shared engine would freeze every other visible anime.js
-    // animation riding the same ticker (spec §6.2). createTimeline/onScroll are the
-    // legitimate import; reaching for `engine` itself is not, in any file, including the
-    // one file allowed to import animejs at all.
-    for (const file of listJsFiles(SRC)) {
-      const source = readFileSync(file, 'utf8');
-      const rel = path.relative(SRC, file);
-      expect(source, `src/${rel} imports animejs's global engine`).not.toMatch(/\{[^}]*\bengine\b[^}]*\}\s*from\s*['"]animejs['"]/);
-      expect(source, `src/${rel} calls engine.pause()`).not.toMatch(/\bengine\.pause\(/);
-      expect(source, `src/${rel} calls engine.resume()`).not.toMatch(/\bengine\.resume\(/);
-    }
+  it('does not declare animejs as a dependency, which is what keeps three out of node_modules', () => {
+    const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    const declared = { ...manifest.dependencies, ...manifest.devDependencies };
+    // Non-vacuity: the object really was read and really does hold this project's deps.
+    expect(Object.keys(declared), 'package.json declares no dependencies at all')
+      .toContain('lenis');
+
+    expect(Object.keys(declared),
+      'package.json declares animejs again; it pulls three@0.186.0 back in as an optional peer')
+      .not.toContain('animejs');
+    expect(Object.keys(declared), 'package.json declares three again').not.toContain('three');
+  });
+
+  it('declares exactly one production dependency -- lenis -- so a second animation engine cannot slip in unnoticed', () => {
+    // The project constraint is "no second animation engine". The two tests above name
+    // animejs and three specifically, which is precise but not general: GSAP, Motion, or
+    // anything else would trip neither one, because neither greps for a name that has not
+    // been chosen yet. Pinning the shape of `dependencies` instead -- exactly one entry,
+    // and it is the scroll library -- catches any addition, named or not.
+    const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    expect(manifest.dependencies, 'package.json has no "dependencies" field at all').toBeDefined();
+    expect(Object.keys(manifest.dependencies),
+      'a second production dependency appeared. If it is a motion/animation library, ' +
+      'this is the constraint firing correctly -- do not except it here. If it is ' +
+      'genuinely unrelated (e.g. a non-visual utility), name it explicitly in this test.')
+      .toEqual(['lenis']);
   });
 });
