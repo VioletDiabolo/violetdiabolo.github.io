@@ -73,34 +73,42 @@ export const SECTION_HEADINGS = {
  * ground, so both are shown in the opposite polarity. That is the same mark, not a
  * redrawing of it.
  *
- * EIGHT ARE DELIBERATELY null. Kappa Phi Lambda and Tisch Talent Guild publish none that
- * could be found; Columbia Wushu's site no longer resolves; the two public schools and
- * USADA were not pursued. NYU VSA's is near-white artwork on white and disappears at
- * 28px, and NYU OGS's is a grey skyline banner rather than a mark — both were found and
- * both were left out, because an illegible logo is worse than the name it replaced.
+ * FOUR ARE null, and each for a reason that was tested rather than assumed:
+ *
+ *   NYU OGS            its Engage artwork is a pale skyline banner; every crop of the
+ *                      NYU lockup inside it came out as a grey rectangle at 28px.
+ *   Tisch Talent Guild  publishes only an Instagram, and appears to have folded into
+ *                      another Tisch organisation.
+ *   PS 124 Yung Wing   no mark found.
+ *   PS 184M Shuang Wen their site serves its mark from a session-protected Google URL.
+ *
+ * NYU VSA was in this list and is not any more. It was dropped as "too pale", which was a
+ * judgement made from a 170px render; at the 28px it actually ships at, the crest reads
+ * perfectly well. Rendering candidates AT DISPLAY SIZE is the only test that means
+ * anything here, and it reversed two calls in both directions.
  */
 export const PERFORMED_FOR = Object.freeze([
   // --- NYU ---------------------------------------------------------------
   { name: 'NYU Welcome', logo: 'logo-nyu-welcome' },   // Club Showcase, Kimmel E&L, Sept 2026
   { name: 'NYU Asian Heritage Month', logo: 'logo-nyu-ahm' }, // Fall Fest, 2019 and since
-  { name: 'NYU VSA', logo: null },                     // Minh 2022; Holiday Night Market 2024 (mark too pale)
+  { name: 'NYU VSA', logo: 'logo-nyu-vsa' },           // Minh 2022; Holiday Night Market 2024
   { name: 'NYU CSS', logo: 'logo-nyu-css' },           // LNY Gala 2024; DynamiCSS 2024
   { name: 'NYU KSA', logo: 'logo-nyu-ksa' },           // Koreating, March 2026
   { name: 'NYU HKSA', logo: 'logo-nyu-hksa' },         // Sensations, April 2025
   { name: 'NYU ACU', logo: 'logo-nyu-acu' },           // ACU Idol, 2022
-  { name: 'NYU Kappa Phi Lambda', logo: null },        // Kappa Kafe, April 2023 (no published mark)
-  { name: 'NYU OGS', logo: null },                     // LNY Celebration 2024 (banner, not a mark)
+  { name: 'NYU Kappa Phi Lambda', logo: 'logo-kpl' },  // Kappa Kafe, April 2023
+  { name: 'NYU OGS', logo: null },                     // LNY Celebration 2024 (see note below)
   { name: 'Tisch Talent Guild', logo: null },          // Holiday Cabaret, 2022 (no published mark)
 
   // --- Beyond NYU --------------------------------------------------------
-  { name: 'Columbia Wushu', logo: null },                       // Showcase, Feb 2026 (site gone)
+  { name: 'Columbia Wushu', logo: 'logo-cuwushu' },             // Showcase, Feb 2026
   { name: 'Brooklyn Conservatory of Music', logo: 'logo-bkcm' }, // LNY Feb 2026; Open Stages May 2026
   { name: 'NYC Mid-Autumn Festival', logo: 'logo-moonlite' },   // Moonlite, Oct 2025
   { name: 'Chinatown Beautification Day', logo: 'logo-cyi' },   // CYI, 2023 and 2024
   { name: 'PS 124 Yung Wing School', logo: null },           // Lunar New Year
   { name: 'PS 184M Shuang Wen', logo: null },                // Spring Bash, June 2026
   { name: 'TAP New York', logo: 'logo-tap' },                   // Lunar New Year Banquet 2024
-  { name: 'USADA Nationals', logo: null },                   // National Diabolo Competition 2024
+  { name: 'USADA Nationals', logo: 'logo-usada' },              // National Diabolo Competition 2024
 ]);
 
 export const MEDIA = [

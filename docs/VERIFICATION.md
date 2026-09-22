@@ -1341,3 +1341,57 @@ and 2.4x for the widest wordmark. Each is 1.7–2.8KB as AVIF.
 
 23 of 23 blocks on index, marquee names at **5.62:1**, no missing selectors, no overflow at
 375 or 280. Ten marks load, none broken, all rendering at exactly 28px tall.
+
+
+---
+
+## 18. The rest of the marks
+
+Four more, taking the strip from 10 of 18 to **14 of 18**.
+
+| organisation | source | treatment |
+|---|---|---|
+| NYU VSA | NYU Engage | none — see below |
+| NYU Kappa Phi Lambda | `kplsorority.org` (national) | cropped to the crest, placed on a white card |
+| Columbia Wushu | `columbiawushu.org` | the lockup is published as two halves; rejoined |
+| USADA | `usadiaboloassociation.org` | none, already a white card |
+
+### 18.1 A judgement reversed by rendering at the size it ships at
+
+§17.2 dropped **NYU VSA** as "near-white artwork on a white card, a pale smudge at 28px".
+That was decided from a 170px render. Rendered at the 28px it actually ships at — and
+blown back up with nearest-neighbour, so what is judged is the real pixels rather than a
+flattering resample — the crest reads perfectly well.
+
+The same method killed **NYU OGS** in the other direction. Its Engage artwork holds a real
+NYU lockup, so the plan was to crop it out; the bright-pixel bounding box said the lockup
+sat at x 38–99, y 65–113, and every crop around it came out a flat grey rectangle at 28px.
+It stays a name.
+
+Rendering candidates at display size is the only test that means anything here. It
+reversed two calls, in opposite directions, and both had been made confidently from a
+large preview.
+
+### 18.2 Backgrounds, at the client's word
+
+Kappa Phi Lambda's mark is a colour crest beside a black wordmark. Inverting it — the
+treatment TAP and CYI got — would have wrecked the crest. A white card instead, which the
+client had explicitly allowed and which half the strip already carries from Engage. The
+wordmark was cropped away with it: it is illegible at 28px and only made the card wide and
+empty, and the organisation's name is already in text beside the chip.
+
+### 18.3 Four that stay names
+
+| organisation | why |
+|---|---|
+| NYU OGS | §18.1 — no legible mark inside the banner |
+| Tisch Talent Guild | publishes only an Instagram, and appears to have folded into another Tisch org |
+| PS 124 Yung Wing School | no mark found |
+| PS 184M Shuang Wen | its site serves the mark from a session-protected Google URL that returns HTML to anything else |
+
+The chip is mark **plus** name, so each of these is still a full credit.
+
+### 18.4 Re-run
+
+23 of 23 blocks on index, marquee names at **5.62:1**, no missing selectors, no overflow at
+375 or 280. Fourteen marks load, none broken, every one rendering at exactly 28px tall.
