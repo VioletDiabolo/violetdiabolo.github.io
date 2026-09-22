@@ -50,7 +50,11 @@ describe('board', () => {
   it('renders one card per member of the selected semester', () => {
     const el = document.getElementById('content');
     mountBoard(el);
-    expect(el.querySelectorAll('[data-member]')).toHaveLength(BOARD['Fall 2025'].length);
+    // The newest semester, read from BOARD rather than named: this was pinned to
+    // 'Fall 2025' and broke the moment a newer board was added, which is the one thing
+    // a roster is guaranteed to do.
+    const newest = BOARD[Object.keys(BOARD)[0]];
+    expect(el.querySelectorAll('[data-member]')).toHaveLength(newest.length);
   });
 
   it('swaps the roster when the semester changes', () => {
@@ -65,10 +69,41 @@ describe('board', () => {
   it('renders the open slot without an img element', () => {
     const el = document.getElementById('content');
     mountBoard(el);
+    // Selected explicitly: the newest board is fully staffed and has no open slot, so
+    // this has to go to a semester that does rather than assume the default does.
+    const semester = Object.keys(BOARD).find((s) => BOARD[s].some((m) => m.placeholder));
+    expect(semester, 'no semester has an open slot to render').toBeDefined();
+    const select = el.querySelector('select');
+    select.value = semester;
+    select.dispatchEvent(new Event('change'));
+
     const cards = [...el.querySelectorAll('[data-member]')];
     const openSlot = cards.find((c) => c.dataset.placeholder === 'true');
     expect(openSlot).toBeDefined();
     expect(openSlot.querySelector('img')).toBeNull();
+  });
+
+  it('renders a seated member whose photograph has not arrived, without an img', () => {
+    // A distinct case from the open slot above, and new with the Fall 2026 board: a real
+    // person holding a real role whose photo is not in public/images yet. The card must
+    // still render -- name, role and bio -- rather than being skipped or given a broken
+    // <img>, and it must NOT be marked as a placeholder seat.
+    const el = document.getElementById('content');
+    mountBoard(el);
+    const semester = Object.keys(BOARD)
+      .find((s) => BOARD[s].some((m) => !m.image && !m.placeholder));
+    expect(semester, 'no roster has a seated member without a photograph').toBeDefined();
+    const select = el.querySelector('select');
+    select.value = semester;
+    select.dispatchEvent(new Event('change'));
+
+    const member = BOARD[semester].find((m) => !m.image && !m.placeholder);
+    const card = el.querySelector(`[data-member="${member.name}"]`);
+    expect(card).not.toBeNull();
+    expect(card.querySelector('img')).toBeNull();
+    expect(card.dataset.placeholder).toBeUndefined();
+    expect(card.textContent).toContain(member.position);
+    expect(card.textContent).toContain(member.description);
   });
 });
 

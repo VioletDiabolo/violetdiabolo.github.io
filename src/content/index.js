@@ -17,7 +17,8 @@ export const ABOUT = {
 export const EVENTS = {
   heading: 'EVENTS',
   body:
-    'Practices are on Saturdays from 1-3PM at Kimmel 606! Our first practice will be on September 20. ' +
+    'Two practices a week, both on Sundays: 3-5PM in Kimmel Center, Room 606, then 5-7PM ' +
+    'outdoors at the Bust of Sylvette. Come to either or stay for both. ' +
     'All equipment will be provided, and anyone is welcome, regardless of experience!',
 };
 
@@ -29,8 +30,8 @@ export const EVENTS = {
  * practice-logistics prose the tests pin stays exactly as it was.
  */
 export const HERO_TEASER = Object.freeze({
-  heading: 'Saturdays, 1–3PM',
-  detail: 'Kimmel 606. Equipment provided, and no experience needed.',
+  heading: 'Sundays, 3–7PM',
+  detail: 'Kimmel 606, then the Bust of Sylvette. Equipment provided, and no experience needed.',
   action: Object.freeze({ label: 'See practice details', target: 'events' }),
 });
 
@@ -98,7 +99,42 @@ const OPEN_SLOT = {
   description: 'More board members coming soon — photos and blurbs are still trickling in.',
 };
 
+/**
+ * Placeholder bios for the Fall 2026 board, at the client's instruction: "you can put
+ * gibberish as filler for their descriptions".
+ *
+ * Lorem ipsum rather than plausible prose, deliberately. These are real, named students.
+ * Filler that READS like a bio is one forgotten deploy away from putting invented words
+ * in someone's mouth, and nobody skimming the page would spot it — every card would look
+ * finished. Nonsense cannot be mistaken for the real thing, and it says at a glance which
+ * cards are still waiting on copy. Replace each one as its owner sends theirs in.
+ */
+const LOREM = (
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
+  'exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute ' +
+  'irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla.'
+).split(' ');
+
+const filler = (words) => `Bio coming soon — ${LOREM.slice(0, words).join(' ')}…`;
+
+/**
+ * Fall 2026. No `image` on anyone but Aaron: the club's photographs for this board have
+ * not been selected yet, and buildPicture is only given a base name once the derivatives
+ * exist (scripts/build-assets.mjs). These are NOT `placeholder: true` — that flag means
+ * an unfilled seat on the board, and every seat here is filled.
+ */
+const FALL_2026 = [
+  { name: 'Barry Chen', position: 'Co-President', image: null, description: filler(26) },
+  { name: 'Evan Yu', position: 'Co-President', image: null, description: filler(22) },
+  { name: 'Hannah Chen', position: 'Logistics', image: null, description: filler(30) },
+  { name: 'Emily Chen', position: 'Media', image: null, description: filler(24) },
+  { name: 'Megan Kim', position: 'Media', image: null, description: filler(28) },
+  { name: 'Aaron Hui', position: 'Treasurer', image: AARON.image, description: filler(20) },
+];
+
 export const BOARD = {
+  'Fall 2026': FALL_2026,
   'Fall 2025': [AARON, JON, OPEN_SLOT],
   'Spring 2025': [AARON, JON, OPEN_SLOT],
   'Fall 2024': [AARON, JON, OPEN_SLOT],
