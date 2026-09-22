@@ -178,7 +178,7 @@ npm test
 
 ## Known limitations
 
-From **§10 of [`docs/VERIFICATION.md`](docs/VERIFICATION.md)**, which lists twelve. The ones worth knowing before you change anything:
+From **§10 of [`docs/VERIFICATION.md`](docs/VERIFICATION.md)**, which lists eleven. The ones worth knowing before you change anything:
 
 1. **Live scroll input is not verified end to end.** The verification host delivers no `requestAnimationFrame` of its own, so Lenis was stepped by hand with real timestamps and anchor activation was synthesized. Wheel and touch inertia, and the velocity uniform under real input, rest on `tests/smooth.dom.test.js` and `tests/gradient.dom.test.js` alone. The sustained frame rate and the 30 fps cap in a live visible tab are likewise unmeasured — the *frame cost* is a real GPU timer query; the *achieved* rate is not.
 
@@ -188,8 +188,6 @@ From **§10 of [`docs/VERIFICATION.md`](docs/VERIFICATION.md)**, which lists twe
 
 4. **`backdrop-filter`'s cost on a mid-range phone.** Two full-viewport blurred layers sit over a canvas that repaints every frame, so the blur cannot be cached. On the measured host the shipped configuration has **at least 33× headroom** and is indistinguishable from `backdrop-filter: none` — but both conditions are pinned at a 60 Hz vsync ceiling there, so the cost is bounded above rather than resolved, and the machine the concern is about was not measured.
 
-5. **A browser with no `IntersectionObserver` at all.** The reveal guard is verified against a deleted-global stand-in, not a real such browser — and in that condition `createLifecycle` still constructs one unguarded, so the gradient never starts and a `ReferenceError` is thrown *after* the content has mounted. Content, nav and contrast are unaffected (`body` is `--stage`, which is `deep` — the best ground in the contrast table, not the worst), but the page is flat rather than animated.
-
-6. **Real devices, other browsers, other GPUs.** Chromium on ANGLE / Metal / Apple M4 only. 320 / 375 / 768 were viewport emulation, not real touch devices. Glyph rendering and font fallback were not inspected.
+5. **Real devices, other browsers, other GPUs.** Chromium on ANGLE / Metal / Apple M4 only. 320 / 375 / 768 were viewport emulation, not real touch devices. Glyph rendering and font fallback were not inspected.
 
 Full details and measurements in [`docs/VERIFICATION.md`](docs/VERIFICATION.md).

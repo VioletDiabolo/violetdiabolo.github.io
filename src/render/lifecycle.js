@@ -14,8 +14,11 @@ const MAX_DELTA = 0.1;
  * reports `isIntersecting: true` at first delivery and never flips. `doc.hidden` is the
  * only gate that fires live. The observer half is defensive depth: it is exercised only
  * through an injected `observerFactory` in tests, and it is kept because `element` is a
- * parameter rather than a hardcoded `#gradient` — a caller observing something that does
- * scroll away gets a real pause out of it. The page this ships on is not that caller.
+ * parameter rather than a hardcoded `#gradient`. That last reason is SPECULATIVE, not
+ * load-bearing: no caller passing something that actually scrolls away exists on this
+ * branch, and no test exercises that shape — tests exercise only the injected-factory
+ * shape, which says nothing about a real intersection change. It costs nothing to keep,
+ * and nothing today needs it; both are true at once.
  *
  * (The 3D object this loop was written for is gone, and so is the animation engine that
  * used to share a ticker with it. There is no global engine left to coordinate with:

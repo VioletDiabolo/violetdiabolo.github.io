@@ -174,7 +174,11 @@ describe('reveal in a browser with no IntersectionObserver', () => {
     const hiding = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
       .filter(([, , body]) => /(?:^|;)\s*opacity:\s*0\s*(?:;|$)/.test(body.trim()))
       .map(([, selector]) => selector.trim());
-    expect(hiding, 'base.css no longer hides anything with opacity: 0 -- update this test')
+    expect(hiding,
+      'base.css\'s opacity: 0 rules no longer match exactly [.reveal-pending] -- most ' +
+      'likely a new rule now hides something too (confirm it does not also need the ' +
+      'no-IntersectionObserver guard above); if the hiding moved off .reveal-pending ' +
+      'entirely instead, update PENDING_CLASS or this test to match')
       .toEqual([`.${PENDING_CLASS}`]);
   });
 });

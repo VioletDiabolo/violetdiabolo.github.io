@@ -235,4 +235,19 @@ describe('no animation engine', () => {
       .not.toContain('animejs');
     expect(Object.keys(declared), 'package.json declares three again').not.toContain('three');
   });
+
+  it('declares exactly one production dependency -- lenis -- so a second animation engine cannot slip in unnoticed', () => {
+    // The project constraint is "no second animation engine". The two tests above name
+    // animejs and three specifically, which is precise but not general: GSAP, Motion, or
+    // anything else would trip neither one, because neither greps for a name that has not
+    // been chosen yet. Pinning the shape of `dependencies` instead -- exactly one entry,
+    // and it is the scroll library -- catches any addition, named or not.
+    const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    expect(manifest.dependencies, 'package.json has no "dependencies" field at all').toBeDefined();
+    expect(Object.keys(manifest.dependencies),
+      'a second production dependency appeared. If it is a motion/animation library, ' +
+      'this is the constraint firing correctly -- do not except it here. If it is ' +
+      'genuinely unrelated (e.g. a non-visual utility), name it explicitly in this test.')
+      .toEqual(['lenis']);
+  });
 });

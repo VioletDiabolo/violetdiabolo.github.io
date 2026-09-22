@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { stubGL } from './helpers/webgl-stub.js';
 import { TARGET_FPS } from '../src/render/budget.js';
+import { PENDING_CLASS } from '../src/ui/reveal.js';
 
 // jsdom implements no IntersectionObserver, and initReveal() (src/ui/reveal.js) is
 // mounted unconditionally in boot() -- before the WebGL branch, per main.js's own
@@ -106,6 +107,18 @@ beforeEach(() => {
   // (`{ ...(window.__vd ?? {}), gradient, lifecycle }`), so a value left behind by one
   // test would otherwise leak into the next -- most importantly into a test asserting
   // window.__vd stays unset (the reduced-motion path never touches it at all).
+  //
+  // Deleting the PROPERTY is not enough on its own: a previous test's real Lenis (this
+  // file never overrides LenisCtor) attaches its wheel/click listeners to window/document,
+  // which persist for the file's whole run regardless of what window.__vd points to --
+  // jsdom gives this file one window for every test in it, and replacing document.body's
+  // innerHTML does not detach a listener registered on window or document itself. Left
+  // undestroyed, a stale Lenis from an earlier test silently intercepts a later test's own
+  // dispatched wheel/click events. Harmless to every test that only checks properties of
+  // the boot it just ran (gl and frames are always fresh), but exactly the failure mode a
+  // test asserting an event was NOT intercepted needs guarded against.
+  window.__vd?.smooth?.destroy?.();
+  window.__vd?.lifecycle?.dispose?.();
   delete window.__vd;
   // jsdom has no real WebGL implementation; left unmocked it still logs a noisy (but
   // harmless) "Not implemented" error for every getContext('webgl') call. This is the
@@ -431,5 +444,111 @@ describe('the animated onFrame composition', () => {
     expect(r.draws).toBeLessThanOrEqual(1);
     // ...and Lenis was still stepped on all six.
     expect(stepped, 'Lenis was stepped at the capped rate, or not at all').toHaveBeenCalledTimes(6);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * Boot with no IntersectionObserver at all.
+ *
+ * initReveal() already guards this (tests/reveal.dom.test.js) so content stays visible.
+ * What that guard does NOT reach is createLifecycle, called later in the same boot(): its
+ * default observerFactory constructs `new IntersectionObserver(...)` unconditionally, and
+ * with the global missing that throws a ReferenceError -- but not until AFTER
+ * createSmoothScroll has already run and wired up a real Lenis, which attaches its own
+ * `wheel` listener and calls preventDefault() on every cancelable one regardless of
+ * whether anything ever pumps raf() to turn that into a scroll. With the lifecycle dead on
+ * arrival, nothing here would. So the failure was worse than the thrown error: a wheel
+ * that does nothing, and nav links (also intercepted by Lenis's click handler) that go
+ * dead, on a page that otherwise looks loaded.
+ *
+ * main.js now renders one frame and returns before either constructor runs. Falsify by
+ * deleting that guard: the first test below fails outright (the import rejects with the
+ * ReferenceError), and if the guard were instead narrowed rather than deleted -- say, to
+ * only cover createLifecycle and not return early -- the last two tests catch that, because
+ * Lenis would still have been constructed before createLifecycle ever threw.
+ * ------------------------------------------------------------------------- */
+
+/** Runs `body` with the global IntersectionObserver removed, then restores it. */
+async function withoutIntersectionObserver(body) {
+  const had = Object.prototype.hasOwnProperty.call(globalThis, 'IntersectionObserver');
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'IntersectionObserver');
+  delete globalThis.IntersectionObserver;
+  try {
+    // This file's own top-level polyfill (top of file) would make this pass vacuously if
+    // the delete above ever missed.
+    expect(typeof IntersectionObserver, 'harness did not remove the global').toBe('undefined');
+    return await body();
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'IntersectionObserver', saved);
+  }
+}
+
+describe('boot without IntersectionObserver', () => {
+  let gl;
+
+  beforeEach(() => {
+    gl = stubGL();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => gl);
+    vi.doMock('../src/fallback/detect.js', () => ({
+      supportsWebGL: () => true,
+      prefersReducedMotion: () => false,
+    }));
+  });
+
+  it('renders one frame and returns instead of throwing, with window.__vd left unassigned', async () => {
+    await withoutIntersectionObserver(async () => {
+      let threw = null;
+      try {
+        await import('../src/main.js');
+      } catch (e) {
+        threw = e;
+      }
+      expect(threw, `boot() threw: ${threw?.message}`).toBeNull();
+
+      // Same shape as the reduced-motion branch just above: nothing constructed, nothing
+      // scheduled -- a composition VERIFICATION.md §5 already covers, not a new one.
+      expect(window.__vd).toBeUndefined();
+      expect(gl.calls.draws, 'expected at least the one render(0) call').toBeGreaterThan(0);
+      expect(frames.pending(), 'a frame got scheduled even though no lifecycle should exist').toBe(0);
+    });
+  });
+
+  it('leaves every room visible, composing correctly with the reveal guard', async () => {
+    await withoutIntersectionObserver(async () => {
+      await import('../src/main.js');
+      const rooms = document.querySelectorAll('.room');
+      expect(rooms.length, 'renderSections did not build the expected six rooms').toBe(6);
+      for (const room of rooms) expect(room.classList.contains(PENDING_CLASS)).toBe(false);
+    });
+  });
+
+  it('does not construct Lenis: a cancelable wheel is left unprevented', async () => {
+    await withoutIntersectionObserver(async () => {
+      await import('../src/main.js');
+      const event = new window.Event('wheel', { cancelable: true });
+      window.dispatchEvent(event);
+      expect(event.defaultPrevented, 'something still called preventDefault() on the wheel').toBe(false);
+    });
+  });
+
+  it('does not construct Lenis: a nav click reaches the browser instead of being swallowed', async () => {
+    await withoutIntersectionObserver(async () => {
+      await import('../src/main.js');
+      const link = document.querySelector('.site-nav-links a[href="#about"]');
+      expect(link, 'nav did not render its About link').not.toBeNull();
+
+      // Neutralise jsdom's own in-page hash navigation strictly AFTER reading what the
+      // app decided, exactly as the external-link test in smooth.dom.test.js does -- this
+      // measures the app's own choice rather than whatever jsdom does with it afterward.
+      const event = new window.MouseEvent('click', { bubbles: true, cancelable: true });
+      let preventedByTheApp = null;
+      window.addEventListener('click', (e) => {
+        preventedByTheApp = e.defaultPrevented;
+        e.preventDefault();
+      }, { once: true });
+      link.dispatchEvent(event);
+
+      expect(preventedByTheApp, 'a nav click was still swallowed with no Lenis to land it').toBe(false);
+    });
   });
 });

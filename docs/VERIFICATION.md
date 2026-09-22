@@ -688,8 +688,11 @@ The docstring no longer claims what it cannot deliver. An observer that exists b
 still leaves the page hidden; in a real browser a visitor cannot reach that state, because
 IntersectionObserver delivery is a step of "update the rendering" — a browser that never delivers an
 entry never painted the frame the content would have appeared in. It is reachable in automation,
-which is why the distinction is now written down instead of assumed. See §10.12 for what this run
-did *not* establish about that path.
+which is why the distinction is now written down instead of assumed. The one thing this left
+unestablished — `createLifecycle` still constructing an `IntersectionObserver` unguarded on the
+same condition — is closed in **Fix pass 2** (`.superpowers/sdd/final-fixes-report.md`): `main.js`
+now renders one frame and returns before either `createLifecycle` or `createSmoothScroll` is
+constructed when `IntersectionObserver` is absent.
 
 ---
 
@@ -736,15 +739,3 @@ did *not* establish about that path.
     the *cost* itself is bounded above rather than resolved, and the mid-range phone the concern is
     actually about was not measured. The frame-budget figure in §3 is the shader alone and should
     not be read as the background's total per-frame cost.
-12. **The reveal's degradation in a browser that has no `IntersectionObserver` at all.** The guard
-    added to `src/ui/reveal.js` was verified by booting the shipped modules in a same-origin
-    `srcdoc` iframe with `window.IntersectionObserver` **deleted**: all six `.room` elements go from
-    `opacity: 0` (every one of them hidden, with nothing left that could reveal them) to
-    `opacity: 1`, and `#content` carries 2,430+ characters on the `--stage` ground. That is a
-    deleted-global stand-in, not a real browser without the API. **One thing it exposes is not
-    fixed:** `createLifecycle` still constructs an `IntersectionObserver` unguarded, so the same
-    condition throws a `ReferenceError` after the content has mounted and the animated gradient
-    never starts. Content, nav and contrast are unaffected — `body` is `background-color:
-    var(--stage)`, which is `deep`, the *best* ground in the contrast table rather than the
-    worst — but the page is flat rather than animated, and the error is real. Left deliberately:
-    it is a behaviour change outside the reviewed scope, on the last commit before merge.

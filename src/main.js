@@ -34,6 +34,28 @@ function boot() {
   };
   fit();
 
+  // Without IntersectionObserver, createLifecycle's default observerFactory throws a
+  // ReferenceError the moment it is called (`new IntersectionObserver(...)`) -- but only
+  // once it IS called, which happens well after createSmoothScroll has already wired up
+  // Lenis below. Lenis installs a `wheel` listener and calls preventDefault() on every
+  // cancelable one as soon as smoothWheel is on, regardless of whether anything ever pumps
+  // its raf() to turn that into an actual scroll -- and with no lifecycle to drive onFrame,
+  // nothing here would. The visible result would be worse than the thrown error: a wheel
+  // that does nothing and nav links (also intercepted by Lenis's own click handler) that
+  // go dead, on a page that looks loaded.
+  //
+  // Returning here, before either constructor runs, avoids both failures at once instead
+  // of guarding one and leaving the other: Lenis is never constructed, so the wheel and
+  // nav clicks fall through to the browser's native handling, and createLifecycle is never
+  // constructed either, so there is nothing left to throw. The outcome is the same shape
+  // as the reduced-motion branch just below -- one rendered frame, nothing scheduled,
+  // window.__vd left unassigned -- which is a composition docs/VERIFICATION.md §5 already
+  // verifies, not a new one.
+  if (typeof IntersectionObserver === 'undefined') {
+    gradient.render(0);
+    return;
+  }
+
   if (prefersReducedMotion()) {
     // One frame, repainted after every resize instead of scheduled just once.
     // gradient.resize() reassigns canvas.width/height, which clears the WebGL drawing
