@@ -11,7 +11,7 @@
  * `data-panel` is the LAYOUT, one of the four patterns below. `data-surface` is the
  * MATERIAL. The hero alone carries no surface: the gradient itself is the hero.
  *
- *   hero      full-bleed, no surface. Head bottom-left, teaser card bottom-right.
+ *   hero      full-bleed, no surface. Head bottom-left, photograph bottom-right.
  *   story     violet-tinted glass. Serif, the club's own account of itself, and a photo.
  *   feature   glass. Title across the top, the practice details dropped bottom-right.
  *   grid      cards beside a title column. Media, board and contact.
@@ -39,7 +39,7 @@
  * where nothing but the gradient shows. That alternation -- plate, light, plate -- is the
  * only structural device in the file. There is no grid overlay, no hairline rule, no
  * counter, and no plate behind a heading or a paragraph. The two filled boxes that exist
- * (the hero's teaser card and the media thumbnails) are objects you read as units, never
+ * (the hero's photograph and the media thumbnails) are objects you read as units, never
  * a backing put behind running text to rescue it -- and nothing on this page needs
  * rescuing, because the gradient's own luminance ceiling keeps --ink legible on it
  * (src/gradient/palette.js).
@@ -164,11 +164,12 @@ body { overflow-x: hidden; }
 }
 
 /*
- * flex + justify-content, not `justify-self: end` on the item. The item shrink-to-fit
- * that justify-self relies on is circular here -- .teaser sizes itself with a percentage
- * against this very box -- so the browser resolved it back to the full track and the card
- * sat at the LEFT edge of the second column, measured 339px in at 768. Stretching the box
- * and pushing the card inside it has no such cycle.
+ * flex + justify-content, not `justify-self: end` on the item. The item shrink-to-fit that
+ * justify-self relies on was circular for the teaser card this replaced -- it sized itself
+ * with a percentage against this very box -- and the browser resolved it back to the full
+ * track, putting the card at the LEFT edge of the second column, measured 339px in at 768.
+ * The photograph is `width: 100%` so it would not hit that cycle, but stretching the box
+ * and pushing the content inside it is what the rest of the file does and it costs nothing.
  */
 [data-panel='hero'] .room-body {
   grid-column: 2;
@@ -186,10 +187,15 @@ body { overflow-x: hidden; }
  * long word cannot wrap, so `max-width` does not contain it -- the h1's BOX stays inside
  * its column while the ink runs out the side, silently, and no layout rule anywhere
  * notices. Measured at 768: "DIABOLO" set 80.6px painted 322px of ink out of a 263px
- * column and crossed 21px into the teaser card. At 9.6vw the ink ends 92px clear of the
- * card at 768, the narrowest width this side-by-side composition is used at; at 767 and
- * below the panel stacks and the card sits under the headline at full width. Desktop is
- * untouched in practice: 9.6vw reaches the 9rem ceiling at 1500px.
+ * column and crossed 21px into the second column's contents -- the teaser card then, the
+ * hero photograph now. At 9.6vw the ink ended 92px clear of it at 768, the narrowest
+ * width this side-by-side composition is used at; at 767 and below the panel stacks and
+ * the second column sits under the headline at full width. Desktop is untouched in
+ * practice: 9.6vw reaches the 9rem ceiling at 1500px.
+ *
+ * That clearance is no longer what holds the line: the h1 is capped at a size its widest
+ * word FITS (the rule below), so the ink cannot leave its column at any width. This
+ * paragraph is why --type-hero is 9.6 and not 10.5, and it stays for that.
  *
  * A THIRD find from the same fix pass that added `overflow-wrap: anywhere` to the contact
  * block: both `--type-hero` here and the mobile override below are `clamp()`s with a
@@ -261,46 +267,6 @@ body { overflow-x: hidden; }
   letter-spacing: 0.16em;
   color: var(--ink);
   max-width: 34ch;
-}
-
-/*
- * The teaser card: when and where to turn up, before anyone has scrolled. Filled, and
- * deliberately so -- it is a discrete object in the composition, and an opaque fill makes
- * its contrast a fixed number instead of a function of whatever the canvas is drawing.
- * That is the opposite of a plate slid under running text to rescue it: this card is a
- * thing you read as a unit, and the dim second line inside it is only possible BECAUSE it
- * is on a surface.
- */
-.teaser {
-  width: min(19rem, 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
-  padding: 1.15rem 1.25rem 1.1rem;
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.teaser-when {
-  font-size: 1.15rem;
-  font-weight: 500;
-  letter-spacing: -0.015em;
-  color: var(--ink);
-  max-width: none;
-}
-
-.teaser-where {
-  font-size: 0.86rem;
-  line-height: 1.5;
-  color: var(--ink-dim);
-  max-width: none;
-}
-
-.teaser-link {
-  margin-top: 0.5rem;
-  font-size: var(--type-micro);
-  font-weight: 500;
 }
 
 /* ---------------------------------------------------------------------------
@@ -554,6 +520,12 @@ body { overflow-x: hidden; }
  * assets' own intrinsic ratios (confirmed against public/images/*-2000.webp), so nothing
  * is cropped or letterboxed; this only tells the layout the shape in advance.
  */
+/*
+ * The hero and events photographs need no aspect-ratio rule: PHOTOS.hero and PHOTOS.events
+ * carry a width/height pair, so the <img>'s own attributes give the browser the shape and
+ * `height: auto` above resolves against it. The two below predate that mechanism and their
+ * content entries have no pair, so the ratio has to come from here.
+ */
 [data-section='about'] .section-photo img { aspect-ratio: 4 / 3; }
 [data-section='contact'] .section-photo img { aspect-ratio: 1000 / 343; }
 
@@ -594,6 +566,32 @@ body { overflow-x: hidden; }
   object-fit: cover;
   border-radius: var(--radius);
   margin-bottom: 0.45rem;
+}
+
+/*
+ * The stand-in for a seated member whose photograph has not arrived. Same 4:5 box the
+ * picture would occupy, so a half-photographed roster keeps its rows level instead of
+ * standing 300px short in the cards that have nothing.
+ *
+ * --surface, the same fill the panels use, rather than a tint of --accent: this is an
+ * absence, and a violet tile would read as a design element someone chose.
+ */
+.board-photo-pending {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  margin-bottom: 0.45rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.board-photo-pending span {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
 }
 
 .board-card h3 { font-size: 1rem; }
@@ -960,8 +958,6 @@ body { overflow-x: hidden; }
   }
 
   [data-panel='story'] p { font-size: 1.15rem; }
-
-  .teaser { width: 100%; }
 
   .form-list { flex-direction: column; align-items: flex-start; }
 

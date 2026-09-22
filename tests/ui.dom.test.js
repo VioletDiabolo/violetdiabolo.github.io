@@ -86,6 +86,52 @@ describe('board', () => {
     expect(openSlot.querySelector('img')).toBeNull();
   });
 
+  it('stands a 4:5 initials tile in for a seated member with no photograph', () => {
+    // Not cosmetic. A card with a picture is ~300px taller than one without, so before
+    // this a half-photographed roster dropped three of its six cards to a third the
+    // height of their neighbours and read as broken rather than as pending.
+    const el = document.getElementById('content');
+    mountBoard(el);
+    const roster = BOARD[Object.keys(BOARD)[0]];
+    const waiting = roster.filter((m) => !m.image && !m.placeholder);
+    expect(waiting.length, 'no seated member is waiting on a photograph').toBeGreaterThan(0);
+
+    for (const member of waiting) {
+      const card = el.querySelector(`[data-member="${member.name}"]`);
+      const tile = card.querySelector('.board-photo-pending');
+      expect(tile, `${member.name} has neither a photograph nor a stand-in`).not.toBeNull();
+      const initials = member.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+      expect(tile.textContent).toBe(initials);
+      // The letters are decoration; the label is what a screen reader should hear.
+      expect(tile.getAttribute('role')).toBe('img');
+      expect(tile.getAttribute('aria-label')).toContain(member.name);
+      expect(tile.querySelector('span').getAttribute('aria-hidden')).toBe('true');
+    }
+
+    // A member WITH a photograph gets the photograph and no tile.
+    for (const member of roster.filter((m) => m.image)) {
+      const card = el.querySelector(`[data-member="${member.name}"]`);
+      expect(card.querySelector('img'), `${member.name} lost their photograph`).not.toBeNull();
+      expect(card.querySelector('.board-photo-pending')).toBeNull();
+    }
+  });
+
+  it('gives an open slot no tile, because there is nobody to photograph', () => {
+    // The distinction the tile turns on: an unfilled SEAT is a different absence from a
+    // filled seat with no picture yet, and giving it initials would invent a person.
+    const el = document.getElementById('content');
+    mountBoard(el);
+    const semester = Object.keys(BOARD).find((k) => BOARD[k].some((m) => m.placeholder));
+    const select = el.querySelector('select');
+    select.value = semester;
+    select.dispatchEvent(new Event('change'));
+
+    const slot = [...el.querySelectorAll('[data-member]')].find((c) => c.dataset.placeholder === 'true');
+    expect(slot).toBeDefined();
+    expect(slot.querySelector('.board-photo-pending')).toBeNull();
+    expect(slot.querySelector('img')).toBeNull();
+  });
+
   it('renders a seated member whose photograph has not arrived, without an img', () => {
     // A distinct case from the open slot above, and new with the Fall 2026 board: a real
     // person holding a real role whose photo is not in public/images yet. The card must
@@ -194,6 +240,40 @@ describe('section photographs', () => {
       expect(img).not.toBeNull();
       expect(img.alt.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('the hero and events photographs', () => {
+  const render = () => { const root = document.createElement('main'); renderSections(root); return root; };
+
+  it('opens on a photograph, loaded eagerly because it is above the fold', () => {
+    const img = render().querySelector('#hero .section-photo img');
+    expect(img, 'the hero has no photograph').not.toBeNull();
+    // buildPicture defaults to lazy, which is right for every other photograph here and
+    // wrong for this one: it is the first screen, and deferring it leaves the hero half
+    // empty while the browser decides it was needed after all.
+    expect(img.getAttribute('loading')).toBe('eager');
+    expect(img.alt.length).toBeGreaterThan(0);
+  });
+
+  it('gives the events panel a photograph, lazily', () => {
+    const img = render().querySelector('#events .section-photo img');
+    expect(img, 'the events panel has no photograph').not.toBeNull();
+    expect(img.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('states the practice times once, in the events panel and nowhere else', () => {
+    // The hero used to carry a card restating them, which is why a guard existed to keep
+    // the two in step. The card is gone; this is the invariant that replaces it, and it
+    // is the stronger one — two places to edit is how they drifted in the first place.
+    const root = render();
+    for (const fact of ['Kimmel', 'Sylvette', '3-5PM', '5-7PM']) {
+      const holders = [...root.querySelectorAll('*')].filter((el) =>
+        [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.includes(fact)));
+      expect(holders.length, `"${fact}" appears in ${holders.length} places, not 1`).toBe(1);
+      expect(holders[0].closest('#events'), `"${fact}" is outside the events panel`).not.toBeNull();
+    }
+    expect(root.querySelector('.teaser'), 'the hero teaser card is still being rendered').toBeNull();
   });
 });
 

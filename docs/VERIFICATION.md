@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 232 tests, all passing**, and with no stderr noise (was 216 at merge; §11's pass added 16) |
+| Unit suite | `npx vitest run` → **17 files, 237 tests, all passing**, and with no stderr noise (was 216 at merge; §11 added 16, §12 added 5) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -431,6 +431,11 @@ parallel arithmetic to keep in sync — to move numbers that already clear with 
 rather than re-derived, and §10.6 says the same.
 
 ### The table, 1440 × 900, tightest margin first
+
+> **Three rows below are retired.** "teaser heading", "teaser detail" and "teaser link"
+> measured a card in the hero that §12 replaced with a photograph. The figures were real
+> when taken; the elements are gone. §12.3 has the current run.
+
 
 | block | px | wt | needs | measured | **bound** | at | margin | surface |
 |---|---|---|---|---|---|---|---|---|
@@ -894,3 +899,70 @@ each, `scrollWidth == clientWidth`.
 Alt text describes the action and never a name. These are identifiable students and
 nothing in the brief says which face belongs to which of the six board members; a test
 asserts no alt string contains any name from BOARD.
+
+
+---
+
+## 12. Second follow-up — photographs at the top, and on the board
+
+### 12.1 What moved
+
+The hero's practice card is gone and a photograph of the team stands in its place; the
+events panel gained one; three of the six Fall 2026 board members gained portraits.
+
+The practice times are now stated **once**, in the events panel. The card restated them,
+which is why a guard existed to hold the two in step; the guard is replaced by a stronger
+one that counts how many elements on the whole page paint each fact and requires exactly
+one, inside `#events`.
+
+### 12.2 Five masters in, one renamed, one photograph reused nowhere
+
+`P1011197` → `hero-group`, `P1011113` → `events-practice`, `P1011169` → `board-barry`,
+`P1011122` → `board-evan`, `P1011134` → `practice-pair`. `P1011184` was already in the
+repository as the gallery's `practice-spin`; it is the client's choice for Hannah Chen, so
+the master was **renamed** to `board-hannah` and the gallery slot refilled with
+`practice-pair` — one picture doing both jobs would have put it on the page twice.
+
+All five went through the same intake as §11.5: rotation applied, EXIF dropped, 2000px on
+the long edge. Two of the five carried `orientation=8`.
+
+The 4:5 crops the board cards actually paint were rendered and inspected before wiring,
+rather than trusted to a centred `object-fit: cover`: all three keep the subject's face
+well inside the frame.
+
+**Aaron Hui has a photograph and does not use it here.** It is a distant indoor full-body
+shot from the previous site; beside three close outdoor portraits from the 2026 shoot it
+reads as a mistake rather than a picture. It stays on every earlier roster, which is what
+it is a photograph of.
+
+### 12.3 Contrast and layout, re-run
+
+**25 of 25 blocks pass** (27 − 3 retired teaser blocks + 1 new). The board's stand-in
+tile carries initials at 40px, which measures **7.51:1** against a 3:1 large-text
+requirement. No missing selectors; the overflow sweep is clean at 375 and 280.
+
+The stand-in tile exists for a layout reason, not a decorative one: a card with a
+photograph stands about 300px taller than one without, so a half-photographed roster
+dropped three of its six cards to a third of their neighbours' height. Measured after:
+510 / 510 / 532 / 532 / 510 / 510.
+
+Hero and events photographs both render at 520×390 from the 1600px AVIF, `scrollWidth ==
+clientWidth`, and the hero's is `loading="eager"` — it is the first screen, and
+`buildPicture` defaults to lazy.
+
+### 12.4 A property that was not an attribute
+
+`buildPicture` set `img.loading = loading`. That works in a browser — verified on the live
+page, where the about photograph carries `loading="lazy"` — because the IDL property
+reflects. jsdom does not implement the reflection, so **no test in this suite could see
+the loading behaviour at all**, and the first one written for it failed against correct
+code. Changed to `setAttribute`, which is what the HTML spec reads and what both
+environments agree on.
+
+### 12.5 What the guards caught
+
+Both halves of §11.5's probe-coverage guard fired on this change before any human looked
+at it: the three teaser selectors became dead, and the board's initials painted text
+nothing measured. That is the whole reason they exist, and it is the first time in this
+project's history that a stale contrast contract was caught by a test rather than by
+someone noticing.

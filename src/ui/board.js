@@ -15,6 +15,27 @@ function card(member) {
       sizes: '(max-width: 720px) 90vw, 320px',
     });
     article.append(picture);
+  } else if (!member.placeholder) {
+    // A seated member whose photograph has not arrived yet — distinct from an open slot,
+    // which has nobody to photograph and gets nothing.
+    //
+    // It occupies the same 4:5 box a picture would, because the alternative is what this
+    // grid did before: a card with a photograph stands ~300px taller than one without, so
+    // a mixed roster reads as broken rather than as pending. Initials rather than a bare
+    // tile, so the box says WHOSE photograph is missing.
+    //
+    // Derived from the name rather than stored beside it: initials are not copy, and a
+    // second field would be one more thing to forget to update when a name changes.
+    const pending = document.createElement('div');
+    pending.className = 'board-photo-pending';
+    pending.dataset.pendingPhoto = member.name;
+    pending.setAttribute('role', 'img');
+    pending.setAttribute('aria-label', `No photograph of ${member.name} yet`);
+    const initials = document.createElement('span');
+    initials.setAttribute('aria-hidden', 'true');
+    initials.textContent = member.name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    pending.append(initials);
+    article.append(pending);
   }
 
   const name = document.createElement('h3');

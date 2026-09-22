@@ -24,7 +24,11 @@ export function buildPicture({
   img.srcset = srcset(fallbackExt, fallbackList);
   img.sizes = sizes;
   img.alt = alt;
-  img.loading = loading;
+  // setAttribute, not `img.loading = loading`. Both work in a browser — the IDL property
+  // reflects, verified on the live page — but the ATTRIBUTE is what the HTML spec reads,
+  // and the property form depends on the reflection being implemented. jsdom does not
+  // implement it, so the property form left every test here unable to see this at all.
+  img.setAttribute('loading', loading);
   img.decoding = 'async';
   // Optional, and only useful together: a width/height PAIR gives the browser the
   // picture's intrinsic ratio, so it reserves the right box before the bytes land

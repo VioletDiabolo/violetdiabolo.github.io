@@ -22,21 +22,6 @@ export const EVENTS = {
     'All equipment will be provided, and anyone is welcome, regardless of experience!',
 };
 
-/**
- * The hero's teaser card: the one thing a visitor to a club page actually needs before
- * they scroll -- when and where to turn up. Every fact here is already in EVENTS.body
- * above, restated in the short form a card can hold; nothing new is claimed on the
- * club's behalf. Kept as its own export rather than folded into EVENTS so the verbatim
- * practice-logistics prose the tests pin stays exactly as it was.
- */
-export const HERO_TEASER = Object.freeze({
-  heading: 'Sundays & Fridays',
-  detail:
-    'Sundays 3–5PM at Kimmel 606, Fridays 5–7PM at the Bust of Sylvette. ' +
-    'Equipment provided, and no experience needed.',
-  action: Object.freeze({ label: 'See practice details', target: 'events' }),
-});
-
 // Headings for the sections that don't otherwise carry a `heading` field (MEDIA is an
 // array, BOARD is a semester map, CONTACT is just an email/linktree pair) - kept here so
 // ui/sections.js never hardcodes club-facing copy, matching ABOUT.heading/EVENTS.heading.
@@ -127,12 +112,16 @@ const filler = (words) => `Bio coming soon — ${LOREM.slice(0, words).join(' ')
  * an unfilled seat on the board, and every seat here is filled.
  */
 const FALL_2026 = [
-  { name: 'Barry Chen', position: 'Co-President', image: null, description: filler(26) },
-  { name: 'Evan Yu', position: 'Co-President', image: null, description: filler(22) },
-  { name: 'Hannah Chen', position: 'Logistics', image: null, description: filler(30) },
+  { name: 'Barry Chen', position: 'Co-President', image: 'board-barry', description: filler(26) },
+  { name: 'Evan Yu', position: 'Co-President', image: 'board-evan', description: filler(22) },
+  { name: 'Hannah Chen', position: 'Logistics', image: 'board-hannah', description: filler(30) },
   { name: 'Emily Chen', position: 'Media', image: null, description: filler(24) },
   { name: 'Megan Kim', position: 'Media', image: null, description: filler(28) },
-  { name: 'Aaron Hui', position: 'Treasurer', image: AARON.image, description: filler(20) },
+  // Aaron has a photograph -- it is on every roster below -- but it is a distant indoor
+  // full-body shot from the old site, and beside three close outdoor portraits from the
+  // 2026 shoot it reads as a mistake rather than a picture. Placeholder here, kept where
+  // it belongs, on the semesters it was taken for.
+  { name: 'Aaron Hui', position: 'Treasurer', image: null, description: filler(20) },
 ];
 
 export const BOARD = {
@@ -189,8 +178,8 @@ export const PRACTICE_PHOTOS = Object.freeze({
       alt: "A club member spinning a diabolo in front of Picasso's Bust of Sylvette" },
     { base: 'practice-reach', widths: [500, 1000], width: 1000, height: 1333,
       alt: 'A club member catching a diabolo with both arms spread wide' },
-    { base: 'practice-spin', widths: [500, 1000], width: 1000, height: 1333,
-      alt: 'A club member mid-turn with a diabolo, trees behind' },
+    { base: 'practice-pair', widths: [500, 1000], width: 1000, height: 1333,
+      alt: 'A club member running two diabolos at once, one on each end of the string' },
     { base: 'practice-back', widths: [500, 1000], width: 1000, height: 1333,
       alt: 'A club member seen from behind, a diabolo running along the string' },
     { base: 'practice-team', widths: [500, 1000], width: 1000, height: 750,
@@ -198,8 +187,19 @@ export const PRACTICE_PHOTOS = Object.freeze({
   ]),
 });
 
-/** The club's two photographs, carried over from the previous site. */
+/**
+ * The page's standalone photographs: two carried over from the previous site, two from
+ * the 2026 practice shoot.
+ *
+ * `hero` and `events` carry a width/height pair and the older two do not, which is not an
+ * oversight: sections.css declares an aspect-ratio for the about and contact photographs
+ * per section, and these two take theirs from the img's own attributes instead (see
+ * src/ui/picture.js). Both reserve the box; only one of them needs a stylesheet to know
+ * the shape.
+ */
 export const PHOTOS = {
   group: { base: 'group-usadc', widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo performing together at the USADA National Diabolo Competition' },
   wide:  { base: 'usadc-wide',  widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo on stage at the USADA National Diabolo Competition' },
+  hero:  { base: 'hero-group', widths: [800, 1600], width: 1600, height: 1200, alt: 'Five Violet Diabolo members on the lawn after practice, diabolos spinning' },
+  events: { base: 'events-practice', widths: [800, 1600], width: 1600, height: 1200, alt: 'A club member spinning a diabolo on the lawn outside the Kimmel Center' },
 };
