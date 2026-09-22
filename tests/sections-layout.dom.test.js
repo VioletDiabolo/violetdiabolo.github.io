@@ -290,7 +290,12 @@ describe('the hero wordmark size cap', () => {
       .toBeGreaterThanOrEqual(2); // the base rule and the narrow-screen override
 
     for (const body of decls) {
-      const fontSize = body.match(/font-size\s*:([^;]*);/)[1];
+      // The LAST font-size in the rule, not the first: each rule carries a bare
+      // declaration ahead of the capped one as a no-`cqi` fallback, and the cascade
+      // gives the win to the last one a browser understood. Matching the first would
+      // read the fallback and pass on a rule whose cap had been deleted.
+      const all = [...body.matchAll(/font-size\s*:([^;]*);/g)];
+      const fontSize = all[all.length - 1][1];
       expect(fontSize, `hero h1 font-size "${fontSize.trim()}" is not capped against the ` +
         'container -- a bare clamp() lets the wordmark outgrow its column and break mid-word')
         .toMatch(/cqi/);

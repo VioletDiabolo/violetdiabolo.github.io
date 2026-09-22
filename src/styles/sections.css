@@ -225,7 +225,13 @@ body { overflow-x: hidden; }
    * are: 100cqi tracks the container, and --wordmark-em is a bare number. --type-hero's
    * rem floor can still win inside the min(), but only by being the SMALLER of the two,
    * which is the direction that is always safe.
+   *
+   * The plain declaration first is the fallback, not a duplicate: a browser that does not
+   * know `cqi` drops the whole min() at parse time, and with nothing before it the hero
+   * would fall to the UA's default h1 size -- the entire type scale gone, not merely the
+   * cap. One line turns that into "uncapped, as it shipped before this fix".
    */
+  font-size: var(--type-hero);
   font-size: min(var(--type-hero), calc(100cqi / var(--wordmark-em)));
   font-weight: 200;
   line-height: 0.88;
@@ -905,7 +911,9 @@ body { overflow-x: hidden; }
        .room into a block, but .room-head is still the query container, so 100cqi is
        still the width the wordmark actually has. Without this line the 280px/32px-root
        case keeps its mid-word break -- the mobile clamp's 2.9rem floor resolves to
-       92.8px there against a 200px column. */
+       92.8px there against a 200px column. The bare declaration above it is the same
+       no-`cqi` fallback the wide rule carries, for the same reason. */
+    font-size: clamp(2.9rem, 15vw, 4.5rem);
     font-size: min(clamp(2.9rem, 15vw, 4.5rem), calc(100cqi / var(--wordmark-em)));
     max-width: none;
   }
