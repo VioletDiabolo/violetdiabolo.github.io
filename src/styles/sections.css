@@ -146,7 +146,22 @@ body { overflow-x: hidden; }
   padding-block: var(--nav-clear) clamp(2.5rem, 9vh, 5.5rem);
 }
 
-[data-panel='hero'] .room-head { grid-column: 1; }
+/*
+ * The hero head is a QUERY CONTAINER, and that is the whole mechanism behind the h1's
+ * size cap below. Its width is the grid track -- min(38%, 30rem) of the panel, whatever
+ * that comes to -- and no viewport formula reproduces that number, because the track is
+ * a percentage of a box that already has the gutters taken out of it. 100cqi IS that
+ * number, so the cap is derived from the column the word actually has to fit in.
+ *
+ * Safe to contain: the track is minmax(0, --text-col), a definite size that never
+ * depended on this box's contents, so inline-size containment takes nothing away that
+ * the layout was using. Measured before and after at 1024, 768 and 1440 -- the head's
+ * width is identical.
+ */
+[data-panel='hero'] .room-head {
+  grid-column: 1;
+  container-type: inline-size;
+}
 
 /*
  * flex + justify-content, not `justify-self: end` on the item. The item shrink-to-fit
@@ -196,7 +211,22 @@ body { overflow-x: hidden; }
  * same reason it cost nothing there.
  */
 [data-panel='hero'] h1 {
-  font-size: var(--type-hero);
+  /*
+   * min(), so --type-hero is a CEILING and the column has the final say. The second
+   * term is the largest size at which "DIABOLO" still fits the head's real width
+   * (--wordmark-em, base.css). Below that width the type shrinks; it never breaks.
+   *
+   * This is the fix for the client's screenshot: at 1024x768 the head is 350px and
+   * --type-hero resolved to 98.3px, where DIABOLO paints 393px of ink. It had nowhere
+   * to go but a second line, and base.css's `overflow-wrap: anywhere` gave it one --
+   * "VIOLET" / "DIABOL" / "O". The cap puts the size where the word fits instead.
+   *
+   * Both terms had to be viewport-derived for this to hold at 200% text zoom, and both
+   * are: 100cqi tracks the container, and --wordmark-em is a bare number. --type-hero's
+   * rem floor can still win inside the min(), but only by being the SMALLER of the two,
+   * which is the direction that is always safe.
+   */
+  font-size: min(var(--type-hero), calc(100cqi / var(--wordmark-em)));
   font-weight: 200;
   line-height: 0.88;
   letter-spacing: -0.045em;
@@ -871,7 +901,12 @@ body { overflow-x: hidden; }
   [data-panel] .room-body { margin-top: clamp(1.75rem, 5vh, 2.5rem); }
 
   [data-panel='hero'] h1 {
-    font-size: clamp(2.9rem, 15vw, 4.5rem);
+    /* Same cap as the wide rule, against the same container: the narrow branch turns
+       .room into a block, but .room-head is still the query container, so 100cqi is
+       still the width the wordmark actually has. Without this line the 280px/32px-root
+       case keeps its mid-word break -- the mobile clamp's 2.9rem floor resolves to
+       92.8px there against a 200px column. */
+    font-size: min(clamp(2.9rem, 15vw, 4.5rem), calc(100cqi / var(--wordmark-em)));
     max-width: none;
   }
 

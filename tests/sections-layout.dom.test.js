@@ -261,3 +261,61 @@ describe('nothing sticks to the viewport', () => {
       `"${position?.selector}" (${position?.rule.sheet})`).toBe('fixed');
   });
 });
+
+/*
+ * The hero wordmark, and why this is a source guard rather than a layout assertion:
+ * jsdom has no layout engine, so nothing here can measure where the ink lands. The
+ * measurements that justify these rules were taken in a real browser and are recorded
+ * with their numbers in the CSS comments; what this file can do is make sure the
+ * MECHANISM those measurements were taken against is still present and still complete.
+ *
+ * The defect being guarded: at 1024x768 the hero head is 350px and --type-hero resolved
+ * to 98.3px, where "DIABOLO" paints 393px. base.css's `overflow-wrap: anywhere` broke it
+ * -- the client's screenshot showed "VIOLET" / "DIABOL" / "O". The fix caps the hero's
+ * font-size at the size its widest word fits, measured against the container.
+ */
+describe('the hero wordmark size cap', () => {
+  const BASE_CSS = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/styles/base.css');
+  const strip = (file) => readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('caps EVERY hero h1 font-size against the container, not just the first one', () => {
+    // matchAll, for the reason the --type-title guard above learned the hard way: a
+    // stylesheet grows by ADDING a rule, and a guard that inspects only the first
+    // declaration it finds is blind to exactly that.
+    const decls = [...strip(SECTIONS_CSS).matchAll(
+      /\[data-panel=['"]hero['"]\]\s+h1\s*\{([^{}]*)\}/g,
+    )].map((m) => m[1]).filter((body) => /font-size\s*:/.test(body));
+
+    expect(decls.length, 'no rule sets the hero h1 font-size any more -- update this guard')
+      .toBeGreaterThanOrEqual(2); // the base rule and the narrow-screen override
+
+    for (const body of decls) {
+      const fontSize = body.match(/font-size\s*:([^;]*);/)[1];
+      expect(fontSize, `hero h1 font-size "${fontSize.trim()}" is not capped against the ` +
+        'container -- a bare clamp() lets the wordmark outgrow its column and break mid-word')
+        .toMatch(/cqi/);
+      expect(fontSize, `hero h1 font-size "${fontSize.trim()}" does not take a min() -- ` +
+        'a cap that is not the smaller of the two terms is not a cap').toMatch(/min\s*\(/);
+    }
+  });
+
+  it('establishes the query container the cap measures against', () => {
+    // Without this the cqi term above resolves against the small-viewport fallback and
+    // the cap silently stops tracking the column it is supposed to track.
+    const rule = strip(SECTIONS_CSS).match(
+      /\[data-panel=['"]hero['"]\]\s+\.room-head\s*\{([^{}]*)\}/,
+    );
+    expect(rule, 'no [data-panel="hero"] .room-head rule found at all').not.toBeNull();
+    expect(rule[1]).toMatch(/container-type\s*:\s*inline-size/);
+  });
+
+  it('keeps --wordmark-em at or above the width the word actually needs', () => {
+    // 4.004em is "DIABOLO" measured in a real browser at Inter 200 with the hero's
+    // -0.045em tracking; "VIOLET" is 3.179em, so DIABOLO binds. A divisor below the
+    // measurement is a cap that does not fit its own word -- which is the original bug
+    // wearing the fix's clothes.
+    const value = strip(BASE_CSS).match(/--wordmark-em\s*:\s*([0-9.]+)\s*;/);
+    expect(value, '--wordmark-em is gone; the hero cap has no divisor').not.toBeNull();
+    expect(Number(value[1])).toBeGreaterThanOrEqual(4.004);
+  });
+});

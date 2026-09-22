@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { stubGL } from './helpers/webgl-stub.js';
 import { TARGET_FPS } from '../src/render/budget.js';
+import { RESTING_RATE } from '../src/gradient/gradient.js';
 import { PENDING_CLASS } from '../src/ui/reveal.js';
 
 // jsdom implements no IntersectionObserver, and initReveal() (src/ui/reveal.js) is
@@ -414,16 +415,20 @@ describe('the animated onFrame composition', () => {
 
   it('hands render() the ACCUMULATED elapsed, not the single frame delta', async () => {
     await boot();
-    // gradient.render(delta) does `time += delta` and writes u_time, so the uniform is a
-    // running total of what onFrame passed it. Five frames a third of an interval apart
-    // produce exactly one draw, and the time it advanced by must be the four deltas the
-    // cap held onto -- not the one delta of the frame that happened to trip it, which is
-    // four times smaller and what `gradient.render(delta)` would have written.
+    // gradient.render(delta) does `time += delta * RESTING_RATE` (nothing is scrolling
+    // here, so the boost is 0) and writes u_time, so the uniform is a running total of
+    // what onFrame passed it, scaled by the resting rate. Five frames a third of an
+    // interval apart produce exactly one draw, and the time it advanced by must be the
+    // four deltas the cap held onto -- not the one delta of the frame that happened to
+    // trip it, which is four times smaller and what `gradient.render(delta)` would have
+    // written. RESTING_RATE is read from the module rather than written in, so this
+    // stays a test of the CAP's arithmetic and not of the rate's value.
     const r = run(5, SLOW_MS);
     expect(r.draws).toBe(1);
     expect(r.time, 'render() got the frame delta rather than the accumulated elapsed')
-      .toBeCloseTo((4 * SLOW_MS) / 1000, 9);
-    expect(r.time, 'render() got a single frame delta').not.toBeCloseTo(SLOW_MS / 1000, 9);
+      .toBeCloseTo((4 * SLOW_MS * RESTING_RATE) / 1000, 9);
+    expect(r.time, 'render() got a single frame delta')
+      .not.toBeCloseTo((SLOW_MS * RESTING_RATE) / 1000, 9);
   });
 
   it('steps Lenis on EVERY frame, ahead of the cap, not only on the frames that draw', async () => {

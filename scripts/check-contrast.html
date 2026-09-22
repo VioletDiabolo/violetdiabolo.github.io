@@ -147,7 +147,11 @@ const H = int('height', 900, 320, 4096);
 // Defaults to contrast.js's own TIME_STEPS so the sample count and the module agree
 // unless the caller deliberately says otherwise.
 const STEPS = int('steps', TIME_STEPS, 1, 64);
-const STEP_SECONDS = 5.5; // 12 x 5.5s = a 66s window, wider than one noise cycle
+// Shader TIME UNITS, not seconds: 12 x 5.5 = a 66-unit window, wider than one noise
+// cycle. gradient.js runs u_time at RESTING_RATE units/second, so 66 units is about 22
+// wall-clock seconds at rest — but u_time is what the shader reads, and the worst case
+// is over u_time, so the window does not move when the rate does.
+const STEP_UNITS = 5.5;
 
 /* ---------------------------------------------------------------------------
  * Colour plumbing. Everything is 0-255 integers, because that is what the framebuffer
@@ -365,7 +369,6 @@ function buildGradient() {
   gl.uniform3f(u('u_mid'), ...PALETTE.mid);
   gl.uniform3f(u('u_bright'), ...PALETTE.bright);
   gl.uniform2f(u('u_resolution'), W, H);
-  gl.uniform1f(u('u_velocity'), 0);
   gl.viewport(0, 0, W, H);
   return { gl, uTime: u('u_time') };
 }
@@ -540,7 +543,7 @@ async function main() {
   const accentInk = anyColor(tokens['--accent-ink']);
 
   say('tokens', [
-    `viewport under test    : ${W}x${H}   time steps: ${STEPS} x ${STEP_SECONDS}s`,
+    `viewport under test    : ${W}x${H}   time steps: ${STEPS} x ${STEP_UNITS} units`,
     `contrast.js TIME_STEPS : ${TIME_STEPS}`,
     '',
     'gradient stops (PALETTE, src/gradient/palette.js):',
@@ -616,7 +619,7 @@ async function main() {
   const pixels = new Uint8Array(W * H * 4);
   const samples = resolved.map(() => []);
   for (let step = 0; step < STEPS; step++) {
-    gl.uniform1f(uTime, step * STEP_SECONDS);
+    gl.uniform1f(uTime, step * STEP_UNITS);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     resolved.forEach((b, i) => samples[i].push(brightestIn(pixels, b.band)));
@@ -672,7 +675,7 @@ async function main() {
   ].join('\n'), fails.length || missing.length ? 'bad' : 'ok');
 
   return {
-    viewport: { width: W, height: H, steps: STEPS, stepSeconds: STEP_SECONDS },
+    viewport: { width: W, height: H, steps: STEPS, stepUnits: STEP_UNITS },
     tokens,
     stops: STOPS,
     surfaces: surfaceResult,
