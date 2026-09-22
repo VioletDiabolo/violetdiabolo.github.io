@@ -26,7 +26,12 @@ export const TARGETS = [
   // The hero and the events panel. Both sit in a panel's second column -- at most about
   // 700px at 1440 -- so 1600 covers a 2x screen with room to spare.
   { name: 'hero-group',      file: 'hero-group.jpg',      widths: [800, 1600], jpgWidths: [] },
-  { name: 'events-practice', file: 'events-practice.jpg', widths: [800, 1600], jpgWidths: [] },
+  // 1200, not 1600, because this one is a PORTRAIT: its master is 1500x2000, and
+  // `withoutEnlargement` would have capped a 1600 request at 1500 while the srcset still
+  // advertised it as 1600w. A `w` descriptor that lies makes the browser pick the wrong
+  // file; the guard in tests/assets.test.js now checks every derivative against its own
+  // filename for exactly this.
+  { name: 'events-practice', file: 'events-practice.jpg', widths: [600, 1200], jpgWidths: [] },
 
   // Board portraits, at the same two widths as the two that predate them: the card crops
   // to 4:5 at a track of at most 320px, so 800 is already the 2x size.

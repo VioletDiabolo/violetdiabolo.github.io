@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 237 tests, all passing**, and with no stderr noise (was 216 at merge; §11 added 16, §12 added 5) |
+| Unit suite | `npx vitest run` → **17 files, 238 tests, all passing**, and with no stderr noise (was 216 at merge; §11 added 16, §12 added 6) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -930,10 +930,10 @@ The 4:5 crops the board cards actually paint were rendered and inspected before 
 rather than trusted to a centred `object-fit: cover`: all three keep the subject's face
 well inside the frame.
 
-**Aaron Hui has a photograph and does not use it here.** It is a distant indoor full-body
-shot from the previous site; beside three close outdoor portraits from the 2026 shoot it
-reads as a mistake rather than a picture. It stays on every earlier roster, which is what
-it is a photograph of.
+**Aaron Hui keeps his photograph**, the one from the previous site. It was briefly
+replaced with a stand-in tile on the grounds that a distant indoor full-body shot reads
+oddly beside three close outdoor portraits; the client's answer was to keep it, so the
+Fall 2026 roster shows four photographs and two tiles.
 
 ### 12.3 Contrast and layout, re-run
 
@@ -966,3 +966,49 @@ at it: the three teaser selectors became dead, and the board's initials painted 
 nothing measured. That is the whole reason they exist, and it is the first time in this
 project's history that a stale contrast contract was caught by a test rather than by
 someone noticing.
+
+
+---
+
+## 13. Two corrections, and a descriptor that would have lied
+
+### 13.1 The events photograph is `P1011100`
+
+Client's pick, replacing `P1011113`. It is two members practising together, one teaching
+the other, which sits better against copy that ends "anyone is welcome, regardless of
+experience".
+
+It is also a **portrait** where the last one was landscape, and that mattered more than
+the picture. Its master is 1500×2000, and the target was still configured `[800, 1600]`.
+`withoutEnlargement: true` would have written the 1600 derivative at **1500px** while
+`buildPicture` went on advertising it as `1600w` — a srcset descriptor the browser acts
+on, picking a candidate believing it is wider than it is. Caught before the file shipped;
+the widths are `[600, 1200]` now, both inside the master.
+
+A guard was added for the general case: every generated derivative's real pixel width must
+equal the width in its own filename. Falsified by restoring `[800, 1600]` and rebuilding —
+it names `events-practice-1600.avif is 1500px wide, not 1600`.
+
+### 13.2 Aaron Hui keeps his photograph
+
+The §12 judgment call is reversed at the client's instruction. Four photographs, two
+tiles.
+
+### 13.3 The stand-in tile was invisible
+
+It shipped with `background: var(--surface)`. Measured on the live page: `--surface` is
+`#16121f` and a **solid panel's background is also `#16121f`**, so the tile was exactly
+the colour of the thing it sat on — it reserved the right box, which was its main job, but
+the initials floated in nothing and it did not read as a slot at all.
+
+Now `var(--stage)` (`#08060d`), the page's own ground, so it reads as a hole punched
+through the panel. A fill rather than a border, because `.board-card`'s own rule is "no
+fill and no border" and a framed empty box is the card kit that rule rejects.
+
+The initials measure **8.22:1** on the darker ground, up from 7.51:1, against a 3:1
+large-text requirement. **25 of 25 blocks pass**, no missing selectors, overflow clean.
+
+This one is worth naming for what it says about the §11.5 coverage guards: they proved the
+tile's text was *measured*, and measured correctly. They cannot see that a box is the same
+colour as its background, because that is not a contrast failure — it is a design failure
+that happens to pass every contrast check. It took looking at the page.
