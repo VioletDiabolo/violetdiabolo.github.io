@@ -17,8 +17,8 @@ export const ABOUT = {
 export const EVENTS = {
   heading: 'EVENTS',
   body:
-    'Two practices a week, both on Sundays: 3-5PM in Kimmel Center, Room 606, then 5-7PM ' +
-    'outdoors at the Bust of Sylvette. Come to either or stay for both. ' +
+    'Two practices a week: Sundays 3-5PM in Kimmel Center, Room 606, and Fridays 5-7PM ' +
+    'outdoors at the Bust of Sylvette. Come to either or both. ' +
     'All equipment will be provided, and anyone is welcome, regardless of experience!',
 };
 
@@ -30,8 +30,10 @@ export const EVENTS = {
  * practice-logistics prose the tests pin stays exactly as it was.
  */
 export const HERO_TEASER = Object.freeze({
-  heading: 'Sundays, 3–7PM',
-  detail: 'Kimmel 606, then the Bust of Sylvette. Equipment provided, and no experience needed.',
+  heading: 'Sundays & Fridays',
+  detail:
+    'Sundays 3–5PM at Kimmel 606, Fridays 5–7PM at the Bust of Sylvette. ' +
+    'Equipment provided, and no experience needed.',
   action: Object.freeze({ label: 'See practice details', target: 'events' }),
 });
 

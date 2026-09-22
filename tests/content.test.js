@@ -16,14 +16,16 @@ describe('content', () => {
     expect(ABOUT.body).toContain("Hell’s Kitchen");
   });
 
-  it('carries both weekly practices, with a time and a place for each', () => {
-    // Fall 2026: two practices, back to back on Sundays. The "first practice will be on
+  it('carries both weekly practices, with a day, a time and a place for each', () => {
+    // Fall 2026: two practices on two different days. The "first practice will be on
     // September 20" line that used to be pinned here went with them -- it dated the 2025
     // season, and a past date standing beside a new timetable reads as this year's.
-    expect(EVENTS.body).toContain('Sundays');
-    expect(EVENTS.body).toContain('3-5PM');
-    expect(EVENTS.body).toContain('Kimmel Center, Room 606');
-    expect(EVENTS.body).toContain('5-7PM');
+    //
+    // Each day is checked NEXT TO its own time, not merely present somewhere in the
+    // string: the first draft of this copy had both practices on Sunday, and every
+    // assertion that looked for the pieces separately passed on it just as happily.
+    expect(EVENTS.body).toContain('Sundays 3-5PM in Kimmel Center, Room 606');
+    expect(EVENTS.body).toContain('Fridays 5-7PM');
     expect(EVENTS.body).toContain('Bust of Sylvette');
   });
 
@@ -31,17 +33,14 @@ describe('content', () => {
     // HERO_TEASER's own doc comment promises exactly this — that the card restates
     // EVENTS.body and never adds a fact of its own — and nothing checked it until both
     // were rewritten at once. A teaser that drifts from the section it summarises is a
-    // club page telling a visitor two different times to turn up.
-    for (const fact of ['Sundays', 'Kimmel 606', 'Bust of Sylvette']) {
-      const teaser = `${HERO_TEASER.heading} ${HERO_TEASER.detail}`;
+    // club page telling a visitor two different days to turn up.
+    const teaser = `${HERO_TEASER.heading} ${HERO_TEASER.detail}`;
+    for (const fact of ['Sundays', 'Fridays', '3–5PM', '5–7PM', 'Kimmel 606', 'Bust of Sylvette']) {
       expect(teaser, `"${fact}" is not in the teaser`).toContain(fact);
     }
-    expect(EVENTS.body).toContain('Sundays');
-    expect(EVENTS.body).toContain('Room 606');
-    expect(EVENTS.body).toContain('Bust of Sylvette');
-    // The teaser's span has to bracket both practices, not just the first.
-    expect(HERO_TEASER.heading).toContain('3');
-    expect(HERO_TEASER.heading).toContain('7');
+    // The card pairs each day with its own time, for the same reason as above.
+    expect(HERO_TEASER.detail).toContain('Sundays 3–5PM at Kimmel 606');
+    expect(HERO_TEASER.detail).toContain('Fridays 5–7PM at the Bust of Sylvette');
   });
 
   it('lists all ten videos with plausible YouTube ids', () => {
