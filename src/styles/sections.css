@@ -401,24 +401,34 @@ body { overflow-x: hidden; }
 /*
  * The club's email address (CONTACT.email, content/index.js) is one unbreakable token --
  * no spaces, so nothing upstream of it can create a soft-wrap opportunity inside it. At a
- * 32px root font (200% text zoom) that token alone is wider than the mobile column, and
- * because this heading/paragraph/socials stack is a COLUMN flex with `align-items:
- * flex-start` (not stretch), each child sizes to its own fit-content width rather than
- * being clamped to the column -- so the paragraph's box grows to match the address and
- * drags document.documentElement.scrollWidth past clientWidth with it. Measured at
- * 375x812, 32px root: 434px scrollWidth against 375 clientWidth, 59px clipped by
- * `body { overflow-x: hidden }` (this file, line 49) rather than scrolled -- silent, not
- * a scrollbar.
+ * 32px root font (200% text zoom) that token alone is wider than the mobile column.
+ * Measured at 375x812, 32px root, with no overflow-wrap on this rule: 434px scrollWidth
+ * against 375 clientWidth, 59px clipped by `body { overflow-x: hidden }` (this file,
+ * line 49) rather than scrolled -- silent, not a scrollbar.
  *
- * `overflow-wrap: break-word` -- the declaration most people reach for first -- measures
- * NO CHANGE AT ALL here (434px before and after): break-word only creates a break at an
- * otherwise-unbreakable point when the LINE has already wrapped down to just that word,
- * and it does not feed into the box's min-content size calculation the fit-content
- * column above is using, so the track this paragraph sizes never shrinks.
- * `overflow-wrap: anywhere` is different -- it changes the min-content contribution
- * itself, which is what the fit-content column actually measures against. Measured:
- * scrollWidth 434 -> 411 (the remainder is the nav's own overflow, fixed separately in
- * base.css), and the address's own box 394.5px -> 282px.
+ * NOT a fit-content-column problem. An earlier version of this comment said the
+ * paragraph's own box grows to match the address; that was wrong. The paragraph
+ * measures 295px in every state tested (no rule, break-word, anywhere), and never
+ * moves. Only the inline `<a>` overflows -- the same box-vs-ink split as the shared
+ * `h1, h2, h3` rule's own comment (base.css) and check-contrast.html's Range-based scan:
+ * a long unbreakable run of inline content can paint past the end of its line without
+ * the line's box, or its block ancestor's box, growing to contain it.
+ * `getBoundingClientRect()` on the paragraph reports 295px throughout; only a `Range`
+ * over the link's own content, or `document.documentElement.scrollWidth`, shows the
+ * address running past the column.
+ *
+ * `overflow-wrap: break-word` DOES resolve this, measured: scrollWidth 375, the link's
+ * own box 282.03px -- identical to `anywhere`. (An earlier version of this comment, and
+ * the guard in tests/visual-language.test.js, both claimed break-word measured no
+ * change at all, 434px before and after; that was also wrong, and is corrected
+ * alongside this comment.) The two properties differ, by spec, in whether they feed a
+ * line's soft-wrap opportunities into min-content/max-content intrinsic-size
+ * calculations -- but nothing in this stack sizes itself from the paragraph's or link's
+ * intrinsic width (see above), so that difference has nothing to act on here, and both
+ * properties produce the same rendered line breaks. `anywhere` is used regardless, not
+ * because break-word fails on this page, but because `anywhere` is the spec-correct
+ * declaration for this failure mode and does not depend on an intrinsic-sizing
+ * interaction that, per spec, `break-word` is not obliged to honour on every engine.
  */
 [data-section='contact'] .room-head p,
 [data-section='contact'] .room-head p a {

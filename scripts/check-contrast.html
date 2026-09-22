@@ -70,10 +70,14 @@
   that only walks descendants, and a heading's overlong single word (base.css's shared
   `h1, h2, h3` rule) can paint past a box that never itself grows, which a scan of
   `getBoundingClientRect()` alone cannot see. `scrollWidth`/`clientWidth` are printed
-  alongside for the literal claim the brief asked for, but the verdict is which real
-  elements overflow -- a fixed decorative canvas (`#gradient`) could in principle move
-  that raw pair on its own with nothing behind it to reach, which is why the check does
-  not stop at comparing the two numbers.
+  alongside for the literal claim the brief asked for, and -- as of fix pass 3 -- checked
+  directly as well: pass requires BOTH zero named offenders AND scrollWidth ===
+  clientWidth exactly. The raw pair is asserted, not just printed, because a fixed
+  decorative canvas (`#gradient`) sits outside both scanned subtrees (#content,
+  .site-nav) and could in principle move that pair on its own with nothing an
+  offender-scan would ever name -- which is exactly what its old `width: 100vw; height:
+  100vh` risked reintroducing (see base.css). Equality holds exactly at both widths with
+  every fix in this file's own list applied, so asserting it costs nothing.
 
   RUN IT:  npm run dev  ->  http://localhost:5173/scripts/check-contrast.html
            ?width=1440&height=900&steps=12   (defaults; all three are overridable, so
@@ -419,11 +423,15 @@ function overflowingElements(root, clientWidth) {
     range.selectNodeContents(el);
     const inkRight = el.childNodes.length ? range.getBoundingClientRect().right : 0;
     const right = Math.max(boxRight, inkRight);
-    if (right > clientWidth + 0.5) {
+    // 0.05px, not 0.5: this is the tolerance the report claims ("0.05px tolerance") for
+    // the exhaustive scan it describes, and a 0.5px window is wide enough to hide a real
+    // half-pixel overflow -- exactly the kind of residual this file exists to catch
+    // rather than paper over.
+    if (right > clientWidth + 0.05) {
       offenders.push({
         selector: el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : el.tagName.toLowerCase(),
         right: Math.round(right * 10) / 10,
-        viaInk: inkRight > boxRight + 0.5,
+        viaInk: inkRight > boxRight + 0.05,
       });
     }
   }
@@ -469,10 +477,15 @@ async function checkOverflow(frameEl, doc) {
     rows.push({
       width, clientWidth, scrollWidth,
       offenders,
-      // The claim this section exists to catch: real content -- not the fixed gradient
-      // backdrop, which carries none -- painting outside the viewport. See the header
-      // comment for why that box is excluded rather than folded into "offenders".
-      pass: offenders.length === 0,
+      // Two signals, both required. offenders.length === 0 catches real content under
+      // #content or .site-nav painting past clientWidth, named and measured. scrollWidth
+      // === clientWidth catches everything else -- chiefly #gradient, which sits outside
+      // both scanned subtrees and is exactly what moved this raw pair on its own before
+      // fix pass 3 removed its explicit vw/vh width (see base.css). Equality holds
+      // exactly at both widths with every fix in this pass applied, so asserting it
+      // costs nothing, and it is the one check that catches that symptom class directly
+      // instead of printing a note beside a result this file still called green.
+      pass: offenders.length === 0 && scrollWidth === clientWidth,
     });
 
     doc.documentElement.style.fontSize = '';
@@ -495,21 +508,23 @@ async function main() {
   const overflowFails = overflowRows.filter((r) => !r.pass);
   say('overflow', [
     'Real content (#content, .site-nav) painting outside the viewport at a 32px root',
-    'font (200% text zoom), at each width. The verdict is which elements overflow, not',
-    'merely scrollWidth vs clientWidth -- a fixed decorative backdrop could move that raw',
-    'pair on its own with nothing behind it to reach (see the header comment) -- but the',
-    'two are printed together because a real content defect always widens both together.',
+    'font (200% text zoom), at each width. PASS requires BOTH zero named offenders AND',
+    'scrollWidth === clientWidth exactly -- the second catches anything outside the two',
+    'scanned subtrees (chiefly the fixed #gradient canvas) that the offender scan below',
+    'was never going to name. Each offender is measured two ways, box and ink; "(ink)"',
+    'means only a Range over the element\'s contents caught it -- see the header comment.',
     '',
     `${'width'.padStart(6)}${'scrollWidth'.padStart(13)}${'clientWidth'.padStart(13)}  verdict`,
     '-'.repeat(50),
     ...overflowRows.map((r) => `${String(r.width).padStart(6)}${String(r.scrollWidth).padStart(13)}`
-      + `${String(r.clientWidth).padStart(13)}  ${r.pass ? 'PASS' : 'FAIL'}`
-      + (r.scrollWidth !== r.clientWidth && r.pass
-        ? '  (scrollWidth/clientWidth differ; no content element accounts for it -- see header comment)'
-        : '')),
+      + `${String(r.clientWidth).padStart(13)}  ${r.pass ? 'PASS' : 'FAIL'}`),
     ...overflowFails.flatMap((r) => [
-      `  width ${r.width}: content painting past clientWidth (${r.clientWidth}px):`,
-      ...r.offenders.map((o) => `    ${o.selector.padEnd(28)} right edge ${o.right}px`),
+      `  width ${r.width}: scrollWidth ${r.scrollWidth} vs clientWidth ${r.clientWidth}:`,
+      ...r.offenders.map((o) => `    ${o.selector.padEnd(28)} right edge ${o.right}px  ${o.viaInk ? '(ink escapes box)' : '(box)'}`),
+      ...(r.offenders.length === 0
+        ? ['    (no scanned element accounts for it -- likely #gradient or another element'
+          + ' outside #content/.site-nav; see the header comment)']
+        : []),
     ]),
   ].join('\n'), overflowFails.length ? 'bad' : 'ok');
 

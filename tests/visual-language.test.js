@@ -983,6 +983,16 @@ describe('the story panel', () => {
  * closed-state text -- all silenced by the same `body { overflow-x: hidden }`
  * (sections.css) that hid the other two.
  *
+ * CORRECTED IN FIX PASS 3: the 411-with-contact-hidden number above was real, but the
+ * cause named for it was not. It was the hero h1's own ink (base.css's shared
+ * `h1, h2, h3` rule) escaping its column at 411.1px -- invisible to a box-only scan of
+ * the nav -- not .site-nav-links/.site-nav-cta's own sizing. Fix pass 2 also gave
+ * .site-nav and #gradient an explicit `width: 100vw` (`100vh` on #gradient's height) on
+ * the strength of that same misattribution; fix pass 3 removed both declarations and
+ * their guards below once re-measurement showed they fixed nothing on their own and
+ * masked the same defect class when tested in isolation. See base.css's `.site-nav` and
+ * `#gradient` comments.
+ *
  * These are static, source-level guards for the declarations each fix depends on -- the
  * real, load-bearing assertion is scripts/check-contrast.html's, because jsdom cannot lay
  * out real text or resolve `vw` against a real viewport. What these guard against is a
@@ -990,15 +1000,23 @@ describe('the story panel', () => {
  * ------------------------------------------------------------------------- */
 
 describe('the horizontal overflow at 200% text zoom', () => {
-  it('lets the contact block break its one unbreakable word, with the declaration that measurably works', () => {
-    // overflow-wrap: break-word was measured and rejected: 434px before, 434px after,
-    // because break-word does not feed the box's min-content the way this column reads
-    // it. Only `anywhere` moves the number (434 -> 411), so break-word here is a defect,
-    // not a milder version of the fix.
+  it('lets the contact block break its one unbreakable word, with the declaration that does not depend on engine behaviour', () => {
+    // overflow-wrap: break-word is banned here NOT because it fails to resolve the
+    // overflow. Measured, it is identical to anywhere: scrollWidth 375, the link's own
+    // box 282.03px, either way. (An earlier version of this comment, and of the failure
+    // message below, both claimed "434px before and after" -- that was wrong, and is
+    // corrected alongside sections.css's own comment on this rule.) The two properties
+    // differ, by spec, in whether they feed a line's soft-wrap opportunities into
+    // intrinsic-size calculations; nothing in this stack relies on that (the paragraph
+    // measures 295px regardless of which property is set), so the difference has
+    // nothing to act on for this element today. `anywhere` is required anyway because
+    // it is the spec-correct declaration for this failure mode and does not depend on
+    // an intrinsic-sizing interaction `break-word` is not obliged to honour on every
+    // engine.
     const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
     const rule = css.match(/\[data-section='contact'\]\s*\.room-head\s*p\s*,\s*\[data-section='contact'\]\s*\.room-head\s*p\s*a\s*\{([^}]*)\}/);
     expect(rule, 'no rule sets overflow-wrap on the contact paragraph and its link').not.toBeNull();
-    expect(rule[1], 'the contact block reads break-word, which measured NO CHANGE at all (434px -> 434px)')
+    expect(rule[1], 'the contact block should read anywhere, not break-word -- break-word measures identically here (scrollWidth 375, link 282.03px, same as anywhere) but is not spec-guaranteed to affect intrinsic sizing the way anywhere is, so anywhere is the declaration that does not depend on engine behaviour')
       .not.toMatch(/overflow-wrap:\s*break-word/);
     expect(rule[1], 'the contact block no longer breaks its one unbreakable word')
       .toMatch(/overflow-wrap:\s*anywhere/);
@@ -1033,19 +1051,6 @@ describe('the horizontal overflow at 200% text zoom', () => {
     expect(rule, 'the form button has no rule of its own any more').not.toBeNull();
     expect(rule[1], 'the form button label can push its card past a narrow column again')
       .toMatch(/overflow-wrap:\s*anywhere/);
-  });
-
-  it('gives the nav bar an explicit, viewport-anchored width, not just insets', () => {
-    // Measured: .site-nav with only `inset: 0 0 auto 0` and no explicit width came in at
-    // 411px (and 434.5px with the contact overflow also live) against a 375px viewport --
-    // the bar's own box, not merely its pill row, failed to land on the width its insets
-    // are supposed to solve for. `100vw` is not a percentage of an ambiguous containing
-    // size; it is the viewport, stated outright.
-    const base = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    const rule = base.match(/(?:^|\n)\.site-nav\s*\{[^}]*\}/);
-    expect(rule, 'the .site-nav rule is gone').not.toBeNull();
-    expect(rule[0], "the nav bar's own box can grow past the viewport again")
-      .toMatch(/width:\s*100vw/);
   });
 
   it("does not let a card grid's automatic minimum size push its own ancestor wider than the viewport", () => {
@@ -1086,19 +1091,41 @@ describe('the horizontal overflow at 200% text zoom', () => {
       .toMatch(/max-width:\s*100%/);
   });
 
-  it('anchors the gradient canvas to the viewport the same way the nav bar is anchored', () => {
-    // A bare percentage width on a `position: fixed` box resolves against whatever the
-    // browser currently considers the viewport, which is not always document.
-    // documentElement.clientWidth once something else on the page has overflowed --
-    // measured at 411px (and 290px at 280 wide) against the real, current viewport while
-    // investigating the fixes above. vw/vh measured stable in every one of the same
-    // checks.
+});
+
+/* ---------------------------------------------------------------------------
+ * The gradient canvas's size -- fix pass 3.
+ *
+ * #gradient is a <canvas>, a REPLACED element, unlike .site-nav (a <nav>, non-replaced).
+ * `inset: 0` with width/height left `auto` only solves the used size from the containing
+ * block for a NON-replaced box; a replaced element with an auto size falls back to its
+ * own intrinsic size instead, which for a canvas is its `width`/`height` CONTENT
+ * ATTRIBUTES -- gradient.js's `resize()` sets exactly those, to the drawing-buffer
+ * resolution, deliberately smaller than the CSS box (see base.css's own comment on
+ * #gradient). Found removing #gradient's `width: 100vw; height: 100vh` in fix pass 3 and
+ * re-measuring rather than assuming: with no explicit size at all, getComputedStyle
+ * (gradient).width tracked the canvas's own drawing-buffer width instead of the
+ * viewport, which would have broken the upscale the adjacent comment depends on. This
+ * guard is what .site-nav does not need and #gradient does.
+ * ------------------------------------------------------------------------- */
+
+describe('the gradient canvas keeps an explicit, non-auto size', () => {
+  it('does not let #gradient fall back to its own drawing-buffer size', () => {
     const base = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
     const rule = base.match(/(?:^|\n)#gradient\s*\{([^}]*)\}/);
     expect(rule, 'the #gradient rule is gone').not.toBeNull();
-    expect(rule[1], 'the gradient canvas is back on a bare percentage width')
-      .toMatch(/width:\s*100vw/);
-    expect(rule[1], 'the gradient canvas is back on a bare percentage height')
-      .toMatch(/height:\s*100vh/);
+    // Checked before the plain presence checks below, so reverting to vw/vh reports
+    // its own specific message rather than the generic "no explicit width" one --
+    // 100vw resolves against the initial containing block, which is wider than
+    // clientWidth by a classic (non-overlay) scrollbar's own width on desktop -- see
+    // base.css's own comment on #gradient.
+    expect(rule[1], '#gradient is back on 100vw, which overshoots clientWidth on a classic scrollbar')
+      .not.toMatch(/width:\s*100vw/);
+    expect(rule[1], '#gradient is back on 100vh, which overshoots clientHeight on a classic scrollbar')
+      .not.toMatch(/height:\s*100vh/);
+    expect(rule[1], '#gradient has no explicit width and will fall back to its own drawing-buffer size')
+      .toMatch(/width:\s*100%/);
+    expect(rule[1], '#gradient has no explicit height and will fall back to its own drawing-buffer size')
+      .toMatch(/height:\s*100%/);
   });
 });

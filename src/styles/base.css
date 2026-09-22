@@ -240,18 +240,37 @@ body {
 #gradient {
   position: fixed;
   inset: 0;
-  /* vw/vh, not a bare percentage. Found verifying finding 2's overflow fixes: a percentage
-     width on a `position: fixed` box resolves against whatever the browser currently
-     considers the viewport, and while investigating a real, separate overflow at
-     280x812/32px root this measured as 411px against a 375px viewport (and 290 against
-     280) purely from a doubled root font -- no content of its own, nothing else on the
-     page unfixed, the same figure the (real) overflow of the moment happened to reach.
-     vw/vh measured stable at the true viewport size in every one of those same checks.
-     This does not change what is on screen anywhere -- the canvas already filled the
-     viewport exactly -- it only stops it from being a second, decorative place the same
-     class of measurement can go wrong. */
-  width: 100vw;
-  height: 100vh;
+  /*
+   * `100%`, not `100vw`/`100vh`, and NOT omitted either -- unlike .site-nav (a <div>),
+   * #gradient is a <canvas>, a REPLACED element. `inset: 0` with `width`/`height` left
+   * `auto` only solves width/height from the containing block for a NON-replaced box;
+   * a replaced element with an auto size falls back to its own intrinsic size instead
+   * -- for a canvas, that is its `width`/`height` CONTENT ATTRIBUTES (gradient.js's
+   * `resize()` sets these to the drawing-buffer resolution, deliberately smaller than
+   * the CSS box -- see the comment below). Tried while fixing finding 1 of fix pass 3
+   * and caught by re-measuring rather than assuming: with no explicit width/height
+   * here, `getComputedStyle(gradient).width` tracked the canvas's drawing-buffer
+   * attribute width instead of the viewport, breaking the upscale this file's next
+   * comment depends on. An explicit size is not optional on this element.
+   *
+   * Fix pass 2 changed a bare `100%` to `100vw`/`100vh` after a percentage width
+   * measured 411px (290 at 280 wide) against a real viewport of 375/280 -- but that
+   * measurement was taken while a real content overflow (the hero h1's own INK, not
+   * its box, escaping its column -- see the shared `h1, h2, h3` rule below) was still
+   * live elsewhere on the page. With that overflow still present, `100%` read the
+   * identical wrong number; once the heading fix is in place, `100%` lands on the
+   * correct width with nothing else changed -- #gradient's own box was never the
+   * cause, only the easiest place to see someone else's overflow, which is also why
+   * fix pass 3 reverts the value rather than keeping `vw`/`vh`.
+   *
+   * `100vw`/`100vh` are also not free to keep: they resolve against the initial
+   * containing block, which on a desktop browser with a classic (non-overlay)
+   * scrollbar is wider than `clientWidth` by the scrollbar's own width -- so a fixed
+   * box pinned with `100vw` can sit past the visible content area on exactly the
+   * browsers/widths where a percentage lands correctly on `clientWidth`.
+   */
+  width: 100%;
+  height: 100%;
   z-index: 0;
   display: block;
   /* The canvas framebuffer is smaller than its CSS box (see render/budget.js);
@@ -299,6 +318,17 @@ h1, h2, h3 {
    * how "EVENTS" went unnoticed until a page-wide ink sweep -- not just a box sweep --
    * was run. Every heading already clears its own line at every width this file has
    * verified, so this changes nothing there.
+   *
+   * CLIENT-VISIBLE COST, noted rather than hidden: at 280x812 with a 32px root font, this
+   * rule breaks the club's own wordmark mid-word. Measured (a Range walked character by
+   * character over the hero h1's text node): "VIOLET DIABOLO" renders as four lines --
+   * "VIOL" / "ET " / "DIAB" / "OLO" -- not two lines split only at the space between the
+   * words. That is correct behaviour for `overflow-wrap: anywhere` on a single word wider
+   * than its column, and it is strictly better than the alternative it replaces (the same
+   * word silently painting past the viewport, clipped by `body { overflow-x: hidden }`),
+   * but it is a visible change to the club's own name at extreme zoom, not a free one,
+   * and worth a human decision if a less aggressive fallback is ever wanted at this
+   * specific size.
    */
   overflow-wrap: anywhere;
 }
@@ -357,28 +387,36 @@ a:hover {
  * ------------------------------------------------------------------------- */
 
 /*
- * `width: 100vw`, not left/right insets alone. Found in the second fix pass, verifying
- * the report's own "the nav is a mis-scoped defect" note (finding 2): with `inset: 0 0
- * auto 0` and no explicit width, .site-nav's own box -- not just its pill row -- measured
- * 411px at 375x812/32px root and 434.5px with the contact panel's own overflow (fixed
- * separately, sections.css) still live, both against a 375px viewport. `left`/`right`
- * both at 0 is supposed to solve `width` outright, but a fixed flex container whose
- * content cannot fit does not reliably land on that solved value -- it grows to its
- * content instead, taking the bar's pills and call-to-action past the viewport edge with
- * it, silently, under the same `body { overflow-x: hidden }` that hid the contact
- * overflow. `100vw` is not a percentage of an ambiguous containing size; it is the
- * viewport, stated outright, and .site-nav-links' own `min-width: 0` (below) was never
- * the problem -- it already shrinks correctly once the bar actually offers it 375px to
- * shrink into. Measured after: bar 411px -> 375px, pill row 363px -> 327px, page
- * scrollWidth 411 -> 375 (== clientWidth), at both 375 and 280 wide, contact panel either
- * way. Unmeasurable at a normal (16px) root: the bar's content never approaches the
- * viewport's width there, so nothing about this changes any previously-verified
- * measurement.
+ * NO explicit width. `inset: 0 0 auto 0` (left and right both 0) already solves the
+ * bar's width from its containing block; fix pass 3 removed the `width: 100vw` that
+ * used to sit here.
+ *
+ * Fix pass 2 added it after measuring .site-nav's own box at 411px (434.5px with the
+ * contact panel's own overflow also live) against a 375px viewport, and read that as
+ * `left`/`right` failing to solve `width` on their own. Fix pass 3 re-measured with
+ * every other fix from this pass in place and found the opposite: reverting `100vw`
+ * alone leaves .site-nav at exactly 375px, its CTA's right edge at 351 -- unchanged.
+ * What actually moved the bar was the same defect #gradient's own comment describes: a
+ * real content overflow (the hero h1's ink escaping its column, fixed by the shared
+ * `h1, h2, h3` rule below) widens the initial containing block, and every unpinned
+ * fixed box on the page -- this one and #gradient alike -- mirrors that wider number
+ * until the real cause is fixed. `100vw` never fixed the nav; it happened to sit on a
+ * value that coincided with the correct answer once everything else was also correct,
+ * and it kept LOOKING correct even when reverting the heading fix alone left the page
+ * overflowing by 36px with the bar still reading 375 -- masking the exact defect class
+ * this pass exists to catch.
+ *
+ * It is also not free to keep: `100vw` resolves against the initial containing block,
+ * which is wider than `clientWidth` by a classic (non-overlay) scrollbar's own width on
+ * desktop. The narrow-breakpoint gutter below is 12px -- less than a typical 15px
+ * scrollbar -- so `100vw` can push the CTA's right edge past `clientWidth` on exactly
+ * the browsers where `overflow-x: hidden` (sections.css) would then clip it silently.
+ * `inset: 0 0 auto 0` alone does not have that failure mode: it solves width from the
+ * same box `clientWidth` itself is measured against, not from `vw`.
  */
 .site-nav {
   position: fixed;
   inset: 0 0 auto 0;
-  width: 100vw;
   z-index: 3;
   display: flex;
   align-items: center;
@@ -470,12 +508,15 @@ a:hover {
  * flex-shrink is spread across the items that can afford it instead of being dumped on
  * this one. `overflow: hidden` would have hidden defect 1 and kept defect 2.
  *
- * A THIRD defect, found verifying the other two at a 32px root font (200% text zoom): see
- * .site-nav's own `width: 100vw` above, which is where it was actually fixed. It reads
- * like a row-shrinking problem from here -- this row measured 363px against a 327px bar
- * interior -- but `min-width: 0` already does what it is supposed to, and the row shrinks
- * correctly to whatever width .site-nav actually offers it. The bar itself was the thing
- * not offering 375px.
+ * A THIRD thing was found verifying the other two at a 32px root font (200% text zoom):
+ * this row measured 363px against a 327px bar interior at that root size, while a real
+ * content overflow was live elsewhere on the page (the hero heading's ink escaping its
+ * own column -- see the shared `h1, h2, h3` rule below). It read like a row-shrinking
+ * problem from here, but `min-width: 0` already does what it is supposed to: the row
+ * shrinks correctly to whatever width .site-nav actually offers it, and once the
+ * heading fix is in place -- with .site-nav carrying no `width` of its own, see its
+ * comment above -- the bar correctly offers 375px and this row lands on 327px with no
+ * declaration of its own needed.
  */
 .site-nav-links {
   display: flex;
