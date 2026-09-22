@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, SECTION_HEADINGS, PHOTOS,
-  HERO_TEASER,
+  HERO_TEASER, PRACTICE_PHOTOS,
 } from '../src/content/index.js';
 
 describe('content', () => {
@@ -106,6 +106,24 @@ describe('content', () => {
       // which buildPicture would happily expand into a srcset of broken URLs.
       for (const member of roster.filter((m) => !m.image)) {
         expect(member.image, `${member.name} has a falsy non-null image`).toBeNull();
+      }
+    }
+  });
+
+  it('describes every practice photograph without naming anyone', () => {
+    expect(PRACTICE_PHOTOS.photos.length).toBeGreaterThan(0);
+    const boardNames = [...new Set(Object.values(BOARD).flat().map((m) => m.name))];
+    for (const photo of PRACTICE_PHOTOS.photos) {
+      expect(photo.alt.length, `${photo.base} has no alt text`).toBeGreaterThan(0);
+      // A base name, not a path or a filename: buildPicture expands it into the srcset.
+      expect(photo.base).not.toMatch(/[/.]/);
+      // An intrinsic size PAIR, or the browser reserves nothing and the panel jumps when
+      // the picture lands. Both, or neither is any use — picture.js requires both too.
+      expect(Number.isFinite(photo.width) && Number.isFinite(photo.height),
+        `${photo.base} is missing a width/height pair`).toBe(true);
+      // Nobody has said which face belongs to which name, so no alt text may claim one.
+      for (const name of boardNames) {
+        expect(photo.alt, `${photo.base}'s alt text names "${name}"`).not.toContain(name);
       }
     }
   });

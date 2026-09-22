@@ -324,3 +324,68 @@ describe('the hero wordmark size cap', () => {
     expect(Number(value[1])).toBeGreaterThanOrEqual(4.004);
   });
 });
+
+/* ---------------------------------------------------------------------------
+ * The contrast probe's COVERAGE, as opposed to its correctness.
+ *
+ * Everything in `describe('the contrast probe')` above asks whether the probe computes
+ * the right answer. None of it asks whether it computes that answer about all the text
+ * on the page -- and a block the contract does not list is simply not measured, silently,
+ * with the report still saying "N of N pass".
+ *
+ * This was written after adding a heading ("AT PRACTICE") to the media panel and getting
+ * a clean 26-of-26 run that had never looked at it.
+ * ------------------------------------------------------------------------- */
+
+const PROBE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../scripts/check-contrast.html');
+
+describe("the contrast probe's block list", () => {
+  /** The [label, selector] pairs out of check-contrast.html's BLOCKS array. */
+  const blocks = () => {
+    const src = readFileSync(PROBE, 'utf8');
+    const body = /const BLOCKS = \[([\s\S]*?)\n\];/.exec(src);
+    expect(body, 'BLOCKS is gone or no longer a flat array literal').not.toBeNull();
+    const pairs = [...body[1].matchAll(/\[\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*\]/g)]
+      .map((m) => [m[1], m[2].replace(/\\'/g, "'")]);
+    expect(pairs.length, 'parsed no blocks out of BLOCKS').toBeGreaterThan(20);
+    return pairs;
+  };
+
+  it('covers every element on the page that paints text', () => {
+    const selectors = blocks().map(([, sel]) => sel);
+
+    const root = document.createElement('main');
+    renderSections(root);
+    document.body.replaceChildren(buildNav(), root);
+
+    // Elements holding a direct, non-whitespace text node: the leaves that actually
+    // paint. A container whose text comes from a child is covered by that child.
+    const painters = [...document.querySelectorAll('body *')].filter((el) =>
+      [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 0));
+
+    const uncovered = painters
+      .filter((el) => !selectors.some((sel) => el.matches(sel) || el.closest(sel)))
+      .map((el) => {
+        const cls = String(el.className || '').trim().split(/\s+/).filter(Boolean).join('.');
+        return `${el.tagName.toLowerCase()}${cls ? `.${cls}` : ''} — "${el.textContent.trim().slice(0, 40)}"`;
+      });
+
+    expect([...new Set(uncovered)], 'these paint text that scripts/check-contrast.html ' +
+      'never measures — add a [label, selector] pair to its BLOCKS array, or the next ' +
+      '"N of N blocks pass" will be true and incomplete at the same time').toEqual([]);
+  });
+
+  it('lists no selector that matches nothing on the page', () => {
+    // The other direction, and the reason the probe reports a `missing` array at all: a
+    // selector kept after its element was renamed measures nothing while still counting
+    // toward the denominator.
+    const root = document.createElement('main');
+    renderSections(root);
+    document.body.replaceChildren(buildNav(), root);
+
+    const dead = blocks()
+      .filter(([, sel]) => document.querySelector(sel) === null)
+      .map(([label, sel]) => `${label} (${sel})`);
+    expect(dead, 'these BLOCKS selectors match nothing the page renders').toEqual([]);
+  });
+});

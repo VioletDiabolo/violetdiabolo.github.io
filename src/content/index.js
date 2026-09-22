@@ -167,6 +167,37 @@ export const SOCIALS = [
   { label: 'GitHub', href: 'https://github.com/VioletDiabolo/violetdiabolo.github.io', icon: 'github' },
 ];
 
+/**
+ * The practice gallery, shot at one Friday session on the lawn by the Bust of Sylvette.
+ *
+ * `width`/`height` are the real pixel dimensions of the 1000px derivative, AFTER the
+ * pipeline applies each file's EXIF orientation -- four of these six are portraits stored
+ * sideways. They are here so the browser can reserve each cell's box before the bytes
+ * arrive; the mixed 3:4 and 4:3 shapes are why the grid cannot simply declare one ratio
+ * the way the about and contact photographs do.
+ *
+ * Alt text is deliberately generic about WHO. These are photographs of identifiable
+ * students and nobody has told us which name belongs to which face; describing the action
+ * is accurate, guessing at a name would not be.
+ */
+export const PRACTICE_PHOTOS = Object.freeze({
+  heading: 'AT PRACTICE',
+  photos: Object.freeze([
+    { base: 'practice-throw', widths: [500, 1000], width: 1000, height: 1333,
+      alt: 'A club member sending a diabolo high into the air on the lawn' },
+    { base: 'practice-sylvette', widths: [500, 1000], width: 1000, height: 750,
+      alt: "A club member spinning a diabolo in front of Picasso's Bust of Sylvette" },
+    { base: 'practice-reach', widths: [500, 1000], width: 1000, height: 1333,
+      alt: 'A club member catching a diabolo with both arms spread wide' },
+    { base: 'practice-spin', widths: [500, 1000], width: 1000, height: 1333,
+      alt: 'A club member mid-turn with a diabolo, trees behind' },
+    { base: 'practice-back', widths: [500, 1000], width: 1000, height: 1333,
+      alt: 'A club member seen from behind, a diabolo running along the string' },
+    { base: 'practice-team', widths: [500, 1000], width: 1000, height: 750,
+      alt: 'Four club members posing together with their diabolos after practice' },
+  ]),
+});
+
 /** The club's two photographs, carried over from the previous site. */
 export const PHOTOS = {
   group: { base: 'group-usadc', widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo performing together at the USADA National Diabolo Competition' },

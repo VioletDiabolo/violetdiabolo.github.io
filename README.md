@@ -11,7 +11,7 @@ npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (runs `npm run assets` first)
 npm run preview      # Serve the built dist/ locally
-npm test             # 225 tests across 17 test files
+npm test             # 232 tests across 17 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -31,7 +31,7 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | Path | Purpose |
 |---|---|
 | `src/content/index.js` | Club identity, board members, events, videos, forms, socials, photos. No markup. Mutations here flow everywhere. |
-| `src/ui/` | DOM rendering: the fixed nav (`nav.js`), the six panels (`sections.js`), board cards (`board.js`), video facades (`media.js`), form facades (`forms.js`), responsive `<picture>` (`picture.js`), scroll reveal (`reveal.js`). No WebGL. |
+| `src/ui/` | DOM rendering: the fixed nav (`nav.js`), the six panels (`sections.js`), board cards (`board.js`), video facades (`media.js`), form facades (`forms.js`), responsive `<picture>` (`picture.js`), the practice gallery (`gallery.js`), scroll reveal (`reveal.js`). No WebGL. |
 | `src/gradient/` | `palette.js` (three stops), `shader.js` (the GLSL), `gradient.js` (the WebGL state), `contrast.js` (contrast arithmetic — **test and probe only, never bundled**). |
 | `src/render/` | `lifecycle.js` (when the loop may run), `budget.js` (`TARGET_FPS`, `RENDER_SCALE`, the frame cap). |
 | `src/scroll/smooth.js` | Lenis inertia scrolling, and the source of the gradient's scroll boost. |
@@ -42,7 +42,7 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | `scripts/check-shader.html` | Dev-time shader bench: compile, frame cost with a zero-render control, luminance histogram. |
 | `scripts/check-contrast.html` | Dev-time contrast probe over the real page. Needs `npm run dev` — it imports `contrast.js`, which the build excludes. |
 | `scripts/bench-verdict.mjs` | The pass/fail decision the shader bench calls, as a module so the suite can falsify it. |
-| `tests/` | 225 tests across 17 files — see **Testing**. |
+| `tests/` | 232 tests across 17 files — see **Testing**. |
 | `public/images/` | Generated derivatives (`npm run assets`). Masters live in `assets-src/`. |
 | `docs/VERIFICATION.md` | What was measured in a real browser, on a named GPU, and what could not be. |
 
@@ -158,25 +158,25 @@ Widths cap at 2000 px, not 2400. Measured on the 4032×3024 master: at 2400 the 
 npm test
 ```
 
-**225 tests across 17 files**, all passing, with no stderr noise.
+**232 tests across 17 files**, all passing, with no stderr noise.
 
 | file | tests | covers |
 |---|---|---|
 | `visual-language.test.js` | 57 | the deleted design elements' absence, the four panel patterns, glass and accent discipline, the focus ring on both grounds, the luminance ceiling, the shader's two fixed defects, the bench and probe wiring, the nav pill row and height, 200 % text zoom |
-| `ui.dom.test.js` | 18 | DOM structure for every panel, media and form facades, the footer, and the content boundary |
+| `ui.dom.test.js` | 21 | DOM structure for every panel, media and form facades, the practice gallery and its reserved cells, the footer, and the content boundary |
 | `lifecycle.test.js` | 17 | pause/resume on visibility and intersection, delta clamping, teardown; the no-animation-engine and no-`animejs`-dependency guards |
 | `contrast.test.js` | 15 | `relativeLuminance`, `contrastRatio`, `worstCase` (including its non-finite guard), `TIME_STEPS` |
 | `smooth.dom.test.js` | 14 | Lenis construction, anchor interception, modifier-click opt-out, teardown, and installing nothing under reduced motion |
 | `main.dom.test.js` | 17 | boot ordering, both fallback paths, the gradient mount, and the animated `onFrame` composition |
 | `gradient.dom.test.js` | 15 | shader compile/link, uniform plumbing, scroll acceleration (rate, direction, cap, decay, monotonicity), failure cleanup, resize |
 | `nav.dom.test.js` | 12 | the links, the CTA, the markup, and `--nav-offset`'s `ResizeObserver` |
-| `content.test.js` | 13 | apostrophe preservation, board structure, the practice timetable and its hero teaser, media list, contact details |
+| `content.test.js` | 14 | apostrophe preservation, board structure, the practice timetable and its hero teaser, media list, photograph alt text, contact details |
 | `budget.test.js` | 9 | the frame cap's accumulation and `renderSize`'s clamp |
 | `reveal.dom.test.js` | 9 | the reveal's pending/visible classes, one-shot unobserve, reduced motion, and the no-`IntersectionObserver` guard |
-| `assets.test.js` | 7 | the image pipeline's derivatives and the 400 KB budget |
+| `assets.test.js` | 8 | the image pipeline's derivatives, EXIF orientation, and the 400 KB budget |
 | `palette.test.js` | 5 | three stops, ordering, range, and that it is violet rather than blue |
 | `panels.dom.test.js` | 5 | `data-panel` / `data-surface` stamping |
-| `sections-layout.dom.test.js` | 7 | the grid panel's title size, the hero wordmark's size cap, that nothing resolves to sticky, and that the scan proving it is not blind |
+| `sections-layout.dom.test.js` | 9 | the grid panel's title size, the hero wordmark's size cap, that nothing resolves to sticky, that the scan proving it is not blind, and that the contrast probe's block list covers every element that paints text |
 | `detect.dom.test.js` | 4 | WebGL and reduced-motion detection |
 | `smoke.test.js` | 1 | module load |
 

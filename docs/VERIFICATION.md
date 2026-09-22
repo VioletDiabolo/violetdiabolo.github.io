@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 225 tests, all passing**, and with no stderr noise (was 216 at merge; §11's pass added 9) |
+| Unit suite | `npx vitest run` → **17 files, 232 tests, all passing**, and with no stderr noise (was 216 at merge; §11's pass added 16) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -850,3 +850,47 @@ Everything in §10 stands. Two specific to this pass:
    cascade, not tested against a browser that actually lacks `cqi` — none was available. What was
    measured is that adding it changes nothing where `cqi` IS supported: 84.39 px and two lines at
    1024×768, identical to the table above.
+
+
+### 11.5 The practice gallery
+
+Six photographs from the client's Drive folder, chosen from all 100 by building a contact
+sheet out of Drive's own thumbnail endpoint — no originals were downloaded to look at
+them. Fifteen were then pulled at full size and six kept.
+
+**The pipeline was rotating nothing.** Nine of those fifteen are PORTRAITS stored as
+4608x3456 landscape with EXIF `orientation=8`; `scripts/build-assets.mjs` never called
+`sharp.rotate()`, so they built lying on their side. The four masters that predate this
+are orientation 1 or none, checked rather than assumed, so the call changes nothing for
+them.
+
+The six masters were rewritten upright at 2000px on the long edge before being committed:
+**46.2 MB → 3.4 MB**, against a repository whose `.git` is 24 MB, and 2000 is this
+document's own derivative ceiling so nothing downstream can want more. That rewrite makes
+an orientation assertion about the shipped derivatives vacuous, so the guard runs
+`prepare()` against a synthesised 40x20 master with `orientation=8` and requires a 20x40
+result — it fails when `.rotate()` is removed.
+
+**A claim that was withdrawn rather than explained.** That test first asserted the rotate
+had to happen BEFORE the resize. A mutation moving `.rotate()` after `.resize()` passed
+it: sharp applies a no-argument rotate during input decode, so the order does not matter.
+The assertion and the comment claiming it both went.
+
+**Contrast, re-run: 27 of 27 blocks pass**, the new "AT PRACTICE" heading at 7.51:1
+against a 4.5 requirement, no missing selectors, overflow clean at 375 and 280.
+
+That 27th block exists because of a gap this pass found in the probe itself: nothing
+checked that its BLOCKS list covered the page. A heading was added, the probe reported a
+clean "26 of 26", and it had never looked at it. Two guards now close it from both sides —
+every element with a direct text node must be matched by some BLOCKS selector, and every
+BLOCKS selector must match something the page renders. Falsified in both directions.
+
+Cells are sized from the `<img>`'s own `width`/`height` attributes rather than a CSS
+`aspect-ratio`, because four of the six are 3:4 and two are 4:3 — one shared ratio would
+crop the group photograph's outer two people off. Verified in the browser at 1440: three
+columns, portraits 251x334 and landscapes 251x188, correct AVIF derivative served for
+each, `scrollWidth == clientWidth`.
+
+Alt text describes the action and never a name. These are identifiable students and
+nothing in the brief says which face belongs to which of the six board members; a test
+asserts no alt string contains any name from BOARD.

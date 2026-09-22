@@ -680,6 +680,47 @@ body { overflow-x: hidden; }
   width: 100%;
 }
 
+/* ---------------------------------------------------------------------------
+ * The practice gallery, below the video facades in the same panel.
+ * ------------------------------------------------------------------------- */
+
+.gallery-heading {
+  margin: clamp(2.5rem, 6vh, 4rem) 0 clamp(1rem, 2.5vh, 1.5rem);
+  font-size: var(--type-micro);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.photo-grid {
+  display: grid;
+  /* min(230px, 100%), matching .media-list directly above it -- the two grids sit in one
+     panel and a different floor would give them visibly different column counts at the
+     same width. The min() wrapper is there for the reason that rule documents. */
+  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
+  gap: clamp(0.75rem, 1.8vw, 1.25rem);
+  /* start, not the default stretch: these are mixed 3:4 and 4:3 photographs and each
+     cell keeps its own height. Stretching would hand a landscape cell the height of the
+     portrait beside it and leave the picture floating in dead space. */
+  align-items: start;
+  width: 100%;
+}
+
+.photo-cell { margin: 0; }
+
+.photo-cell img {
+  display: block;
+  width: 100%;
+  /* The ratio comes from the img's own width/height ATTRIBUTES (src/ui/picture.js, fed
+     from PRACTICE_PHOTOS), so `height: auto` resolves against a known intrinsic size and
+     the cell is the right height before the bytes arrive. No aspect-ratio is declared
+     here on purpose -- one value cannot serve both shapes, and the attributes already
+     carry the right one per picture. */
+  height: auto;
+  border-radius: var(--radius);
+}
+
 .media-card {
   display: flex;
   flex-direction: column;

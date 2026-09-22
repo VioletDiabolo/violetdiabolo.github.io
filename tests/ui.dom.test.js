@@ -6,8 +6,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { renderSections } from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
 import { mountMedia } from '../src/ui/media.js';
+import { mountGallery } from '../src/ui/gallery.js';
 import { mountForms } from '../src/ui/forms.js';
-import { BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS } from '../src/content/index.js';
+import {
+  BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS, PRACTICE_PHOTOS,
+} from '../src/content/index.js';
 
 beforeEach(() => { document.body.innerHTML = '<main id="content"></main>'; });
 
@@ -191,6 +194,45 @@ describe('section photographs', () => {
       expect(img).not.toBeNull();
       expect(img.alt.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('practice gallery', () => {
+  it('renders one cell per photograph, each with an AVIF and a WebP source', () => {
+    const el = document.getElementById('content');
+    mountGallery(el);
+    const cells = el.querySelectorAll('[data-photo]');
+    expect(cells).toHaveLength(PRACTICE_PHOTOS.photos.length);
+    for (const cell of cells) {
+      const types = [...cell.querySelectorAll('source')].map((x) => x.type);
+      expect(types).toEqual(['image/avif', 'image/webp']);
+    }
+  });
+
+  it('reserves each cell before the bytes land', () => {
+    // The defect this exists for is documented at the top of sections.css: buildPicture
+    // sets no intrinsic size by default, so with `height: auto` a cell computes to ZERO
+    // height until its picture loads and everything below it jumps. Measured there at
+    // 256px of shift on the contact panel. The about and contact photographs are fixed
+    // by a per-section aspect-ratio in CSS; these six cannot be, because they are two
+    // different shapes, so the size rides on the img's own attributes instead.
+    const el = document.getElementById('content');
+    mountGallery(el);
+    for (const cell of el.querySelectorAll('[data-photo]')) {
+      const img = cell.querySelector('img');
+      const declared = PRACTICE_PHOTOS.photos.find((p) => p.base === cell.dataset.photo);
+      expect(img.getAttribute('width'), `${cell.dataset.photo} has no width attribute`)
+        .toBe(String(declared.width));
+      expect(img.getAttribute('height')).toBe(String(declared.height));
+    }
+  });
+
+  it('carries both portrait and landscape cells, which is why no ratio is shared', () => {
+    // The non-vacuity control for the rule above. If every photograph were the same
+    // shape, a single CSS aspect-ratio would be the simpler answer and the attribute
+    // plumbing would be dead weight -- this fails the moment that becomes true.
+    const shapes = new Set(PRACTICE_PHOTOS.photos.map((p) => (p.width > p.height ? 'wide' : 'tall')));
+    expect([...shapes].sort()).toEqual(['tall', 'wide']);
   });
 });
 

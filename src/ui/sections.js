@@ -3,6 +3,7 @@ import {
 } from '../content/index.js';
 import { mountBoard } from './board.js';
 import { mountMedia } from './media.js';
+import { mountGallery } from './gallery.js';
 import { mountForms } from './forms.js';
 import { buildPicture } from './picture.js';
 
@@ -110,6 +111,9 @@ export function renderSections(root) {
 
   const media = section('media', SECTION_HEADINGS.media, 'grid', 'solid');
   mountMedia(media.body);
+  // Photographs after the videos, in the same panel: both are the club's own record of
+  // itself, and a seventh nav entry for six pictures is a heavier thing than the pictures.
+  mountGallery(media.body);
 
   const board = section('board', SECTION_HEADINGS.board, 'grid', 'solid');
   mountBoard(board.body);
