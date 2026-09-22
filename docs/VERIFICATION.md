@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 244 tests, all passing**, and with no stderr noise (was 216 at merge; §11–§16 added 28) |
+| Unit suite | `npx vitest run` → **17 files, 246 tests, all passing**, and with no stderr noise (was 216 at merge; §11–§17 added 30) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -1271,3 +1271,73 @@ to 7,306px and the strip from 56px/s to 87px/s without a line of CSS changing. R
    from a host confirming afterwards.
 3. **Dates are not published.** The table above carries them; the marquee shows names
    only, so nothing on the page can go stale as years pass.
+
+
+---
+
+## 17. Marks for the marquee
+
+§16.4 shipped a logo-capable strip with no logos. Ten of the eighteen have marks now.
+
+### 17.1 Where they came from
+
+**NYU Engage has a search API**, and it returns each organisation's `ProfilePicture`
+filename directly — `/api/discovery/search/organizations?query=…`. That produced nine NYU
+groups in one request each, served from
+`se-images.campuslabs.com/clink/images/<file>?preset=med-sq`. The rest came from each
+organisation's own site.
+
+Every mark is the organisation's own published artwork. **Two were re-coloured, and only
+in value**: TAP's wordmark and CYI's paths are black on transparent and are invisible on
+this page's near-black ground, so both are shown in the opposite polarity. That is the
+same mark, not a redrawing of it. CYI's was an inline SVG on their site, so it was taken
+as vector and rasterised at 600 dpi rather than scraped as a bitmap.
+
+### 17.2 Two that were found and left out
+
+| organisation | why not |
+|---|---|
+| NYU VSA | near-white artwork on a white card; at 28px it is a pale smudge |
+| NYU OGS | a grey skyline banner rather than a mark |
+
+An illegible logo is worse than the name it would replace. Six others publish nothing
+findable (Kappa Phi Lambda, Tisch Talent Guild), no longer have a live site (Columbia
+Wushu), or were not pursued (both public schools, USADA).
+
+### 17.3 The name is the constant
+
+The chip is **mark + name**, not mark *instead of* name — which is also what the client's
+own reference image shows. That decision is what let eight missing logos stay eight
+present credits rather than becoming eight gaps.
+
+It also settles the alt text: the mark is `alt=""`, because the name is right beside it in
+readable text. The first version gave the image the name as well, which has a screen
+reader announce every organisation twice. Same rule as the nav's logo, arrived at from the
+opposite direction.
+
+### 17.4 A whole class of defect nobody was checking
+
+Falsifying the new guards turned up one that was **not** caught: pointing a marquee logo at
+`logo-does-not-exist` passed the entire suite. Every existing guard checked the pipeline
+against itself, or the DOM against content. Nothing checked **content against the
+pipeline**, so any base-name typo in `src/content/index.js` — a logo, a board portrait, a
+gallery photograph — rendered a `<picture>` whose every source 404s, silently.
+
+`tests/assets.test.js` now cross-checks every base name content references against the
+pipeline's targets. Falsified twice: a bad logo name and a one-letter board-photo typo,
+each reported with the entry that referenced it.
+
+### 17.5 Sizing, and a guard that nearly fired
+
+Masters are normalised to a uniform **480px width**. Height-normalised masters were tried
+first and were wrong: one logo came out 194px wide, `withoutEnlargement` would have written
+its "240" derivative at 194, and §13.1's srcset-descriptor guard would have failed the
+build. The guard did its job before the file existed.
+
+Derivatives are `[120, 240]`, rendering at `1.75rem` tall — about 3x for a square avatar
+and 2.4x for the widest wordmark. Each is 1.7–2.8KB as AVIF.
+
+### 17.6 Re-run
+
+23 of 23 blocks on index, marquee names at **5.62:1**, no missing selectors, no overflow at
+375 or 280. Ten marks load, none broken, all rendering at exactly 28px tall.

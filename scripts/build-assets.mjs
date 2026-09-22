@@ -27,6 +27,13 @@ export const TARGETS = [
   // 521x608, and shipping 63KB of PNG for a 32px mark is what the pipeline is for.
   { name: 'logo', file: 'logo.png', widths: [64, 128], jpgWidths: [] },
 
+  // Marquee marks. Every master is 480px wide so `withoutEnlargement` can never shrink a
+  // derivative below the width its own filename claims; they render at 1.75rem tall, so
+  // 240 covers a 3x screen for the squares and about 2.4x for the widest wordmark.
+  ...['logo-bkcm', 'logo-cyi', 'logo-moonlite', 'logo-nyu-acu', 'logo-nyu-ahm', 'logo-nyu-css',
+      'logo-nyu-hksa', 'logo-nyu-ksa', 'logo-nyu-welcome', 'logo-tap']
+    .map((name) => ({ name, file: `${name}.png`, widths: [120, 240], jpgWidths: [] })),
+
   // The hero and the events panel. Both sit in a panel's second column -- at most about
   // 700px at 1440 -- so 1600 covers a 2x screen with room to spare.
   { name: 'hero-group',      file: 'hero-group.jpg',      widths: [800, 1600], jpgWidths: [] },

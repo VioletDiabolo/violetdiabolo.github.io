@@ -123,15 +123,22 @@ export function renderMediaPage(root) {
 export function marqueeItem(org) {
   const li = document.createElement('li');
   if (org.logo) {
-    // The name becomes the mark's alt text: the strip has to read as a list of
-    // organisations to a screen reader whichever form it takes on screen.
     li.dataset.logo = org.logo;
+    // alt="" — decorative, because the name is right beside it in text. Giving the mark
+    // the name as well would have a screen reader read every organisation twice. This is
+    // the opposite of the nav, where the logo sits inside a link that already has a name:
+    // same rule, which is that the name is said exactly once.
     li.append(buildPicture({
-      base: org.logo, widths: [80, 160], alt: org.name, sizes: '80px', loading: 'lazy',
+      base: org.logo, widths: [120, 240], alt: '', sizes: '120px', loading: 'lazy',
     }));
-  } else {
-    li.textContent = org.name;
   }
+  // The name always renders, logo or not. A mark is an addition beside it, never a
+  // replacement for it, so a chip nobody could find artwork for still reads — and the
+  // strip does not look half-finished because eight of eighteen came up empty.
+  const name = document.createElement('span');
+  name.className = 'marquee-name';
+  name.textContent = org.name;
+  li.append(name);
   return li;
 }
 
