@@ -1,379 +1,570 @@
-# Real-condition verification record — wireframe object, four rooms
+# Real-condition verification record — animated violet gradient, panels over it
 
-Recorded 2026-09-21 against `build/wireframe-rooms` at `79aee1c`, `npm run build` → `vite preview`
-on :4173, driven in a Chromium instance. **Only numbers re-measured in this run appear here.**
-Nothing was carried forward from the previous (six-act) record.
+What this is: a record of what was actually **measured** on branch `build/gradient-panels`, in a
+real browser against the real built bundle, on a named GPU. It replaces the record for the 3D
+diabolo object, which this branch deleted.
 
-Two things must be read before any number below:
+Everything here was measured in one run. **No figure is carried forward from an earlier task
+without being re-measured**, and where a re-measurement moved a previously published number, both
+are printed. Where the environment could not produce a condition, the stand-in is named and
+labelled, and §10 lists every claim this run could **not** establish.
 
-1. **The host reports `document.hidden === true`.** Measured this run: **0 `scroll` events** fired
-   while `scrollY` moved 0 → 3871, and **0 `requestAnimationFrame` callbacks** in 1500 ms. The
-   timeline's `currentTime` stayed at 0 where a live scrub would have put it at 420. So nothing on
-   this page animated on its own, and **every room state below is synthetic** — produced by
-   `timeline.seek()` plus `stage.render(0)`, then read back. They are frozen frames, not observed
-   motion.
-2. **The screenshot pipeline returned a demonstrably stale frame.** At a scroll position where the
-   panel section's border-box provably filled the viewport with an opaque violet, the screenshot
-   came back solid near-black, and its coordinate frame was 800×600 against a real 1024×768
-   viewport. Screenshots were therefore not used as evidence anywhere in this record. Geometry,
-   `getComputedStyle`, and WebGL `readPixels` were.
+Two committed probes did most of the work. Neither is part of the build; neither is a CI gate.
+Both need the **dev** server, because `check-contrast.html` imports `src/gradient/contrast.js`,
+which the build deliberately excludes.
+
+```
+npm run dev
+  http://localhost:5173/scripts/check-shader.html      ?draws= ?size= ?steps=
+  http://localhost:5173/scripts/check-contrast.html    ?width= ?height= ?steps=
+```
+
+## Environment
+
+| | |
+|---|---|
+| Host | macOS (darwin 25.6.0), Chromium |
+| GPU | **`ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)`** |
+| Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
+| Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
+| Live page | `vite preview`, port 4173 — the shipped bundle |
+| Unit suite | `npx vitest run` → **17 files, 202 tests, all passing** |
+
+Three properties of this host shaped how the live-page checks were run, and each is restated where
+it matters:
+
+1. **`document.hidden` is `true`** here, measured directly. The render loop therefore never starts
+   on its own — which is exactly how a "the loop stops when hidden" check passes for the wrong
+   reason. See §4.
+2. **`requestAnimationFrame` and `IntersectionObserver` deliver nothing until a paint is forced.**
+   Measured: 0 rAF callbacks across six 700 ms attempts; 0 IntersectionObserver entries in 4 s.
+   Forcing the compositor to produce a frame delivers both.
+3. **Screenshots can return stale frames.** No claim below rests on one. Screenshots were used as a
+   *paint trigger*; the single place one is cited as evidence (§6) it agrees with the computed style
+   and geometry rather than standing in for them.
+
+---
 
 ## Summary
 
 | Claim | Status |
 |---|---|
-| Object is unlit: only `MeshBasicMaterial` + `LineBasicMaterial` | **Verified** — 8 materials, no others |
-| No `transmission` / `clearcoat` / `roughness` / `metalness` | **Verified** — all `undefined` |
-| No environment map in use | **Verified** — `envMap` is `null`; `scene.environment` null; 0 lights |
-| Edge lines land in the predicted 48–204 / 780 range | **Verified** — 48–204, total **780** |
-| Four rooms, distinct states at every boundary | **Verified** — all five sampled points differ as specified |
-| `cupTop` at rest at 0.12, 0.30, 1.0; exploded only at 0.55 | **Verified** — 0.235 / 0.235 / 0.235 / 1.650 |
-| Explosion *begins* inside the showcase room | **Verified** — leaves rest at f = 0.3054 (see §below on why the source says 0.3014) |
-| Explosion *ends* inside the showcase room | **Qualified** — reassembly tween runs to f = 0.992; object invisible from f = 0.595 |
-| `OPACITY_SETTLE` lands well inside `LATERAL_SETTLE` | **Verified** — opacity 0 at f = 0.59498, x = 0 at f = 0.64893 |
-| Labels never outlive the object | **Verified** — DOM opacity 0 at f = 0.60 despite `labelOpacity` 0.9698 |
-| Labels do not orbit with the spin | **Verified** — parented `labelRoot < diaboloTilt`, not `spinner` |
-| Exploded object fits the frustum | **Verified** — NDC y [−0.914, 0.910], 8.6% margin |
-| Panel actually covers the object | **Verified** — opaque sheet, full-viewport box, higher stacking order |
-| Every nav pill resolves and moves the scroll | **Verified** — 6/6 resolve, 6/6 move |
-| No light spill survives | **Verified** — element, CSS, custom props, source and bundle all clean |
-| Hero title clear of the object at 375 / 768 / 1440 | **Verified** — 18.20:1, zero object pixels behind it |
-| Bundle dropped | **Verified but small** — JS −9,933 B; total shipped −5,486 B |
-| PBR machinery left the bundle | **False** — three.js still ships it; see §8 |
-| Live scroll drives the timeline | **Not verified** — host fires no scroll events (see above) |
-| Reduced-motion path | **Not verified** — no way to toggle the media query here |
+| Three.js absent from `package.json` and from the built bundle | **Verified** — the only "three" in the bundle is the English word, in two GLSL comments |
+| Bundle shrank from 600 kB | **Verified; baseline rebuilt from the merge base** — 600,476 B → **38,522 B** raw, −93.6 % |
+| `contrast.js` never ships | **Verified** — no `worstCase` / `TIME_STEPS` / `0.03928` / `12.92` in `dist/` |
+| Nothing uses `position: sticky` | **Verified** — 0 in source, 0 in built CSS, 0 computed across 145 live elements |
+| The about panel scrolls immediately; no heading pins | **Verified** — residual **0 px** from pure scroll at 10 sampled offsets |
+| Shader compiles and links | **Verified** — vertex, fragment and link OK, empty driver logs |
+| Frame cost inside the 4 ms budget | **Verified, with a zero-render control** — **0.01253 ms/frame**, control **0.0000** |
+| Most of the frame stays near-black | **Verified** — **85.43 %** of the *worst* frame under L 0.02 |
+| The render loop stops when the document hides | **Verified, and proved to have been running first** |
+| Reduced motion renders one frame and installs nothing | **Verified against a labelled JS-level stand-in** |
+| No-WebGL fallback renders the whole page | **Verified** — `data-stage="unsupported"`, 7/7 sections, static gradient painted |
+| 26 text blocks clear WCAG over the moving gradient | **Verified at 375 / 768 / 1440** — **26/26**, tightest margin **1.166×** |
+| `scrollWidth === clientWidth` | **Verified at 320 / 375 / 768 / 1440**, and at **320 / 375 / 280 with a 32 px root** |
+| Nav pills never overflow; the bar never covers a heading | **Verified** — 0 pills outside the viewport at any width |
+| Every nav anchor resolves and moves the scroll | **Verified** — 6/6 resolve, 6/6 move |
+| Four `data-panel` values and both `data-surface` values in use | **Verified** |
+| Page is 6–8 screens | **Qualified** — 7.37 at 1440×900; **8.31 / 8.64 / 9.05** at 375×812 / 320×812 / 768×1024 |
+| Lenis costs ~5.4 kB gzipped | **Corrected** — re-measured at **5,050 B ≈ 4.93 kB** |
+| Real reduced-motion, real tab visibility, real WebGL-less browser, real scroll input | **Not verified** — §10 |
+| `README.md` describes the shipped site | **False** — it still documents the deleted 3D system, including a `position: sticky` stage. See F4. |
 
-## 1. Build and serve
+---
 
-`npm run build` succeeded: 78 modules transformed.
+## 1. Bundle and dependencies
 
-```
-dist/index.html                  3.89 kB   gzip  1.73 kB
-dist/assets/index-SpxIeYYa.css  14.18 kB   gzip  3.78 kB
-dist/assets/index-BFzzgGKp.js  600.45 kB   gzip 158.39 kB
-```
+`grep -c three package.json` → **0**.
 
-`vite preview` on :4173. The first page load served a **stale bundle** (`index-C2Ag_LhL.js`); a
-hard reload was required before any measurement, and every figure below was taken against
-`index-BFzzgGKp.js`. `dist/` is gitignored, so building leaves the tree clean.
-
-Test suite: **268 tests across 19 files, all passing.**
-
-## 2. The object is unlit and drawn in lines
-
-Traversed `stage.tilt`. **Eight distinct materials, and nothing else:**
-
-| material | type | colour | `transparent` |
-|---|---|---|---|
-| cup fill | `MeshBasicMaterial` | `#0c0a12` | true (`DoubleSide`) |
-| hub fill | `MeshBasicMaterial` | `#08070c` | true |
-| bearing fill | `MeshBasicMaterial` | `#14131a` | true |
-| gasket fill | `MeshBasicMaterial` | `#cf2f2a` | true |
-| cup edge | `LineBasicMaterial` | `#efeaf8` | true |
-| hub edge | `LineBasicMaterial` | `#b9b4c6` | true |
-| bearing edge | `LineBasicMaterial` | `#f2f4f8` | true |
-| gasket edge | `LineBasicMaterial` | `#ff6a62` | true |
-
-`transmission`, `clearcoat`, `roughness` and `metalness` are **`undefined` on every one of the
-eight**. `scene.environment` is `null`, `scene.background` is `null`, the scene contains **0
-lights**, and `renderer.toneMapping === 0` (`NoToneMapping`).
-
-> **A note on the `envMap` check.** The obvious probe — `['envMap', …].filter(p => m[p] !== undefined)`
-> — reports `['envMap']` for all four fills and so appears to fail. It does not: three.js declares
-> `envMap` as an own property of `MeshBasicMaterial`, initialised to `null`. The measured **value**
-> is `null` on all four. The predicate is wrong, not the object. Recorded because a future run will
-> otherwise re-discover this as a false alarm.
-
-### Edge lines, measured
-
-`geometry.attributes.position.count / 2` on each part's `LineSegments`:
-
-| part | edge lines | triangles |
+| | raw | gzip |
 |---|---|---|
-| cupTop | **204** | 192 |
-| cupBottom | **204** | 192 |
-| axleBearing | **132** | 168 |
-| gasketTop | **72** | 96 |
-| gasketBottom | **72** | 96 |
-| hubConeTop | **48** | 48 |
-| hubConeBottom | **48** | 48 |
-| **total** | **780** | **840** |
+| `dist/assets/index-DTqm9uPc.js` | **38,522 B** | 13,464 B |
+| `dist/assets/index-9lyFq0Rz.css` | 13,174 B | 3,627 B |
+| `dist/index.html` | 1,605 B | 875 B |
 
-Per-part range **48–204**, total **780** — exactly what the plan predicted, now measured rather
-than asserted. Seven `LineSegments`, one per part.
+**The 600 kB baseline was rebuilt, not quoted.** Commit `19e4131` — the merge base with `main`,
+where `package.json` still listed `"three": "^0.186.0"` — was checked out into a throwaway worktree
+and built with the same Vite.
 
-## 3. The rooms, and whether the explosion is contained
+| | before | after | change |
+|---|---|---|---|
+| JS raw | 600,476 B | 38,522 B | **−561,954 B (−93.6 %)** |
+| JS gzip | 156,758 B | 13,464 B | −143,294 B (−91.4 %) |
+| CSS raw | 14,275 B | 13,174 B | −1,101 B |
+| `index.html` raw | 4,656 B | 1,605 B | −3,051 B |
+| **total shipped, raw** | **619,407 B** | **53,301 B** | **−566,106 B (−91.4 %)** |
 
-Sampled by seeking the real timeline (`duration` 1000). **Synthetic — frozen frames.**
-Rest height for `cupTop` is 0.235; fully exploded is 1.650.
+The string `three` occurs exactly twice in the shipped JS, both times as the English word inside
+GLSL comments carried over from `src/gradient/shader.js`. No `THREE`, no `WebGLRenderer`, no
+`PerspectiveCamera`.
 
-| f | room boundary | cupTop | tiltX | objX | camZ | spin | labels | opacity |
+**A nuance the old record did not carry.** `three@0.186.0` is still present in `node_modules` and in
+`package-lock.json`, but **not** as a dependency of this project: `npm ls three` reports
+`violet-diabolo → animejs@4.5.0 → three@0.186.0`, and the lockfile entry is marked
+`"optional": true, "peer": true`. animejs declares a `three` adapter as an optional peer and npm
+installs optional peers by default. Nothing imports it; nothing ships it.
+
+`contrast.js` is confirmed absent from the bundle — `worstCase`, `TIME_STEPS`, `relativeLuminance`,
+`contrastRatio`, `0.03928` and `12.92` all miss on a substring scan of the built JS. The two probe
+pages under `scripts/` do not reach `dist/` either.
+
+**Lenis's cost, re-measured.** HEAD was rebuilt in a second throwaway worktree with the `lenis`
+import replaced by a no-op class:
+
+| | raw | gzip |
+|---|---|---|
+| shipped | 38,522 B | 13,464 B |
+| Lenis stubbed | 19,982 B | 8,414 B |
+| **Lenis's share** | **18,540 B** | **5,050 B ≈ 4.93 kB** |
+
+Previously published as "~5.4 kB gzipped". **The figure moves down to ≈ 4.93 kB.**
+
+---
+
+## 2. Nothing sticks
+
+`grep -rni sticky src dist index.html` finds one hit in the whole tree — prose inside a comment in
+`src/ui/sections.js:24`, describing the layout this branch replaced. No `position: sticky` in
+`base.css`, `sections.css`, or the built CSS.
+
+On the live page at 1440×900 (145 elements): **0** computed `position: sticky`. Exactly two computed
+`position: fixed`, both deliberate — `nav.site-nav` and `canvas#gradient`.
+
+**The about panel scrolls immediately.** `#about` sits at document top 981 px; its viewport top was
+read at ten offsets across the whole range where a pinned panel would hold still:
+
+| scrollY | 0 | 200 | 400 | 600 | 800 | 900 | 1000 | 1200 | 1600 | 2000 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `#about` top | 981 | 781 | 581 | 381 | 181 | 81 | −19 | −219 | −619 | −1019 |
+| `#about h2` top | 1264 | 1064 | 864 | 664 | 464 | 364 | 264 | 64 | −336 | −736 |
+| residual | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+`residual = top − (documentTop − scrollY)`. **Max |residual| = 0 px** — the panel and its heading
+move one-for-one with the scroll offset at every sample.
+
+---
+
+## 3. Frame cost, and how dark the frame stays
+
+`scripts/check-shader.html?size=1440x900&steps=12`, against the real shader exports.
+**Vertex compile OK, fragment compile OK, program link OK**, all three driver logs empty.
+
+### Cost, with its control
+
+| | |
+|---|---|
+| method | `EXT_disjoint_timer_query_webgl2` |
+| size / draws | 1440 × 900, 240 draws per pass, 3 passes |
+| busy pass total | **3.0066 ms** |
+| **zero-render control total** | **0.000 ms** — identical loop, no `drawArrays` |
+| **ms / frame** | **0.01253** |
+| control / frame | **0.0000** |
+| budget | 4.0 ms → **0.31 % of budget** |
+
+The control exists because an earlier measurement on this branch reported 0.0002 ms/frame, which
+was the cost of *queueing* a draw call. `gl.finish()` does not block the JS thread in this browser,
+so 200 finishes with zero renders cost the same as 200 renders. The control is the floor of what the
+measurement can see, and it is printed beside the result rather than assumed away.
+
+A second check that the number is real: cost scales with pixels and with draws, which queueing
+overhead would not.
+
+| size | draws | busy total | ms/frame |
+|---|---|---|---|
+| 720 × 450 | 240 | 0.652 ms | 0.00272 |
+| **1440 × 900** | **240** | **3.007 ms** | **0.01253** |
+| 1440 × 900 | 480 | 6.996 ms | 0.01457 |
+| 2880 × 1800 | 240 | 4.709 ms | 0.01962 |
+
+Previously published: 0.0122 ms/frame. **Re-measured at 0.01253** — same order, slightly up.
+
+### Darkness
+
+15,552,000 pixels over 12 time steps at 1440×900.
+
+| | |
+|---|---|
+| mean luminance | 0.01005 |
+| median | 0.00214 |
+| p75 / p90 / p99 | 0.00461 / 0.02320 / 0.11750 |
+| max | 0.12930, at `rgb(127, 36, 254)` |
+| **under L 0.02, per time step** | **85.43 % … 93.24 %** (worst: step 5) |
+| under L 0.02, pooled | 89.17 % |
+| under L 0.01, per step | 80.44 % … 88.05 % |
+| `--ink` on the brightest pixel in the run | **5.29:1** |
+
+Reported per step, not pooled: a 99 %-dark frame and a 60 %-dark frame pool to a passing 89.5 % with
+the 60 % frame invisible. The constraint is about every frame, so the minimum is the number.
+Previously published: 89.17 % pooled, worst step 85.43 %. **Both reproduce exactly.**
+
+---
+
+## 4. The loop actually stops — and it was running first
+
+This is the check that passes for the wrong reason if nobody looks.
+
+**The trap, measured.** On the freshly loaded live page: `document.hidden` is **`true`**,
+`lifecycle.isRunning()` is **`false`**, `lifecycle.frameCount()` is **`0`**. `createLifecycle`'s
+`active()` is `visible && !doc.hidden`, and both halves fail here. Asserting "it stops" against that
+state reports a pass on a loop that never started.
+
+**Getting it to run.** Two blockers, both from the host:
+
+- `document.hidden` cannot be switched by any control this host exposes, so it was **redefined to
+  `false`** and `visibilitychange` dispatched — the same two inputs the application keys on.
+- `visible` comes from an `IntersectionObserver` on the canvas, which delivered **0 entries in 4 s**;
+  a free rAF pump got **0 callbacks across six 700 ms attempts**. Both are steps of "update the
+  rendering", which this host does not reach unless a paint is forced. Forcing one delivers both,
+  at roughly one frame per forced paint.
+
+**Proof it was advancing**, then the assertion:
+
+| phase | `frameCount()` | `isRunning()` | `document.hidden` |
+|---|---|---|---|
+| visible, start | **75** | true | false |
+| visible, after 4 forced paints | **79** | true | false |
+| immediately after `visibilitychange`, hidden = true | 79 | **false** | true |
+| after 4 more forced paints + 500 ms | **79** | **false** | true |
+
+`isRunning()` flips to `false` **synchronously inside the handler** — the pending frame is cancelled,
+not left to fire. `frameCount()` then holds at **79** across four further forced paints, each of
+which had just been shown to drive a frame while visible. **`advanced = 0`: no no-op frame is
+scheduled.**
+
+**What this does not establish:** `document.hidden` here is a redefined own-property, not the
+browser's own visibility state. The application's reaction is genuinely exercised; the browser's own
+rAF suppression in a truly hidden tab is not, and is not the application's to guarantee.
+
+---
+
+## 5. Reduced motion
+
+**No control in this host emulates `prefers-reduced-motion`.** The **shipped bundle** was booted
+inside a same-origin `srcdoc` iframe behind a pre-script that overrides `window.matchMedia` to
+report `matches: true` for `(prefers-reduced-motion: reduce)` and delegates everything else, and
+that instruments `drawArrays`, `addEventListener` and `requestAnimationFrame` before boot.
+
+**This is a JS-level stand-in.** The browser's own media state is unchanged, so CSS's
+`@media (prefers-reduced-motion: no-preference)` block in `base.css` was **not** switched off by it.
+What follows verifies `main.js`'s branch, not the stylesheet's.
+
+| check | result |
+|---|---|
+| `matchMedia('(prefers-reduced-motion: reduce)').matches` | `true` |
+| `drawArrays` calls | **1** — exactly one frame rendered |
+| `requestAnimationFrame` requests | **0** — no loop was ever scheduled |
+| `window.__vd` | **`undefined`** — no lifecycle, no Lenis, nothing constructed |
+| wheel / mousewheel / touchstart / touchmove / scroll listeners | **none, anywhere** |
+| every listener type registered (14 registrations) | `change`, `click`, `resize` |
+| `[data-section]` rendered | 7 |
+
+`main.js` returns before it assigns `window.__vd` on this path, so `window.__vd.smooth` is
+`undefined.smooth` rather than `null` — the outcome is stronger than "a disabled instance": nothing
+is constructed at all.
+
+**The reduced-motion resize repaint, verified live.** `gradient.resize()` reassigns
+`canvas.width/height`, which clears the WebGL drawing buffer; with no loop to draw a next frame, a
+bare re-fit would leave the canvas permanently transparent after the first resize. Dispatching a
+`resize` took `drawArrays` from **1 → 2**, re-sized the framebuffer 1440×900 → 900×700, and
+`gl.readPixels` at the framebuffer centre returned **`rgba(101, 31, 199, 255)`** — opaque, not the
+transparent buffer the bug produced. `requestAnimationFrame` count still **0**.
+
+---
+
+## 6. No WebGL
+
+Same harness, same shipped bundle; the pre-script sets
+`HTMLCanvasElement.prototype.getContext = () => null` before the module runs. Confirmed in-frame:
+`document.createElement('canvas').getContext('webgl')` returns `null`.
+
+| check | result |
+|---|---|
+| `document.documentElement.dataset.stage` | **`"unsupported"`** |
+| `window.__vd` | `undefined` — no gradient, no lifecycle, no Lenis |
+| `[data-section]` rendered | **7** |
+| heights (px) | hero 900, about 900, events 900, media 1533, board 1082, contact 453, footer 360 |
+| text under `#content` | **2,430 characters** |
+| images under `#content` | 4 |
+| document height | 6,613 px (vs 6,635 px with WebGL — the same page) |
+| nav links | 6: `#hero #about #events #media #board #contact` |
+
+**The static fallback gradient is painted.** `#gradient` computes
+`background-image: linear-gradient(126deg, rgb(8,6,13) 0%, rgb(8,6,13) 34%, rgb(41,30,82) 46%,
+rgb(128,36,254) 52%, …)` — the `:root[data-stage=unsupported] #gradient` rule — at
+`position: fixed`, `z-index: 0`, `display: block`, `opacity: 1`, `visibility: visible`, box
+1440 × 900. `#content` sits above it at `z-index: 1` with a fully transparent background, and the
+six inter-panel gaps are **81 px** each, so the fallback is genuinely exposed rather than covered.
+A screenshot taken at that moment shows the diagonal violet beam behind the hero, agreeing with the
+computed style and geometry — the only place in this document a rendered image is cited at all.
+
+---
+
+## 7. Worst-case contrast over a background that moves
+
+`scripts/check-contrast.html`, run at three viewports. It imports the real `worstCase`,
+`contrastRatio`, `relativeLuminance` and `TIME_STEPS`, the real `PALETTE`, and the real shader;
+every colour, size, weight and surface chain is read with `getComputedStyle` off the live page.
+**26 selectors, 0 matched nothing** at any width.
+
+**Two columns, because they answer different questions.**
+
+- **measured** — the brightest gradient pixel inside the block's own viewport band at its resting
+  scroll position, per time step, composited through the block's surface chain, minimised by
+  `worstCase()`. What the page reaches in this run. A sample, not a guarantee.
+- **bound** — the same chain composited over each of the gradient's three arithmetic extremes
+  (`deep` `rgb(8,6,13)`, `mid` `rgb(82,30,158)`, `bright` `rgb(128,36,255)`), minimised. Every colour
+  the shader emits is a component-wise mix along those stops, so this is a **guarantee over every
+  frame and every scroll position**. It is the column pass/fail is taken on.
+
+The bound is not always at the bright end: near-black ink on a translucent *light* pill has `deep` as
+its worst ground, which is why all three stops are evaluated.
+
+### Solid versus glass
+
+They go through **the same code path**, which is the point. The probe walks every painted layer
+between the text and the canvas and composites source-over in sRGB,
+`over(src, α, dst) = round(α·src + (1−α)·dst)`. Because `α = 1` annihilates the ground, a solid
+panel's gradient reading drops out of the arithmetic on its own — nothing has to remember to treat
+it specially, and nothing can forget.
+
+| handling | blocks | what is behind the text | gradient reading load-bearing? |
+|---|---|---|---|
+| **bare** (no painted layer) | 3 | the gradient itself | **Yes** — hero h1, hero tagline, footer line read the canvas directly |
+| **glass** (one layer, α < 1) | 8 | the gradient, tinted | **Yes** — the composite depends on the sampled ground |
+| **solid** (α = 1) | 14 | `--surface` `rgb(22,18,31)`, opaque | **No** — `measured == bound` for all 14 |
+| **glass then solid** | 1 | `--glass` α .80, then an opaque `--accent` button | **No** — the button wins |
+
+Translucent surfaces, composited onto each stop:
+
+| token | α | over `deep` | over `mid` | over `bright` | worst `--ink` |
+|---|---|---|---|---|---|
+| `--glass` `rgba(11,8,18,.80)` | .80 | `rgb(10,8,17)` | `rgb(25,12,46)` | `rgb(34,14,65)` | 15.71:1 |
+| `--story-tint` `rgba(37,21,56,.76)` | .76 | `rgb(30,17,46)` | `rgb(48,23,80)` | `rgb(59,25,104)` | 12.44:1 |
+| `--chip` `rgba(12,9,20,.82)` | .82 | `rgb(11,8,19)` | `rgb(25,13,45)` | `rgb(33,14,62)` | 15.84:1 |
+| `--chip-cta` `rgba(198,118,255,.92)` | .92 | `rgb(183,109,236)` | `rgb(189,111,247)` | `rgb(192,111,255)` | `--accent-ink` **6.08:1** at `deep` |
+
+`backdrop-filter` is deliberately ignored: blurring averages, so the blurred value lies between the
+band's minimum and its maximum, and taking the maximum is strictly conservative for light text on a
+dark surface. It is *not* conservative for the near-black-on-light pills, which is exactly why those
+are bounded at `deep` as well.
+
+### The table, 1440 × 900, tightest margin first
+
+| block | px | wt | needs | measured | **bound** | at | margin | surface |
 |---|---|---|---|---|---|---|---|---|
-| 0.00 | start | **0.235** | −1.5708 | 0.88 | 6.2 | 1.0 | 0 | 1 |
-| 0.12 | hero end | **0.235** | −0.42 | 0.88 | 6.2 | 1.0 | 0 | 1 |
-| 0.30 | panel end | **0.235** | −0.42 | 0.88 | 6.2 | 1.0 | 0 | 1 |
-| 0.55 | showcase end | **1.650** | 0 | 0.80 | 10 | 0.5 | 1 | 1 |
-| 1.00 | grid end | **0.235** | 0 | 0 | 7 | 1.6 | 0 | 0 |
+| hero tagline | 13.1 | 400 | 4.5 | 10.35 | **5.25** | bright | **1.17×** | bare |
+| footer line | 12.5 | 400 | 4.5 | 5.45 | **5.25** | bright | **1.17×** | bare |
+| nav CTA "Join us" | 12.5 | 600 | 4.5 | 6.08 | 6.08 | deep | 1.35× | glass α .92 |
+| teaser link | 12.5 | 500 | 4.5 | 6.52 | 6.52 | deep | 1.45× | solid |
+| board position | 12.2 | 500 | 4.5 | 6.52 | 6.52 | deep | 1.45× | solid |
+| contact email link | 20.2 | 400 | 4.5 | 6.52 | 6.52 | deep | 1.45× | solid |
+| form button label | 14.1 | 600 | 4.5 | 7.05 | 7.05 | deep | 1.57× | glass → solid |
+| feature body | 20.2 | 400 | 4.5 | 7.18 | 7.10 | bright | 1.58× | glass α .80 |
+| form card label | 11.5 | 500 | 4.5 | 7.24 | 7.10 | bright | 1.58× | glass α .80 |
+| teaser detail | 13.8 | 400 | 4.5 | 7.51 | 7.51 | deep | 1.67× | solid |
+| media card title | 14.7 | 400 | 4.5 | 7.51 | 7.51 | deep | 1.67× | solid |
+| board bio | 14.1 | 400 | 4.5 | 7.51 | 7.51 | deep | 1.67× | solid |
+| contact line | 20.2 | 400 | 4.5 | 7.51 | 7.51 | deep | 1.67× | solid |
+| socials link | 13.1 | 500 | 4.5 | 7.51 | 7.51 | deep | 1.67× | solid |
+| hero h1 | 138.2 | 200 | 3 | **5.29** | 5.25 | bright | 1.75× | bare |
+| story body (serif) | 23.0 | 400 | 4.5 | 12.44 | 12.44 | bright | 2.76× | glass α .76 |
+| nav wordmark | 12.5 | 600 | 4.5 | 16.51 | 15.84 | bright | 3.52× | glass α .82 |
+| nav pill | 12.5 | 500 | 4.5 | 15.84 | 15.84 | bright | 3.52× | glass α .82 |
+| teaser heading | 18.4 | 500 | 4.5 | 16.63 | 16.63 | deep | 3.70× | solid |
+| semester select | 13.6 | 500 | 4.5 | 16.63 | 16.63 | deep | 3.70× | solid |
+| board name | 16.0 | 500 | 4.5 | 16.63 | 16.63 | deep | 3.70× | solid |
+| story h2 (ABOUT US) | 62.4 | 400 | 3 | 12.47 | 12.44 | bright | 4.15× | glass α .76 |
+| feature h2 (EVENTS) | 68.0 | 300 | 3 | 15.71 | 15.71 | bright | 5.24× | glass α .80 |
+| grid h2 (MEDIA) | 34.6 | 300 | 3 | 16.63 | 16.63 | deep | 5.54× | solid |
+| grid h2 (BOARD) | 34.6 | 300 | 3 | 16.63 | 16.63 | deep | 5.54× | solid |
+| grid h2 (CONTACT US) | 34.6 | 300 | 3 | 16.63 | 16.63 | deep | 5.54× | solid |
 
-`cupTop` sits at rest at 0.12, 0.30 and 1.0 and at its exploded height only at 0.55.
-`camera.position.x` is 0 at every sample — there is no orbit room. Every row differs from its
-neighbour.
+**26 of 26 pass on the bound.** `needs` is WCAG 1.4.3 resolved per block: 3:1 for ≥ 24 px, or
+≥ 18.66 px bold; 4.5:1 otherwise.
 
-### Containment, by dense sampling rather than endpoints
+### Across viewports
 
-502 samples across the whole timeline. `cupTop` departs rest at **f = 0.3054** — the first
-sample past rest on this 502-point grid; `src/scroll/choreography.js`, `README.md` and
-`tests/choreography.dom.test.js` cite **f = 0.3014** for the same departure, resolved off a
-finer grid. Both describe one tween, not two measurements that disagree. It returns at
-**f = 0.992**.
+| | 375 × 812 | 768 × 1024 | 1440 × 900 |
+|---|---|---|---|
+| resolved | 26 / 26 | 26 / 26 | 26 / 26 |
+| **pass on the bound** | **26** | **26** | **26** |
+| tightest margin | **1.166×** | **1.166×** | **1.166×** |
+| lowest bound | 5.247:1 | 5.247:1 | 5.247:1 |
+| lowest measured | 5.307:1 | 5.326:1 | **5.288:1** |
 
-So the explosion *starts* inside the showcase room, but the **reassembly tween spans the entire grid
-room**, not the showcase. What keeps this from showing is opacity, not position:
+Previously published: "26/26 pass, tightest margin 1.17×, lowest 5.29:1". **All three reproduce** —
+1.1660× rounds to 1.17×, and 5.29:1 is the lowest *measured* figure; the lowest **bound**, the
+number the design is certified against, is **5.25:1**.
 
-- `state.objectOpacity` reaches 0 at **f = 0.59498** (predicted 0.55 + 0.45 × `OPACITY_SETTLE` = 0.595).
-- `tilt.position.x` reaches 0 at **f = 0.64893** (predicted 0.55 + 0.45 × `LATERAL_SETTLE` = 0.649).
+---
 
-The fade therefore completes with the object still **42.9% of the way** from x = 0.80 to centre —
-it is gone before it arrives under a centred column, which is what `OPACITY_SETTLE` exists to do,
-and it is confirmed here rather than assumed.
+## 8. Navigation, overflow, panels, height
 
-There is a window, **f ∈ [0.55, 0.595]** — about **54vh of scroll** — in which the object is still
-**97.5–100% exploded and visible**, fading 1 → 0 while sliding from x = 0.80 to x = 0.457. After
-f = 0.595 the object is invisible for the remaining 40% of the page, so the reassembly that
-continues to f = 0.992 is never seen. Reported as **qualified** rather than verified: the exploded
-*target state* is confined to the showcase room, the *tween out of it* is not.
+### Nav anchors, 1440 × 900
 
-### Labels
+Each pill was clicked for real; Lenis was then stepped by hand — `smooth.raf(performance.now())` on
+a 16 ms timer, the same call `main.js` makes inside `onFrame` — because this host delivers no rAF.
 
-`labelOpacity` also runs the full grid room (0.9698 at f = 0.60, 0.117 at f = 0.90). The label layer
-multiplies it by `objectOpacity`, so the measured DOM opacity is **0 from f = 0.595 onward** —
-verified directly on the element, not inferred. `pointerEvents` flips to `none` at the same point.
-Annotations cannot outlive the thing they annotate.
+| link | href | resolves | from → to | moved | target top after |
+|---|---|---|---|---|---|
+| VIOLET DIABOLO | `#hero` | yes | 5670 → 0 | −5670 | 0 |
+| About | `#about` | yes | 0 → 910 | +910 | **71** |
+| Events | `#events` | yes | 910 → 1891 | +981 | **71** |
+| Media | `#media` | yes | 1891 → 2872 | +981 | **71** |
+| Board | `#board` | yes | 2872 → 4507 | +1635 | **71** |
+| Join us | `#contact` | yes | 4507 → 5670 | +1163 | **71** |
 
-Label sprites are parented **`labelRoot < diaboloTilt < Scene`** — under the tilt, never under
-`diaboloSpinner`, whose children are exactly the seven part groups. The orbiting-label defect has
-not returned.
+**6/6 resolve, 6/6 move.** Every target lands its top at **71 px** = `--nav-offset` (63) + 0.5 rem,
+i.e. `--nav-clear`. The fixed bar is 63 px tall, so no heading lands underneath it.
 
-### Camera
+### Overflow and the pill row
 
-All four rooms' `camZ` ∈ [6.2, 10], the near/far bounds. Frustum fit measured by projecting every
-part's bounding-box corners at f = 0.55 (fully exploded, camZ 10, aspect 1.333):
+`--nav-offset` is written by `nav.js`'s `ResizeObserver`, and this host throttles its delivery, so
+every row was read **after forcing a paint**. Without that, `--nav-offset` reads its CSS fallback and
+the figures mean nothing.
 
-```
-NDC x   [-0.055, 0.493]
-NDC y   [-0.914, 0.910]      margin 0.0864 (8.6% of half-height)
-world span 5.02 units        visible height at camZ 10: 6.115
-```
+| viewport | root | `clientWidth` | `scrollWidth` | equal | nav height | `--nav-offset` | rows | pills outside | offenders |
+|---|---|---|---|---|---|---|---|---|---|
+| 1440 × 900 | 16 px | 1440 | 1440 | **yes** | 63.0 | `63px` | 1 | **0/6** | **none** |
+| 768 × 1024 | 16 px | 768 | 768 | **yes** | 68.0 | `68px` | 1 | **0/6** | **none** |
+| 375 × 812 | 16 px | 375 | 375 | **yes** | 56.8 | `56.84px` | 1 | **0/5** | **none** |
+| 320 × 812 | 16 px | 320 | 320 | **yes** | 56.8 | `56.84px` | 1 | **0/5** | **none** |
+| 320 × 812 | **32 px** | 320 | 320 | **yes** | **188.8** | **`188.77px`** | **3** | **0/5** | **none** |
+| 375 × 812 | **32 px** | 375 | 375 | **yes** | — | — | — | — | **none** |
+| 280 × 812 | **32 px** | 280 | 280 | **yes** | — | — | — | — | **none** |
 
-It fits, with real margin, measured by projection rather than by trigonometry on paper.
+32 px root is this branch's stand-in for 200 % text zoom. The 320 px row is the interesting one: the
+bar wraps to **three rows and 188.8 px**, and `--nav-offset` tracks it to **188.77 px** — the exact
+failure `nav.js` exists to prevent (a fixed `clamp()` cannot know the bar has wrapped), working live.
 
-## 4. The panel actually covers the object
+"Offenders" is an exhaustive scan of `#content` and `.site-nav` **and those two elements
+themselves**, measuring each element's **box** (`getBoundingClientRect`) *and* its **painted ink**
+(a `Range` over its own contents), at 0.05 px tolerance — because an overlong word can paint past a
+box that never grows, and a fixed bar can be too wide without any descendant being too wide. Zero
+offenders at every width.
 
-The panel is the `<section id="about">` itself, and the coverage is a CSS-paint-order fact:
+Previously published: equality at 375, 280 and 1440. **Reproduces, and extends to 320 and 768.**
 
-- `background-color: rgb(198, 118, 255)` — **fully opaque**, `opacity: 1`, `mix-blend-mode: normal`,
-  no `filter`, no `backdrop-filter`, no `transform`. **No ancestor** (`#content`, `body`, `html`)
-  has `opacity < 1` or any filter or blend.
-- `#content` is `position: relative; z-index: 1`; `#stage` is `position: sticky; z-index: 0`. The
-  content column paints above the canvas.
-- `#about`'s border-box **covers the entire viewport** from progress 0.12 to ≈ 0.217 (at 1024×768
-  it spans document Y 1106 → 2765, i.e. 216vh).
-- The object is genuinely *there* to be covered: a framebuffer `readPixels` at the object's
-  projected screen point returned **`[20, 19, 26, 255]`** — `#14131a`, the bearing fill, at full
-  alpha.
+### Panels
 
-> **Method note, because it nearly produced a tautology.** `#stage` carries `pointer-events: none`
-> (stage.css), so `document.elementFromPoint` can **never** return the canvas at desktop widths —
-> "the hit is not the canvas" is true by construction and proves nothing. That probe was run,
-> recognised as vacuous, and **discarded**. The coverage claim rests on the opacity / geometry /
-> stacking facts above.
+| section | `data-panel` | `data-surface` |
+|---|---|---|
+| `#hero` | `hero` | *(none — text directly on the gradient)* |
+| `#about` | `story` | `glass` |
+| `#events` | `feature` | `glass` |
+| `#media` | `grid` | `solid` |
+| `#board` | `grid` | `solid` |
+| `#contact` | `grid` | `solid` |
+| `[data-section=footer]` | *(none)* | *(none)* |
 
-From progress ≈ 0.217 the panel's bottom edge rises above the viewport bottom and the (transparent)
-events section below it progressively re-exposes the stage. That is the designed handover into the
-showcase room, not light leaking through the sheet.
+All four `data-panel` values in use; both `data-surface` values in use. Gaps between consecutive
+panels: **81 px**, uniform. None of the deleted 3D symbols survive anywhere in `src/` or
+`index.html` — `createStage`, `createLabels`, `createChoreography`, `createEntrance`,
+`applySectionSides`, `SECTION_FOR_ROOM`, `ROOMS`, `data-room`, `data-side`: zero hits.
 
-## 5. The nav
+### Height in screens
 
-Six links: the wordmark, four pills, and the CTA. **All six resolve to a real `<section>`**, with
-no duplicate targets:
+| viewport | `scrollHeight` | screens |
+|---|---|---|
+| **1440 × 900** | 6,635 px | **7.37** |
+| 375 × 812 | 6,747 px | **8.31** |
+| 320 × 812 | 7,017 px | **8.64** |
+| 768 × 1024 | 9,268 px | **9.05** |
 
-| link | href | target exists | `data-room` | click moved scroll |
+Previously published: 7.37 and 8.31. **Both reproduce exactly.** See F2.
+
+---
+
+## 9. Findings
+
+**No correctness defect was found** in the shader, the lifecycle, the fallback, the nav or the
+contrast arithmetic. Nothing in the *shipped code* blocks a merge. **F4 is documentation, and it is
+the one thing here worth fixing first.**
+
+**F1 — `three@0.186.0` is still installed and still in `package-lock.json`.** Not a dependency of
+this project: `npm ls three` shows `violet-diabolo → animejs@4.5.0 → three@0.186.0`, marked
+`"optional": true, "peer": true` in the lockfile. animejs declares a `three` adapter as an optional
+peer and npm installs optional peers by default. Nothing imports it and nothing ships it, so this
+costs visitors nothing — it will only surprise someone who greps `node_modules` to check the branch
+did what it says. No action needed unless the team wants `--omit=optional` pinned.
+
+**F2 — 6–8 screens holds at desktop widths only.** 7.37 at 1440×900 is inside the range; 8.31 at
+375×812, 8.64 at 320×812 and 9.05 at 768×1024 are outside it. The 8.31 figure was already published
+by an earlier task, so this is a known shape rather than a regression, but the constraint as written
+is met at one of the four viewports measured. A decision, not a bug. Relevant:
+`src/styles/sections.css` — `--panel-gap`, and the `@media (width<=767px)` block's `min-height: 0`
+and `padding-block`.
+
+**F3 (fixed in this commit) — `src/gradient/contrast.js` named an impossible cause.** The docstring
+for `worstCase`'s non-finite guard listed "a negative component from a float framebuffer readback".
+`channel`'s branch is `s <= 0.03928`, and that bound is positive, so *every* negative `s` takes the
+linear `s / 12.92` branch — `**` never sees a negative base. Measured:
+
+| sample vs `--ink` | luminance | ratio | finite | `worstCase` |
 |---|---|---|---|---|
-| VIOLET DIABOLO | `#hero` | yes | hero | yes (5000 → 0) |
-| About | `#about` | yes | panel | yes (0 → 1052) |
-| Events | `#events` | yes | showcase | yes (0 → 2711) |
-| Media | `#media` | yes | grid | yes (0 → 5015) |
-| Board | `#board` | yes | grid | yes (0 → 7780) |
-| Join us | `#contact` | yes | grid | yes (0 → 8932) |
+| `[-40,-40,-40]` | −0.01214 | 25.045 | **yes** | returns it |
+| `[-255,-255,-255]` | −0.07740 | −34.606 | **yes** | returns it |
+| `[NaN,0,0]` | NaN | NaN | no | **throws** |
+| `[Infinity,0,0]` | ∞ | ∞ | no | **throws** |
+| `[10,10]` (short array) | NaN | NaN | no | **throws** |
 
-The nav is `position: fixed; z-index: 3`, measured 54px tall; every target carries
-`scroll-margin-top: 53.76px`, and each click lands its section's top at exactly `y = 54` — clear of
-the bar rather than under it.
+The reachable causes are a `NaN`/`Infinity` component, or an RGB/RGBA-length mismatch destructuring
+`b` to `undefined`. The docstring now says that, and records the negative case as an explicit
+non-cause — harmless here because the only producer is `gl.readPixels` with `UNSIGNED_BYTE`, which
+cannot emit one. **The arithmetic is untouched:** the bundle keeps its identical content hash
+(`index-DTqm9uPc.js`, 38,522 B) across the edit, and the suite is 202/202 both before and after.
 
-## 6. No spill survives
+**F4 — `README.md` still documents the deleted 3D system, and contradicts this branch.** Not
+measured as part of the nine steps; found while checking which files reference this record. It is
+the one finding here I would fix before merge, because it is the first file a reader opens and
+almost every load-bearing sentence in it is now false.
 
-- `document.querySelector('.light-spill')` → `null`; **0** elements with any class containing "spill".
-- **0 of 117** enumerable CSS rules mention `spill`. (One cross-origin Google Fonts sheet cannot be
-  enumerated; it cannot contain application rules.)
-- `--spill-x`, `--spill-y`, `--spill`, `--spill-opacity` all resolve to the empty string on `:root`.
-- `grep -rni spill` over `src/`, `index.html` and the built `dist/` JS, CSS and HTML: **no matches**.
-- Git confirms the deletion in `98f9157`: `src/diabolo/spill.js`, `tests/spill.dom.test.js` and
-  `tests/stage-spill.dom.test.js` are all gone.
-
-## 7. Appearance, contrast, responsiveness, links
-
-### What the framebuffer actually contains
-
-`readPixels` over the whole drawing buffer at 1440×900, progress 0 — **249,850 sampled opaque
-pixels, 19.28% of the canvas**:
-
-| colour | share of object | is |
+| `README.md` | says | actual |
 |---|---|---|
-| `#0c0a12` | 95.55% | cup fill |
-| `#14131a` | 0.52% | bearing fill |
-| `#cf2f2a` | 0.43% | gasket — the one colour in the object |
-| `#08070c` | 0.20% | hub fill |
+| line 3 | "a Three.js diabolo … scrubbed by page scroll through an anime.js timeline" | an animated violet gradient behind panels; no Three.js |
+| line 31 | `src/diabolo/` — "Three.js scene, materials, geometry build, render loop" | **directory does not exist** |
+| line 32 | `src/scroll/` — "entrance sequence and the anime.js/ScrollObserver choreography" | `src/scroll/` holds `smooth.js` (Lenis) only; `choreography.js` and `entrance.js` **do not exist** |
+| line 30 | `src/ui/layout.js`, the `data-side` stamping | **does not exist**; `data-side` is gone branch-wide |
+| line 34 | `src/styles/stage.css` — "the sticky canvas, the narrow-screen object band" | **does not exist**; `src/styles/` is `base.css` + `sections.css` |
+| line 36 | "280 unit tests across 19 test files" | **202 tests across 17 files** |
+| line 69 | "`#stage` is `position: sticky`" | `#stage` is gone, and **§2 above measures zero `position: sticky` anywhere** — the README asserts the exact thing this branch removed |
+| lines 73, 77, 79, 81, 164 | the 40dvh object band, `LatheGeometry` profiles, the `ROOMS` table, `cupTop` fractions, the sticky-pin IntersectionObserver argument | all describe deleted code |
 
-The remainder is antialiased edge blending. The bright edges do reach the framebuffer at their
-exact authored values — `#efeaf8` (144 px) and `#f2f4f8` (20 px) — but only **0.08%** of object
-pixels exceed luminance 0.5, because the wireframe is 1px and heavily antialiased at DPR 2. Dark
-body, bright edges, one red accent: confirmed against live pixels.
+Also stale by implication: lines 160–170 summarise the *previous* `VERIFICATION.md`, which this
+commit replaced.
 
-### Contrast, measured against live canvas pixels
+---
 
-The backdrop for each run of text was resolved by paint order: an opaque background on an ancestor
-*inside* `#content` covers the canvas; otherwise the canvas pixel, composited over the page ground,
-is the backdrop.
+## 10. What this run could NOT verify, and why
 
-| | 375×812 | 768×1024 | 1440×900 |
-|---|---|---|---|
-| `#hero h1` | **18.20:1** | **18.20:1** | **18.20:1** |
-| hero tagline | 8.22:1 | 8.22:1 | 8.22:1 |
-| `.teaser-when` | 16.63:1 | 16.63:1 | 16.63:1 |
-| `.teaser-where` | 7.51:1 | 7.51:1 | 7.51:1 |
-
-72 samples per element per width. **Zero object pixels fall behind the hero title at any width.**
-
-That "zero" is only meaningful with a negative control, so here it is: the object is
-simultaneously occupying **19.28%** of the canvas at 1440, **28.19%** at 768 and **26.70%** of the
-band at 375, with a screen bounding box disjoint from the title's — at 1440 the object spans
-x 685–1261 while the title spans x 72–552, a 133px gap. The readback is not returning an empty
-buffer.
-
-Per-room overlap of the object's pixel bounding box against the reading column, at each room's
-midpoint (1440×900): hero **no overlap**, showcase **no overlap**, grid **no object at all**
-(opacity 0, 0 pixels). The panel room's boxes do overlap by 25px — but that is underneath an
-opaque violet sheet, so it is a canvas-space overlap and not a visible collision.
-
-### Responsiveness
-
-| | 375×812 | 768×1024 | 1440×900 |
-|---|---|---|---|
-| `#stage` z-index | **2** (above content) | 0 | 0 |
-| `#stage` height | 324.8px (40dvh) | full | full |
-| `#stage` background | opaque `#08060d` | transparent | transparent |
-| `#content` margin-top | **0px** | −100dvh | −100dvh |
-| horizontal overflow | none | none | none |
-
-The narrow-screen recipe is live and correct: the object gets a 40dvh band, the reading column
-scrolls under it, and the `-100dvh` pull-up is cancelled — measured `0px`, the specific bug
-stage.css's comment warns about. Page length is 13.0 screens at desktop widths and 13.4 at 375.
-
-### Links and images
-
-- **7** in-page links, all resolving. **1** mailto. **5** external, every one `target="_blank"`
-  with `rel="noreferrer"` — **0** missing `noopener`/`noreferrer`.
-- All 4 images fetch **200** and decode at 800×800. Two board portraits appeared unloaded until
-  forced: `loading="lazy"`'s IntersectionObserver never fires while `document.hidden`, and setting
-  `loading = 'eager'` loaded both immediately. **Environment artifact, not a product defect.**
-- **0 console messages** of any level across the session.
-
-## 8. Bundle size
-
-Both builds run from the same `node_modules`. The baseline is `main` (`fc42907`), which is the
-branch's merge-base and is a docs-only commit, so it is the true pre-branch code.
-
-| | main `fc42907` | branch `79aee1c` | Δ |
-|---|---|---|---|
-| JS raw | 610,389 B | **600,456 B** | **−9,933 B (−1.63%)** |
-| JS gzip | 158,190 B | **156,170 B** | −2,020 B (−1.28%) |
-| CSS raw | 9,733 B | **14,180 B** | **+4,447 B (+45.7%)** |
-| CSS gzip | 2,932 B | 3,782 B | +850 B (+29.0%) |
-| **total raw** | 620,122 B | **614,636 B** | **−5,486 B (−0.88%)** |
-| **total gzip** | 161,122 B | 159,952 B | −1,170 B (−0.73%) |
-
-**The JS bundle did drop — but far less than "deleting the PBR path" suggests, and the PBR
-machinery has not left.** Token occurrences in the minified JS, branch vs main:
-
-| token | main | branch |
-|---|---|---|
-| `RoomEnvironment` | 1 | **0** |
-| `MeshPhysicalMaterial` | 5 | 3 |
-| `MeshStandardMaterial` | 14 | 12 |
-| `envMap` | 154 | 131 |
-| `transmission` | 103 | 88 |
-| `clearcoat` | 201 | 176 |
-| `roughness` | 136 | 126 |
-
-Only `RoomEnvironment` — a separately tree-shakeable addon — actually left. three.js ships
-`MeshStandardMaterial`, `MeshPhysicalMaterial` and their shader chunks regardless of which
-materials the application instantiates, so the shader cost stays whether or not the object is lit.
-`PMREMGenerator` reads 0 in **both** minified bundles because the class name is mangled; that count
-is not evidence either way, and the baseline source does import it.
-
-Net: the page ships **5.5 kB less** than before the branch, because a ~10 kB JS saving is partly
-spent on 4.4 kB of new CSS for the four room patterns.
-
-## 9. Defects found
-
-Neither is merge-blocking. Both are of the exact species this project keeps shipping — a comment
-asserting a number nobody measured.
-
-**D1 — `src/styles/sections.css:102`, false parenthetical.**
-The comment reads "the grid room's own beat (reassemble, spin, fade) is over by progress 0.595".
-Measured: only the **fade** ends there (0.59498). **Reassembly** runs to f = 1.00 — `cupTop` is
-still 11.7% exploded at f = 0.90 — and **`spinRate`** reaches its target 1.6 only at f = 1.00.
-The comment's *conclusion* ("everything after that is reading, not object") is nonetheless true,
-because `objectOpacity` is 0 from 0.595 on. Impact: documentation only.
-
-**D2 — `src/styles/sections.css:445–447`, wrong measured figures.**
-The comment reads "the first card becomes visible at 725vh, 11vh after the fade completes."
-Measured **735.3vh at 1440×900** and **735.6vh at 1024×768** — i.e. **21.3–21.6vh** after the
-714vh fade, not 11. The 725 figure is `660 + 165 − 100` and omits `.room`'s own `padding-top`
-(81px ≈ 9vh at 900). The error is in the **safe** direction: there is roughly twice the documented
-clearance. The guarding test, `tests/sections-layout.dom.test.js:172`, explicitly and correctly
-states that it ignores the padding "which only ever makes this stricter", so the test is sound —
-it is only the prose that overstates its own precision. Impact: documentation only.
-
-## 10. Outstanding for a human on a real machine
-
-What this run could **not** verify, and why:
-
-1. **Live scroll-driven scrubbing.** Measured directly: 0 `scroll` events while `scrollY` moved
-   0 → 3871, 0 rAF callbacks in 1500 ms, `timeline.currentTime` frozen at 0 where a live scrub
-   would read 420. The binding of the timeline to `#content` is covered only by unit tests. **This
-   is the single largest gap, and it is unchanged from the previous record.**
-2. **Any motion over time.** The entrance never played; it was completed via `entrance.skip()` —
-   the application's own seam, which calls the same `onComplete` that attaches the scroll timeline.
-   Every room state in §3 is a seeked frozen frame.
-3. **Anything requiring the compositor.** The screenshot pipeline returned a stale frame that
-   contradicted geometry, so no claim here rests on a rendered image. In particular, the panel's
-   coverage is established by opacity, geometry and stacking order — **not** by looking at it.
-4. **The `prefers-reduced-motion` path.** `main.js`'s static branch, `applySectionSides({ staticAt })`,
-   and the `labelOpacity = 1` still frame are untested here; the media query cannot be toggled in
-   this host.
-5. **The unsupported-WebGL path.** Not exercised *in this run* — WebGL was available throughout.
-   It has since been exercised separately, at 1440x900, by denying `getContext('webgl'|'webgl2')`
-   before the bundle boots and measuring the resulting layout: `html[data-stage="unsupported"]`,
-   the canvas hidden, the fallback SVG shown at x 549.3-890.7 with its drawn ink at 583.5-856.5,
-   and the reading column at x 72-552 — a 31.5px gap. Geometry only, from the same
-   `getBoundingClientRect` / `getBBox` instruments as the rest of this document; still no
-   rendered image, and still no real browser without WebGL. See
-   `.superpowers/sdd/final-fixes-report.md`, finding I1.
-6. **Real mobile devices.** 375×812 was viewport emulation only — no real touch input, no real
-   device pixel pipeline.
-7. **Lazy-loading in a visible tab.** Confirmed broken *only* by `document.hidden`; normal
-   behaviour is inferred from the files fetching 200 and decoding, not observed.
-8. **Cross-browser.** Chromium only. No Safari or Firefox.
-9. **Font rendering.** Google Fonts stylesheets load, but glyph rendering and fallback behaviour
-   were not inspected.
+1. **A real `prefers-reduced-motion: reduce`.** No emulation surface exists in this host. §5 used a
+   **JS-level `window.matchMedia` override**: `main.js`'s branch is verified, the stylesheet's
+   `@media (prefers-reduced-motion: no-preference)` block in `base.css` is **not**. Whether the
+   reveal transitions are actually suppressed for such a visitor rests on that CSS rule, unexercised.
+2. **Real browser tab visibility.** `document.hidden` was redefined in JS, not switched by the
+   browser. The application's reaction to `visibilitychange` is verified; the browser's own rAF
+   suppression in a genuinely hidden tab is not.
+3. **A real browser without WebGL.** `getContext` was patched to return `null`. The unsupported code
+   path and its layout are verified; no actual WebGL-less browser was used.
+4. **Real scroll input.** This host delivers no `requestAnimationFrame`, so Lenis was stepped by hand
+   with `setTimeout` and real timestamps, and anchor activation was synthesized. **Wheel and touch
+   inertia, and the velocity uniform under real input, are not verified here** — they are covered
+   only by `tests/smooth.dom.test.js` and `tests/gradient.dom.test.js`.
+5. **Sustained frame rate under a running loop.** The *frame cost* is a real GPU timer-query
+   measurement. The *achieved* frame rate and the 30 fps cap in a live visible tab are not measured,
+   because a free rAF loop will not run here; `createFrameCap` is covered by `tests/budget.test.js`
+   alone.
+6. **`backdrop-filter`'s actual blurred composite.** The contrast probe ignores it by design, taking
+   the band maximum instead — strictly conservative for light text on a dark surface, and separately
+   bounded at `deep` for the near-black-on-light pills. The blurred pixels themselves were never
+   sampled.
+7. **Real mobile devices.** 320 / 375 / 768 were viewport emulation. No real touch input, no real
+   device pixel pipeline, no real mobile GPU.
+8. **Cross-browser and cross-GPU.** Chromium on ANGLE / Metal / Apple M4 only. No Safari, no Firefox,
+   no non-Apple GPU — and `EXT_disjoint_timer_query` availability differs across those, so the frame
+   cost in §3 is a figure for this machine.
+9. **Appearance.** The screenshots in this run were thumbnails taken to force paints, not a design
+   review. Nothing here is a judgement about how the page looks.
+10. **Font loading and glyph rendering.** The Google Fonts stylesheet is requested; glyph rendering,
+    the swap and fallback metrics were not inspected. The contrast figures are computed from
+    `getComputedStyle` colours and sizes, which do not depend on which face actually rendered.

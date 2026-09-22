@@ -37,11 +37,19 @@ export function contrastRatio(a, b) {
  * for one still fails the reader on that frame.
  *
  * Throws on a non-finite ratio (NaN or Infinity) rather than skipping it. `r < ratio`
- * alone would let a malformed sample — a negative or NaN component from a float
- * framebuffer readback, or an RGB/RGBA-length mismatch destructuring to `undefined` —
+ * alone would let a malformed sample — a NaN or Infinity component, or an RGB/RGBA-length
+ * mismatch destructuring `b` to `undefined`, which `undefined / 255` turns into NaN —
  * silently lose the comparison and vanish from consideration, which is worse than
  * reporting nothing: it reports a *result*, just one that quietly excludes the corrupted
  * frame instead of flagging it.
+ *
+ * A NEGATIVE component is not one of those causes, though an earlier version of this
+ * comment listed it. `channel`'s branch is `s <= 0.03928`, and that bound is positive, so
+ * every negative `s` takes the linear `s / 12.92` branch: `**` never sees a negative base,
+ * the luminance stays finite, and the ratio comes back finite too (rgb(-40,-40,-40)
+ * against --ink yields 25.05). A negative component would therefore pass this guard
+ * rather than trip it — which costs nothing here, because the only producer is
+ * `gl.readPixels` with `UNSIGNED_BYTE`, and that cannot emit one.
  */
 export function worstCase(backgroundSamples, textRgb) {
   if (!backgroundSamples?.length) {
