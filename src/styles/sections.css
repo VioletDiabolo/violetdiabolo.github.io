@@ -97,8 +97,9 @@ body { overflow-x: hidden; }
  *
  * Tinted glass keeps both. --story-tint is --accent's hue taken down to a value that can
  * carry WHITE text instead of black: at alpha 0.76 over the gradient's brightest pixel it
- * composites to rgb(59, 38, 103), where --ink measures 10.1:1, and over the near-black
- * ground it composites to rgb(30, 17, 46) at 15.9:1. The panel is unmistakably violet at
+ * composites (source-over, sRGB) to rgb(59, 25, 104), where --ink measures 12.44:1, and
+ * over the near-black ground to rgb(30, 17, 46) at 16.14:1. The panel is unmistakably
+ * violet at
  * both ends of that range, and the range is narrow enough that the contrast is a fact
  * rather than a hope.
  *
@@ -127,7 +128,10 @@ body { overflow-x: hidden; }
   column-gap: var(--gutter);
   align-content: end;
   align-items: end;
-  padding-block: var(--nav-h) clamp(2.5rem, 9vh, 5.5rem);
+  /* --nav-clear, not --nav-h: the bar's measured height plus a gap (base.css). A fixed
+     clamp cannot know the bar has wrapped, and a wrapped bar is what paints over the
+     h1 at 200% text zoom. */
+  padding-block: var(--nav-clear) clamp(2.5rem, 9vh, 5.5rem);
 }
 
 [data-panel='hero'] .room-head { grid-column: 1; }
@@ -170,8 +174,8 @@ body { overflow-x: hidden; }
 
 /*
  * The tagline. --ink, not --ink-dim, and that is a consequence of the gradient rather
- * than a taste change: this line sits on bare canvas, where --ink-dim measures 2.19:1
- * against the brightest pixel the shader can emit and --ink measures 5.26:1 (see the
+ * than a taste change: this line sits on bare canvas, where --ink-dim measures 2.37:1
+ * against the brightest pixel the shader can emit and --ink measures 5.25:1 (see the
  * "over bare gradient, only --ink" rule in base.css). Nothing dim can live out here.
  *
  * So the hierarchy between the club's name and its tagline is carried by SCALE instead
@@ -245,7 +249,7 @@ body { overflow-x: hidden; }
   column-gap: clamp(1.5rem, 5vw, 5rem);
   align-content: center;
   align-items: center;
-  padding-block: calc(var(--nav-h) + clamp(2rem, 6vh, 4rem)) clamp(2.5rem, 8vh, 5rem);
+  padding-block: calc(var(--nav-clear) + clamp(2rem, 6vh, 4rem)) clamp(2.5rem, 8vh, 5rem);
 }
 
 [data-panel='story'] .room-head { grid-column: 1; }
@@ -255,9 +259,10 @@ body { overflow-x: hidden; }
  * Instrument Serif's one job on the page. Set at real size on the club's own story, it
  * marks this panel as a change of material even before the tint and the blur do.
  *
- * No colour override: --ink is right on this ground and measured (10.1:1 at the tint's
- * worst composite). The near-black --accent-ink this used to take belonged to the opaque
- * violet sheet the panel no longer is, and would be 1.4:1 here.
+ * No colour override: --ink is right on this ground and measured (12.44:1 at the tint's
+ * worst composite, which is over the gradient's brightest stop). The near-black
+ * --accent-ink this used to take belonged to the opaque violet sheet the panel no longer
+ * is, and would run 1.11:1 to 1.45:1 across the same range here.
  */
 [data-panel='story'] h2 {
   font-family: var(--font-panel);
@@ -290,7 +295,7 @@ body { overflow-x: hidden; }
   grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   column-gap: var(--gutter);
-  padding-block: calc(var(--nav-h) + clamp(1.5rem, 5vh, 3rem)) clamp(2.5rem, 8vh, 5rem);
+  padding-block: calc(var(--nav-clear) + clamp(1.5rem, 5vh, 3rem)) clamp(2.5rem, 8vh, 5rem);
 }
 
 [data-panel='feature'] .room-head {
@@ -701,7 +706,7 @@ body { overflow-x: hidden; }
 }
 
 /* --ink, not --ink-dim. This line is one of exactly two things on the page sitting on
-   bare canvas (the hero's head is the other), and --ink-dim measures 2.19:1 against the
+   bare canvas (the hero's head is the other), and --ink-dim measures 2.37:1 against the
    gradient's brightest pixel. Held quiet by size and tracking instead. */
 .footer-line {
   font-size: var(--type-micro);
@@ -734,8 +739,14 @@ body { overflow-x: hidden; }
   }
 
   [data-panel='hero'] .room {
-    /* The hero opens the page, so it gets less top padding than a panel lower down. */
-    padding-block: clamp(3.5rem, 9vh, 5rem) clamp(2.5rem, 7vh, 4rem);
+    /* The hero opens the page, so it gets less top padding than a panel lower down --
+       but never less than the bar standing over it. This override dropped --nav-h
+       entirely, which is why the 200%-zoom overlap showed up HERE rather than in the
+       wide rule: at 375x812 with a 32px root it resolved to 112px against a bar of
+       188.8px. max() keeps the composition at every width where it already cleared the
+       bar (unchanged at 375x812 and 1440x900 at a 16px root) and hands the bar the
+       decision where it did not. */
+    padding-block: max(clamp(3.5rem, 9vh, 5rem), var(--nav-clear)) clamp(2.5rem, 7vh, 4rem);
   }
 
   [data-panel] .room-head,

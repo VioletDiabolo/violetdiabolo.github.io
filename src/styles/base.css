@@ -28,14 +28,14 @@
  * WHY NO TEXT ON THIS PAGE NEEDS A PLATE. Every colour the gradient can emit is a
  * component-wise mix along deep -> mid -> bright (src/gradient/palette.js), each stop
  * component-wise greater than the one below, so `bright` is an arithmetic ceiling on the
- * gradient's luminance -- not a sampled maximum. At WCAG L = 0.130 that ceiling puts
- * --ink at 5.26:1 against the brightest pixel the canvas can ever draw. That is what
+ * gradient's luminance -- not a sampled maximum. At WCAG L = 0.1307 that ceiling puts
+ * --ink at 5.25:1 against the brightest pixel the canvas can ever draw. That is what
  * makes the hero's headline and tagline legible over bare gradient with no plate, no
  * scrim and no shader vignette, and it is the reason the palette is a saturated violet
  * rather than a pale one.
  *
  * The corollary is a rule worth stating outright, because it is easy to break by
- * accident: OVER BARE GRADIENT, ONLY --ink. --ink-dim measures 2.19:1 on that same
+ * accident: OVER BARE GRADIENT, ONLY --ink. --ink-dim measures 2.37:1 on that same
  * ceiling. Dim text is for a surface -- solid, glass or tinted -- and there are exactly
  * two places on the page that sit on no surface at all (the hero's own head and the
  * footer line), both of which take --ink.
@@ -79,23 +79,38 @@
   --accent:     #c676ff;
   --accent-ink: #0a0810; /* the near-black that sits ON the accent, never on --stage */
 
-  --ink:     #f5f2fa; /* 18.20:1 on --stage, 5.26:1 on the gradient's brightest pixel */
-  --ink-dim: #aaa2b8; /* 8.22:1 on --stage, 7.51:1 on --surface, 2.19:1 on the gradient */
+  --ink:     #f5f2fa; /* 18.20:1 on --stage, 5.25:1 on the gradient's brightest pixel */
+  --ink-dim: #aaa2b8; /* 8.22:1 on --stage, 7.51:1 on --surface, 2.37:1 on the gradient */
 
   /* ---- The three panel materials, as alpha fills rather than opaque plates, because a
    *      panel's job here is to sit IN the light rather than block it out.
    *
    *      Each alpha is chosen against the same worst case: the gradient's brightest
-   *      possible pixel, rgb(128, 36, 255). Compositing C over that ground gives
-   *      a*C + (1-a)*bright, and the figures below are that composite, not the token.
+   *      possible pixel, rgb(128, 36, 255). Compositing C over that ground is plain
+   *      SOURCE-OVER IN sRGB -- a*C + (1-a)*bright per channel, rounded to 8 bits -- and
+   *      the figures below are that composite, not the token.
    *
-   *        --glass       0.80 over bright -> rgb(37, 30, 61), L = 0.0219.
-   *                      --ink 12.9:1, --ink-dim 5.99:1. Dim body copy is safe on it.
-   *        --story-tint  0.76 over bright -> rgb(59, 38, 103), L = 0.0435.
-   *                      --ink 10.1:1. Violet enough to read as the club's colour,
+   *        --glass       0.80 over bright -> rgb(34, 14, 65), L = 0.0104.
+   *                      --ink 15.71:1, --ink-dim 7.10:1. Dim body copy is safe on it.
+   *        --story-tint  0.76 over bright -> rgb(59, 25, 104), L = 0.0262.
+   *                      --ink 12.44:1. Violet enough to read as the club's colour,
    *                      open enough that the ribbons still drift through it.
-   *        --chip        0.82 over bright -> rgb(31, 22, 63), L = 0.0207.
-   *                      --ink 13.0:1. The nav's pills.
+   *        --chip        0.82 over bright -> rgb(33, 14, 62), L = 0.0099.
+   *                      --ink 15.84:1. The nav's pills.
+   *        --chip-cta    0.92 over bright -> rgb(192, 111, 255), L = 0.2980.
+   *                      --accent-ink 6.60:1 there and 6.08:1 over `deep`, which is this
+   *                      chip's worst ground: near-black ink wants the ground BRIGHT, so
+   *                      the DARK end of the gradient is what binds it, not the light one.
+   *
+   *      Those five figures replace numbers that were not source-over composites of these
+   *      tokens at all: --glass was written rgb(37, 30, 61) / --ink 12.9:1, --story-tint
+   *      rgb(59, 38, 103) / --ink 10.1:1, --chip rgb(31, 22, 63) / --ink 13.0:1, and the
+   *      CTA's ink 6.36:1. Each overstated the GREEN channel of the composite by 8-16
+   *      levels and so understated the contrast -- every real ratio is HIGHER than the
+   *      one it replaces, which is why no readability claim in this file moved. The
+   *      per-block table they were meant to summarise was never wrong; it is recomputed
+   *      by scripts/check-contrast.html, which reads these tokens and PALETTE off disk so
+   *      the next drift between the summary and the arithmetic is caught, not inherited.
    *
    *      Opaque fills would make every one of those numbers a constant, which is simpler
    *      and is what the nav used to do. The client asked for the gradient to show
@@ -147,7 +162,30 @@
   --radius-pill: 999px;
 
   --gutter: clamp(1.25rem, 5vw, 4.5rem);
-  --nav-h:  clamp(3.25rem, 7vh, 4.25rem);
+
+  /* ---- The bar's height, in three parts, because the bar's real height is not a
+   *      constant and pretending it was is what broke the page at 200% text zoom.
+   *
+   *      --nav-h is the bar's declared MINIMUM, and .site-nav's `min-height` is the only
+   *      thing that may read it. It is a floor, not a measurement.
+   *
+   *      --nav-offset is the bar's REAL height. src/ui/nav.js measures it with a
+   *      ResizeObserver and writes it here on :root; this declaration is the fallback
+   *      for the moment before the first measurement, and for a browser without
+   *      ResizeObserver -- it is today's behaviour, not a new one.
+   *
+   *      --nav-clear is what every offset that has to clear the bar actually reads:
+   *      the bar, plus a gap that scales with the TEXT rather than with the viewport,
+   *      because the case this exists for is text getting bigger.
+   *
+   *      Measured at 375x812 with a 32px root font: the bar wraps to three rows and
+   *      stands 188.8px against a --nav-h of 104px. Five offsets were driven from the
+   *      fixed value -- the hero, story and feature padding-block tops, the hero's
+   *      narrow-screen override, and [data-section]'s scroll-margin-top -- so all five
+   *      cleared a bar that was not there. See src/ui/nav.js. ---- */
+  --nav-h:      clamp(3.25rem, 7vh, 4.25rem);
+  --nav-offset: var(--nav-h);
+  --nav-clear:  calc(var(--nav-offset) + 0.5rem);
 
   /* The gap between panels, where nothing but the gradient shows. This is the page's
      only structural device: plate, light, plate. It replaces every rule and divider the
@@ -281,8 +319,9 @@ a:hover {
  * Semi-transparent chips, as the client asked for: the gradient drifts visibly behind
  * the bar instead of being blanked out by it. What makes that safe rather than a gamble
  * is the gradient's luminance ceiling (see the header comment) -- --chip at alpha 0.82
- * over the brightest pixel the canvas can emit composites to L = 0.021, where --ink
- * measures 13.0:1. There is no backdrop-filter here and there must not be: blur is
+ * over the brightest pixel the canvas can emit composites to rgb(33, 14, 62), L = 0.0099,
+ * where --ink measures 15.84:1. There is no backdrop-filter here and there must not be:
+ * blur is
  * reserved for [data-surface='glass'] and a guard enforces it.
  * ------------------------------------------------------------------------- */
 
@@ -298,6 +337,14 @@ a:hover {
    * user at 200% text zoom -- pushes the call to action onto a second line instead of off
    * the screen. It is deliberately not `overflow: hidden` and deliberately not a scroll
    * container: see .site-nav-links.
+   *
+   * WRAPPING ALONE WAS NOT ENOUGH, and this comment used to claim otherwise. At 375x812
+   * with a 32px root font -- exactly the 200% text zoom cited above -- the bar wraps to
+   * three rows and stands 188.8px tall, while the hero h1 sat at y 112: the wrap kept
+   * the call to action on screen and then painted the bar over the club's own name. The
+   * missing half was that nothing downstream knew the bar had grown. It does now:
+   * src/ui/nav.js publishes the measured height as --nav-offset and every offset reads
+   * --nav-clear. Same measurement, after: bar 188.8px, h1 top 204.8px, 16px of clearance.
    */
   flex-wrap: wrap;
   gap: clamp(0.35rem, 1.2vw, 0.9rem);
@@ -310,7 +357,7 @@ a:hover {
  *
  * That ring is invisible for most of the page -- it is --stage on --stage -- and exists
  * for the moments a chip's translucent fill would otherwise swim in whatever is behind
- * it. Against the gradient's brightest pixel the ring is 3.75:1, which is what draws the
+ * it. Against the gradient's brightest pixel the ring is 3.47:1, which is what draws the
  * chip's edge when a ribbon passes under the bar. The nav cannot detect what is behind it
  * anywhere without a scroll listener, so every chip carries its own edge and the bar
  * stays correct on any ground it is ever laid over.
@@ -406,7 +453,9 @@ a:hover {
 /* The one filled control in the page's chrome. A club page's job is to get people to
    turn up, so the accent goes here and to the two forms that do the same job. At alpha
    0.92 the gradient is a faint movement inside the pill rather than a wash over it, and
-   --accent-ink measures 6.36:1 on the composite at its worst. */
+   --accent-ink measures 6.08:1 on the composite at its worst -- which is over the
+   gradient's DARKEST stop, not its brightest: near-black ink on a translucent light pill
+   loses contrast as the ground behind the pill goes dark. */
 .site-nav-cta {
   background: var(--chip-cta);
   color: var(--accent-ink);
@@ -474,18 +523,23 @@ a:hover {
 }
 
 /* A jump link lands the section's top edge at the viewport's top, which is underneath
-   the fixed nav. Offsetting by the bar's height is what keeps the heading visible. */
-[data-section] { scroll-margin-top: var(--nav-h); }
+   the fixed nav. Offsetting by the bar's MEASURED height is what keeps the heading
+   visible -- --nav-h, the fixed clamp this used to read, is only the bar's minimum, and
+   a wrapped bar is taller than its minimum by however much it wrapped. */
+[data-section] { scroll-margin-top: var(--nav-clear); }
 
 /* ---------------------------------------------------------------------------
  * Accessibility: a keyboard user must always be able to see where they are.
  *
- * The ring has to work on FOUR grounds, and no single colour works on all of them:
+ * The ring has to work on FOUR grounds, and no single colour works on all of them.
+ * Rows 2 and 4 are RANGES because those grounds move: row 2 spans --surface and both
+ * glass composites over each of the gradient's three stops, and the figures are the
+ * worst each band reaches anywhere in that span -- the lowest accent, the highest stage:
  *
- *   --stage, the near-black the page mostly is          accent 7.14:1  stage 1.00:1
- *   --surface / glass composites, the panels            accent 6.52:1  stage 1.32:1
- *   an opaque --accent fill (the nav CTA, form buttons) accent 1.00:1  stage 7.14:1
- *   the gradient's brightest pixel, rgb(128, 36, 255)   accent 1.90:1  stage 3.75:1
+ *   --stage, the near-black the page mostly is          accent 7.14:1      stage 1.00:1
+ *   --surface / glass composites, the panels            accent 4.88:1      stage <= 1.46:1
+ *   an opaque --accent fill (the nav CTA, form buttons) accent 1.00:1      stage 7.14:1
+ *   the gradient's brightest pixel, rgb(128, 36, 255)   accent 2.06:1      stage 3.47:1
  *
  * So the ring is TWO BANDS, layered so that whichever ground is really behind the
  * element, one of them clears 3:1 (WCAG 1.4.11 for non-text). The accent outline is the
@@ -506,8 +560,11 @@ a:hover {
  *
  *     stage [0, 3)      accent [3, 5)      stage [5, S)
  *
- * On a bright ribbon the accent band is 1.90:1 and fails on its own, so that trailing
- * stage band is the entire visible difference between focused and unfocused there. At
+ * On a bright ribbon the accent band is 2.06:1 and fails on its own, so that trailing
+ * stage band is the entire visible difference between focused and unfocused there -- and
+ * at 3.47:1 it clears WCAG 1.4.11's 3:1 by 0.47, not by the 0.75 this comment used to
+ * claim. The margin is real but it is thin, which is the reason the spread below is 7
+ * rather than 6. At
  * S = 6 it is ONE CSS pixel wide, and one pixel is not a margin: half a device pixel of
  * rounding, or anyone later widening the outline to 3px "to make focus clearer", erases
  * the only band that can be seen. S = 7 makes it 2px.

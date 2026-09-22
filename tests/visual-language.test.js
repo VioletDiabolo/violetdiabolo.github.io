@@ -6,6 +6,9 @@ import path from 'node:path';
 // in this file that has to agree with what the shader actually emits, so it reads the
 // same stops gradient.js uploads as uniforms.
 import { PALETTE } from '../src/gradient/palette.js';
+// The shader bench's pass/fail decision, imported so this file can RUN it instead of
+// grepping the bench page for the word. See scripts/bench-verdict.mjs.
+import { costVerdict, FRAME_BUDGET_MS } from '../scripts/bench-verdict.mjs';
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 // stage.css was the 3D stage's own stylesheet and is gone with it (this branch strips
@@ -604,22 +607,189 @@ describe('the shader bench', () => {
     // A previous measurement on this branch reported 0.0002 ms/frame and was measuring
     // the cost of queueing a draw call. A control pass with no drawArrays is what tells
     // those apart, and subtracting it is what makes the number mean anything.
-    expect(bench()).toMatch(/controlIsNegligible/);
-    expect(bench()).toMatch(/body\(false\)/);
+    expect(bench(), 'the control pass -- the identical loop with no drawArrays -- is gone')
+      .toMatch(/body\(false\)/);
+  });
+
+  it('cannot report a pass on a measurement its control says is noise', () => {
+    // THE POINT OF THIS TEST. The version it replaces asserted that the page CONTAINED
+    // the strings `controlIsNegligible` and `body(false)`. A bench that measured the
+    // control, printed it, and then reported a pass anyway satisfies both -- which is
+    // exactly the failure the control exists to catch. So the decision was moved into
+    // scripts/bench-verdict.mjs and this runs it.
+
+    // 1. a real measurement: 2.94 ms busy against a 0.00 ms control, 240 draws.
+    const real = costVerdict({ busyTotalMs: 2.9378, controlTotalMs: 0, draws: 240 });
+    expect(real.msPerFrame).toBeCloseTo(0.012241, 6);
+    expect(real.controlIsNegligible).toBe(true);
+    expect(real.ok).toBe(true);
+
+    // 2. the 0.0002 ms/frame reading: a tiny busy pass whose control is nearly as big.
+    //    ms/frame is 327x under budget and the verdict still has to be a failure.
+    const queueing = costVerdict({ busyTotalMs: 0.05, controlTotalMs: 0.048, draws: 240 });
+    expect(queueing.msPerFrame).toBeLessThan(FRAME_BUDGET_MS);
+    expect(queueing.controlIsNegligible).toBe(false);
+    expect(queueing.ok, 'a measurement whose control is as large as its busy pass ' +
+      'measured queueing, not drawing -- being under budget does not redeem it')
+      .toBe(false);
+    expect(queueing.message).toMatch(/queueing/);
+
+    // 3. the control is SUBTRACTED, not merely printed beside the result.
+    expect(costVerdict({ busyTotalMs: 10, controlTotalMs: 2, draws: 10 }).msPerFrame).toBe(0.8);
+
+    // 4. a clean control does not excuse being over budget either.
+    expect(costVerdict({ busyTotalMs: 1200, controlTotalMs: 0, draws: 240 }).ok).toBe(false);
+
+    // 5. and a measurement that cannot mean anything throws rather than returning NaN,
+    //    the same call worstCase() makes in src/gradient/contrast.js.
+    expect(() => costVerdict({ busyTotalMs: 1, controlTotalMs: 0, draws: 0 })).toThrow();
+    expect(() => costVerdict({ busyTotalMs: NaN, controlTotalMs: 0, draws: 240 })).toThrow();
+  });
+
+  it('routes its own verdict through that function rather than deciding twice', () => {
+    // Otherwise the test above proves something about a module the page ignores.
+    expect(bench(), 'the bench no longer imports the verdict it is judged by')
+      .toMatch(/import\s*\{[^}]*costVerdict[^}]*\}\s*from\s*['\"]\.\/bench-verdict\.mjs['\"]/);
+    expect(bench(), 'the bench computes controlIsNegligible inline again, so the page ' +
+      'and the guarded module can disagree')
+      .not.toMatch(/controlIsNegligible\s*:/);
+  });
+
+  it('takes its draw count and framebuffer size from the query string', () => {
+    // The report's linearity table (120/240/480 draws; quarter- and 4x-size passes) was
+    // produced by editing the constants between runs, so it could not be reproduced
+    // from the committed file. Parameters, not edits.
+    const source = bench();
+    expect(source, 'the bench no longer reads the query string').toMatch(/URLSearchParams/);
+    expect(source, '?draws= is gone; the linearity table needs an edit again')
+      .toMatch(/intParam\(\s*['\"]draws['\"]/);
+    expect(source, '?size= is gone; the pixel-count table needs an edit again')
+      .toMatch(/sizeParam\(/);
+    expect(source, 'the framebuffer size is a hard-coded constant again')
+      .not.toMatch(/const\s+W\s*=\s*\d+\s*;/);
+  });
+
+  it('reports the near-black fraction per time step, not pooled across them', () => {
+    // Pooling every step's pixels before taking the fraction lets a frame that is 99%
+    // dark and a frame that is 60% dark average to a passing 89.5%, with the 60% frame
+    // -- the one where a ribbon has swung across the screen under the text -- invisible
+    // in the output. The constraint is about every frame.
+    const source = bench();
+    expect(source, 'the pooled fraction is back; a bright frame can hide behind a dark one')
+      .not.toMatch(/fractionUnder0_02/);
+    expect(source, 'the histogram no longer keeps per-step figures').toMatch(/perStep/);
+    expect(source, 'the pass/fail class no longer keys off the WORST frame')
+      .toMatch(/hist\.under0_02\.min/);
   });
 
   it('stays out of the build', () => {
     // Vite's only entry is index.html; nothing may pull scripts/ into dist/.
     expect(read('../index.html')).not.toMatch(/check-shader/);
-    expect(read('../vite.config.js')).not.toMatch(/rollupOptions|input/);
+    expect(read('../index.html')).not.toMatch(/check-contrast/);
+
+    // The claim is "no second rollup entry", so that is what is banned -- an
+    // `input` key inside a rollupOptions block, in either spelling. The version this
+    // replaces banned the bare substring `input` ANYWHERE in the file, which would have
+    // failed on the word "input" in a comment, on `assetsInlineLimit` if it were ever
+    // spelled differently, and on any future option whose name contains it.
+    const config = read('../vite.config.js')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    expect(config, 'vite.config.js declares a second rollup entry; scripts/ can reach dist/')
+      .not.toMatch(/rollupOptions\s*:\s*\{[^}]*\binput\b\s*:/);
+    expect(config, 'vite.config.js sets rollupOptions.input; scripts/ can reach dist/')
+      .not.toMatch(/rollupOptions\s*\.\s*input/);
   });
 });
+
+/* ---------------------------------------------------------------------------
+ * scripts/check-contrast.html -- the per-block contrast table, which was published from
+ * a probe that was then deleted.
+ * ------------------------------------------------------------------------- */
+
+describe('the contrast probe', () => {
+  const probe = () => read('../scripts/check-contrast.html');
+  /**
+   * The page's own module body, with its <style> block left out.
+   *
+   * The probe styles ITSELF in the page's colours -- #08060d on #f5f2fa, the same
+   * chrome check-shader.html uses -- so a guard that scanned the whole file for a
+   * hard-coded token would fail on the probe's own text colour. Same trap this file
+   * has now hit four times: a guard cannot tell a defect from its own furniture.
+   */
+  const probeScript = () => /<script type="module">([\s\S]*?)<\/script>/.exec(probe())[1];
+
+  it('exists, because the table in the report came from something that did not', () => {
+    // Three scratch artifacts have now been built and deleted on this branch. The
+    // headline safety claim -- "26 of 26 text blocks pass" -- was reported from one of
+    // them, which made it unverifiable the moment the task ended.
+    expect(existsSync(new URL('../scripts/check-contrast.html', import.meta.url))).toBe(true);
+  });
+
+  it('imports the real arithmetic instead of re-deriving it', () => {
+    // worstCase() in particular: the probe's whole job is the minimum over a background
+    // that moves, and a second copy of that minimisation is a second thing to get wrong.
+    expect(probe()).toMatch(/import\s*\{[\s\S]*?worstCase[\s\S]*?\}\s*from\s*['\"][^'\"]*src\/gradient\/contrast\.js['\"]/);
+    expect(probe()).toMatch(/import\s*\{[^}]*PALETTE[^}]*\}\s*from\s*['\"][^'\"]*src\/gradient\/palette\.js['\"]/);
+    expect(probe()).toMatch(/import\s*\{[^}]*FRAGMENT_SHADER[^}]*\}\s*from\s*['\"][^'\"]*src\/gradient\/shader\.js['\"]/);
+  });
+
+  it('reads the tokens off the live page rather than keeping a copy', () => {
+    // A probe with the hexes pasted into it answers questions about a snapshot. The
+    // five composite figures it replaces in base.css were exactly that failure, one
+    // comment at a time.
+    expect(probeScript(), 'the probe no longer reads :root off the page')
+      .toMatch(/getComputedStyle\(\s*doc\.documentElement\s*\)/);
+    expect(probeScript(), 'the probe has a page token pasted into it instead of ' +
+      'reading it off :root, which is how a figure goes stale without anyone noticing')
+      .not.toMatch(/#(?:f5f2fa|aaa2b8|c676ff|16121f|08060d|0a0810)\b/i);
+  });
+
+  it('composites source-over in sRGB, which is what the browser paints', () => {
+    // The defect: five documented composites were not source-over composites of the
+    // shipped tokens at all -- every one overstated the green channel by 8-16 levels.
+    expect(probeScript()).toMatch(/alpha\s*\*\s*c\s*\+\s*\(\s*1\s*-\s*alpha\s*\)\s*\*\s*dst\[i\]/);
+  });
+});
+
 
 /* ---------------------------------------------------------------------------
  * The nav's pill row.
  * ------------------------------------------------------------------------- */
 
 describe('the nav pill row', () => {
+  /**
+   * The class tokens in a selector's FINAL compound.
+   *
+   * `.site-nav-links`, `.site-nav .site-nav-links` and `nav.site-nav-links:focus-within`
+   * all end in the same class and all establish the same clip box; the version of this
+   * guard they defeated compared the whole selector to the literal string
+   * `.site-nav-links`, so two of those three walked straight past it.
+   */
+  const finalCompoundClasses = (selector) => {
+    const last = selector.trim().split(/[\s>+~]+/).pop() ?? '';
+    return new Set(last.match(/\.[-\w]+/g) ?? []);
+  };
+
+  /**
+   * Every leaf rule whose final compound is the pill row, and every one whose final
+   * compound is the BAR -- `overflow` on `.site-nav` clips the pills identically, and
+   * scanning only the row left that path open.
+   */
+  const navRules = () => {
+    const css = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const row = [];
+    const bar = [];
+    for (const { selector, body } of leafRules(css)) {
+      for (const one of selector.split(',')) {
+        const classes = finalCompoundClasses(one);
+        if (classes.has('.site-nav-links')) row.push({ selector: one.trim(), body });
+        else if (classes.has('.site-nav')) bar.push({ selector: one.trim(), body });
+      }
+    }
+    return { row, bar };
+  };
+
   it('is not a scroll container, which is what clipped the pills', () => {
     // Measured on the live page at 1440, where the row fits with room to spare and
     // nothing needs to scroll: `overflow: auto hidden` on this row made it a scroll
@@ -632,12 +802,22 @@ describe('the nav pill row', () => {
     // Asserting the absence of `overflow` rather than of `overflow: hidden` on purpose:
     // `auto`, `scroll` and `clip` all establish the same clip box, so banning one value
     // would leave the defect one keystroke away.
-    const css = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    for (const { selector, body } of leafRules(css)) {
-      if (!selector.split(',').some((s) => s.trim() === '.site-nav-links')) continue;
-      expect(body, '.site-nav-links declares overflow again -- that clips the pills\' ' +
-        'rings and their focus rings. Make the bar fit instead.')
-        .not.toMatch(/overflow(-x|-y)?\s*:/);
+    const { row, bar } = navRules();
+
+    // Existence FIRST, and counted. The version this replaces `continue`d unless a
+    // selector was exactly `.site-nav-links`; rename the class, or move the declaration
+    // onto a descendant selector, and the loop asserted nothing and stayed green.
+    expect(row.length, 'no rule in base.css targets the pill row any more -- this guard ' +
+      'has gone vacuous, which is how the clip came back last time')
+      .toBeGreaterThan(0);
+    expect(bar.length, 'no rule in base.css targets .site-nav any more -- same problem')
+      .toBeGreaterThan(0);
+
+    for (const { selector, body } of [...row, ...bar]) {
+      expect(body, `${selector} declares overflow -- that clips the pills' 2px rings and ` +
+        'their 7px focus rings, whether it is on the row, on a descendant selector that ' +
+        'ends in the row, or on the bar itself. Make the bar fit instead.')
+        .not.toMatch(/overflow(-x|-y|-inline|-block)?\s*:/);
     }
   });
 
@@ -647,6 +827,82 @@ describe('the nav pill row', () => {
     expect(nav, 'the .site-nav rule is gone').not.toBeNull();
     expect(nav[0], 'a width nobody tested should push the call to action onto a second ' +
       'line, not off the screen').toMatch(/flex-wrap:\s*wrap/);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The bar's height, which is not --nav-h.
+ *
+ * .site-nav is fixed, so nothing in the flow knows it is there and five offsets clear
+ * it by hand. They all read --nav-h, a fixed clamp(), and a fixed clamp cannot know the
+ * bar has wrapped: at 375x812 with a 32px root font the bar stands 188.8px against a
+ * --nav-h of 104px and painted over the hero h1 by 76.8px. The height is measured now
+ * (src/ui/nav.js), and these guards are what stop an offset drifting back onto the
+ * constant.
+ * ------------------------------------------------------------------------- */
+
+describe("the nav's height", () => {
+  it('is published as a measured custom property, with the clamp as the fallback', () => {
+    const base = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(base, '--nav-offset is gone; nothing carries the bar\'s measured height')
+      .toMatch(/--nav-offset:\s*var\(--nav-h\)/);
+    expect(base, '--nav-clear no longer derives from the MEASURED height, so every ' +
+      'offset below is back to clearing a bar that may not be that tall')
+      .toMatch(/--nav-clear:\s*calc\(\s*var\(--nav-offset\)/);
+  });
+
+  it('is what every offset that has to clear the bar reads', () => {
+    // The real assertion: --nav-h is the bar's MINIMUM and only .site-nav's min-height
+    // may read it. Anything else reading it is an offset that cannot see a wrapped bar.
+    const sources = [
+      ['base.css', read('../src/styles/base.css')],
+      ['sections.css', read('../src/styles/sections.css')],
+    ];
+    const offenders = [];
+    let clears = 0;
+    for (const [name, raw] of sources) {
+      const css = raw.replace(/\/\*[\s\S]*?\*\//g, '');
+      for (const { selector, body } of leafRules(css)) {
+        if (/var\(\s*--nav-clear\s*\)/.test(body)) clears++;
+        if (!/var\(\s*--nav-h\s*\)/.test(body)) continue;
+        // :root declares it; .site-nav's min-height is the one legitimate reader.
+        const isRoot = selector.split(',').some((one) => one.trim() === ':root');
+        // ...and ONLY its min-height. Exempting the whole rule would let a second
+        // `padding-top: var(--nav-h)` ride in beside the floor it is allowed to set.
+        const usesInRule = (body.match(/var\(\s*--nav-h\s*\)/g) ?? []).length;
+        const isBarFloor = selector.split(',').some((one) => one.trim() === '.site-nav')
+          && /min-height:\s*var\(\s*--nav-h\s*\)/.test(body)
+          && usesInRule === 1;
+        if (!isRoot && !isBarFloor) offenders.push(`${name}: ${selector.trim()}`);
+      }
+    }
+    expect(offenders, 'these rules clear the nav with --nav-h, which is only the bar\'s ' +
+      'MINIMUM height. A wrapped bar is taller than its minimum by however much it ' +
+      'wrapped, and the offset misses by exactly that. Read --nav-clear instead.')
+      .toEqual([]);
+    // Non-vacuity: the five offsets have to be somewhere. Four in sections.css (hero
+    // wide, hero narrow, story, feature) and one in base.css (scroll-margin-top).
+    expect(clears, 'nothing reads --nav-clear any more, so this guard proves nothing')
+      .toBeGreaterThanOrEqual(5);
+  });
+
+  it('lands a jump link below the bar rather than under it', () => {
+    const base = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = leafRules(base)
+      .find(({ selector }) => selector.split(',').some((one) => one.trim() === '[data-section]'));
+    expect(rule, '[data-section] has no rule -- jump links have no offset at all')
+      .toBeDefined();
+    expect(rule.body, 'scroll-margin-top must track the bar\'s measured height; a fixed ' +
+      'clamp lands every heading under a wrapped bar')
+      .toMatch(/scroll-margin-top:\s*var\(\s*--nav-clear\s*\)/);
+  });
+
+  it('is measured by src/ui/nav.js rather than assumed', () => {
+    const nav = read('../src/ui/nav.js');
+    expect(nav, 'the ResizeObserver is gone; --nav-offset will never be written and ' +
+      'every offset falls back to the fixed clamp')
+      .toMatch(/new ResizeObserver\(/);
+    expect(nav, 'nav.js no longer writes --nav-offset').toMatch(/--nav-offset/);
   });
 });
 
@@ -674,8 +930,25 @@ describe('the story panel', () => {
     const base = read('../src/styles/base.css');
     const token = base.match(new RegExp(`${background[1]}:\\s*rgba?\\(([^)]*)\\)`));
     expect(token, `${background[1]} is not declared as an rgba() token`).not.toBeNull();
-    const [r, g, b] = token[1].split(',').map((v) => parseFloat(v));
+    const [r, g, b, alpha] = token[1].split(',').map((v) => parseFloat(v));
     expect(b, 'the story tint is not violet').toBeGreaterThan(r);
     expect(r, 'the story tint is not violet').toBeGreaterThan(g);
+
+    // And it has to be GLASS. The hue test above passes for rgba(37, 21, 56, 1), which
+    // is precisely the opaque violet plate the client rejected -- the decision on record
+    // is "tinted glass, NOT the opaque violet plate it replaced", and an alpha of 1
+    // satisfies every other assertion in this test while reversing that decision.
+    //
+    // The range, not just `< 1`: below about 0.55 the tint stops being a surface and
+    // becomes a wash (--ink-dim composited over the gradient's brightest pixel measures
+    // 4.50:1 at 0.55 and falls under AA below it), and above 0.9 it is a plate in all
+    // but name -- at 0.95 the composite is rgb(42, 22, 66) against the token's own
+    // rgb(37, 21, 56), a difference nobody can see.
+    expect(alpha, `${background[1]} has no alpha at all, so it is an opaque plate`)
+      .toBeTypeOf('number');
+    expect(alpha, 'the story panel is an opaque violet plate again, which is the thing ' +
+      'the client replaced with tinted glass').toBeLessThan(1);
+    expect(alpha, 'the story tint is too transparent to read as a surface').toBeGreaterThanOrEqual(0.55);
+    expect(alpha, 'the story tint is opaque in all but name').toBeLessThanOrEqual(0.9);
   });
 });

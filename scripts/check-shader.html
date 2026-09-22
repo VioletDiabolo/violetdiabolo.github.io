@@ -26,17 +26,30 @@
   (Any static server rooted at the repo works; it needs HTTP only because ES module
   imports do. No dependencies, no build step, no network access.)
 
+  KNOBS, from the query string, so the numbers in a report can be reproduced from this
+  file instead of by editing it -- the scaling table in the Task 7 report was produced
+  by changing constants between runs, which made it un-rerunnable:
+
+      ?draws=480          draws per timed pass    (default 240)
+      ?size=720x450       bench framebuffer       (default 1440x900)
+      ?steps=24           histogram time steps    (default 12)
+
   It reports four things, in the order you need them while tuning:
 
     1. compile + link status, with the driver's own info logs;
     2. a luminance histogram over the real framebuffer across 12 time steps, which is
        how you check the "most of the frame stays near-black" constraint instead of
-       squinting at it;
+       squinting at it. The fractions are PER TIME STEP, min to max: pooling every
+       step's pixels before taking a fraction lets a 99%-dark frame and a 60%-dark
+       frame average to a passing 89.5% with the 60% frame invisible in the output;
     3. the frame cost, with a ZERO-RENDER CONTROL. A measurement on this branch once
        reported 0.0002 ms/frame, which was the cost of queueing a draw call and not of
        drawing anything. The control runs the identical loop with no drawArrays and its
        result is subtracted, so a number that small now shows up as "control is not far
-       below busy", i.e. as measuring nothing, rather than as a pass;
+       below busy", i.e. as measuring nothing, rather than as a pass. The pass/fail
+       decision itself is bench-verdict.mjs, a module the unit suite RUNS -- the guard
+       it replaces was a grep for the word `controlIsNegligible`, which a bench that
+       measured the control and then ignored it would have satisfied;
     4. a live preview, stepped by setInterval rather than requestAnimationFrame so it
        still advances in a background or hidden tab.
 
@@ -77,9 +90,37 @@
 <script type="module">
 import { VERTEX_SHADER, FRAGMENT_SHADER } from '../src/gradient/shader.js';
 import { PALETTE } from '../src/gradient/palette.js';
+// The pass/fail decision lives in a module so the unit suite can RUN it rather than
+// grep for it -- see the header of bench-verdict.mjs.
+import { costVerdict, FRAME_BUDGET_MS } from './bench-verdict.mjs';
 
 const $ = (id) => document.getElementById(id);
 const say = (id, text, cls) => { const el = $(id); el.textContent = text; el.className = cls ?? ''; };
+
+/* ---------------------------------------------------------------------------
+ * Knobs, from the query string.
+ *
+ * The scaling table in the task report -- 120/240/480 draws, a quarter-size and a
+ * 4x-size pass -- was produced by EDITING these constants between runs, which means the
+ * table could not be reproduced from the committed artifact. That is the same defect as
+ * a deleted probe, one file smaller. They are parameters now.
+ *
+ *   ?draws=480          draws per timed pass   (default 240)
+ *   ?size=720x450       bench framebuffer      (default 1440x900, the budget's size)
+ *   ?steps=24           histogram time steps   (default 12, = contrast.js TIME_STEPS)
+ * ------------------------------------------------------------------------- */
+const params = new URLSearchParams(location.search);
+const intParam = (name, fallback, lo, hi) => {
+  const v = Number.parseInt(params.get(name) ?? '', 10);
+  return Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
+};
+const sizeParam = (fallbackW, fallbackH) => {
+  const m = /^(\d{2,5})x(\d{2,5})$/.exec((params.get('size') ?? '').trim());
+  if (!m) return [fallbackW, fallbackH];
+  const [w, h] = [Number(m[1]), Number(m[2])];
+  return w >= 64 && h >= 64 && w <= 8192 && h <= 8192 ? [w, h] : [fallbackW, fallbackH];
+};
+
 
 /* ---------------------------------------------------------------------------
  * A program built from the real exports, reporting every status the driver gives.
@@ -136,14 +177,27 @@ const channel = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((
 const luminance = (r, g, b) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 
 /** Matches TIME_STEPS in src/gradient/contrast.js; four seconds apart covers a cycle. */
-const TIME_STEPS = 12;
+const TIME_STEPS = intParam('steps', 12, 1, 64);
 const STEP_SECONDS = 4;
 
+/**
+ * The luminance histogram, with the "most of the frame is near-black" constraint
+ * reported PER TIME STEP rather than pooled.
+ *
+ * Pooling across steps before taking the fraction is how a bench lies by averaging: a
+ * frame that is 99% dark and a frame that is 60% dark pool to a comfortable 89.5%, and
+ * the 60% frame -- the one where a ribbon has swung across most of the screen and text
+ * is sitting on it -- never appears in the output at all. The constraint is about every
+ * frame, so the number reported is the WORST frame, with the best beside it to show the
+ * spread. The pooled figure is kept only as the mean of the per-step values, which is
+ * what it always was.
+ */
 function histogram(gl, loc, width, height) {
   const pixels = new Uint8Array(width * height * 4);
   const lums = [];
   let sum = 0;
   let brightest = { rgb: null, lum: -1 };
+  const perStep = [];
   gl.viewport(0, 0, width, height);
   gl.uniform2f(loc.uResolution, width, height);
   gl.uniform1f(loc.uVelocity, 0);
@@ -151,17 +205,44 @@ function histogram(gl, loc, width, height) {
     gl.uniform1f(loc.uTime, step * STEP_SECONDS);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let stepUnder01 = 0;
+    let stepUnder02 = 0;
+    let stepUnder05 = 0;
+    let stepMax = 0;
+    let stepCount = 0;
     for (let i = 0; i < pixels.length; i += 4) {
       const L = luminance(pixels[i], pixels[i + 1], pixels[i + 2]);
       lums.push(L);
       sum += L;
+      stepCount++;
+      if (L < 0.01) stepUnder01++;
+      if (L < 0.02) stepUnder02++;
+      if (L < 0.05) stepUnder05++;
+      if (L > stepMax) stepMax = L;
       if (L > brightest.lum) brightest = { lum: L, rgb: [pixels[i], pixels[i + 1], pixels[i + 2]] };
     }
+    perStep.push({
+      step,
+      time: step * STEP_SECONDS,
+      max: stepMax,
+      under0_01: stepUnder01 / stepCount,
+      under0_02: stepUnder02 / stepCount,
+      under0_05: stepUnder05 / stepCount,
+    });
   }
   lums.sort((a, b) => a - b);
   const pct = (q) => lums[Math.min(lums.length - 1, Math.floor(q * lums.length))];
-  const under = (t) => lums.filter((L) => L < t).length / lums.length;
   const max = lums[lums.length - 1];
+  const span = (key) => {
+    const values = perStep.map((p) => p[key]);
+    const lo = Math.min(...values);
+    return {
+      min: lo,
+      max: Math.max(...values),
+      mean: values.reduce((a, b) => a + b, 0) / values.length,
+      worstStep: perStep.find((p) => p[key] === lo).step,
+    };
+  };
   return {
     size: `${width}x${height}`,
     steps: TIME_STEPS,
@@ -171,9 +252,11 @@ function histogram(gl, loc, width, height) {
     p75: pct(0.75), p90: pct(0.9), p99: pct(0.99),
     max,
     brightestPixel: brightest.rgb,
-    fractionUnder0_01: under(0.01),
-    fractionUnder0_02: under(0.02),
-    fractionUnder0_05: under(0.05),
+    perStep,
+    // Per-step spans. `.min` is the claim; `.mean` is what a pooled fraction was.
+    under0_01: span('under0_01'),
+    under0_02: span('under0_02'),
+    under0_05: span('under0_05'),
     // What --ink (#f5f2fa, L = 0.8982) measures against the brightest pixel found.
     inkContrastAtBrightest: (0.8982 + 0.05) / (max + 0.05),
   };
@@ -188,7 +271,7 @@ function histogram(gl, loc, width, height) {
  * of what this measurement can see, and it is printed so a suspiciously small "busy"
  * cannot be mistaken for a fast shader.
  * ------------------------------------------------------------------------- */
-const DRAWS = 240;
+const DRAWS = intParam('draws', 240, 1, 20000);
 const SAMPLES = 5;
 const WARMUPS = 2;
 
@@ -294,17 +377,15 @@ async function frameCost(gl, loc, timer, width, height) {
   const median = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
   const busy = median(busySamples);
   const control = median(controlSamples);
+  // The raw pass, and then the verdict -- computed by bench-verdict.mjs, which the unit
+  // suite runs. Nothing here decides pass or fail on its own.
   return {
     method,
     size: `${width}x${height}`,
     draws: DRAWS,
     busyTotalMs: busy,
     controlTotalMs: control,
-    msPerFrame: (busy - control) / DRAWS,
-    controlMsPerFrame: control / DRAWS,
-    // If the control is not far below the busy pass, the busy pass measured queueing,
-    // not drawing, and the ms/frame above means nothing.
-    controlIsNegligible: control < busy * 0.25,
+    ...costVerdict({ busyTotalMs: busy, controlTotalMs: control, draws: DRAWS }),
   };
 }
 
@@ -314,8 +395,9 @@ async function main() {
   const bench = document.createElement('canvas');
   // 1440x900 is the budget's stated size. The shipped framebuffer is smaller
   // (render/budget.js halves the linear resolution), so this is the conservative read.
-  const W = 1440;
-  const H = 900;
+  // Overridable with ?size=WxH so the scaling table can be re-run from this file rather
+  // than by editing it.
+  const [W, H] = sizeParam(1440, 900);
   bench.width = W;
   bench.height = H;
 
@@ -368,6 +450,7 @@ async function main() {
   say('histogram', `sampling ${TIME_STEPS} frames at ${W}x${H}…`, 'wait');
   const hist = histogram(gl, loc, W, H);
   const pc = (v) => `${(v * 100).toFixed(2)}%`;
+  const spanText = (s) => `${pc(s.min)} .. ${pc(s.max)}   (worst frame: step ${s.worstStep}; pooled mean ${pc(s.mean)})`;
   say('histogram', [
     `${hist.samples.toLocaleString()} pixels — ${hist.size} x ${hist.steps} time steps`,
     '',
@@ -376,12 +459,20 @@ async function main() {
     `p75 / p90 / p99  : ${hist.p75.toFixed(5)} / ${hist.p90.toFixed(5)} / ${hist.p99.toFixed(5)}`,
     `max              : ${hist.max.toFixed(5)}   rgb(${hist.brightestPixel.join(', ')})`,
     '',
-    `under L 0.01     : ${pc(hist.fractionUnder0_01)}`,
-    `under L 0.02     : ${pc(hist.fractionUnder0_02)}   <- "most of the frame is near-black"`,
-    `under L 0.05     : ${pc(hist.fractionUnder0_05)}`,
+    'fraction of each FRAME below a luminance, reported per time step rather than',
+    'pooled: a 99%-dark frame and a 60%-dark frame pool to a passing 89.5% and the',
+    '60% frame never appears. The constraint is about every frame, so the min is it.',
+    '',
+    `under L 0.01     : ${spanText(hist.under0_01)}`,
+    `under L 0.02     : ${spanText(hist.under0_02)}   <- "most of the frame is near-black"`,
+    `under L 0.05     : ${spanText(hist.under0_05)}`,
+    '',
+    'per step  (time s, max L, % under 0.02):',
+    ...hist.perStep.map((p) =>
+      `  ${String(p.step).padStart(2)}  t=${p.time.toFixed(1).padStart(5)}s  max ${p.max.toFixed(5)}  ${pc(p.under0_02).padStart(7)}`),
     '',
     `--ink on the brightest pixel : ${hist.inkContrastAtBrightest.toFixed(2)}:1`,
-  ].join('\n'), hist.fractionUnder0_02 > 0.75 ? 'ok' : 'bad');
+  ].join('\n'), hist.under0_02.min > 0.75 ? 'ok' : 'bad');
 
   const timer = timerExtension(gl, isWebGL2);
   say('cost', `timing ${DRAWS} draws x 3, plus the same again with no draws…`, 'wait');
@@ -395,15 +486,14 @@ async function main() {
       `busy pass total  : ${cost.busyTotalMs.toFixed(3)} ms`,
       `control total    : ${cost.controlTotalMs.toFixed(3)} ms   (identical loop, zero drawArrays)`,
       '',
-      `ms / frame       : ${cost.msPerFrame.toFixed(4)}   (budget: 4.0)`,
+      `ms / frame       : ${cost.msPerFrame.toFixed(4)}   (budget: ${FRAME_BUDGET_MS.toFixed(1)})`,
       `control / frame  : ${cost.controlMsPerFrame.toFixed(4)}`,
       '',
-      cost.controlIsNegligible
-        ? 'control is well under the busy pass, so the busy pass measured real work.'
-        : 'WARNING: the control is not far below the busy pass. This measured queueing, '
-          + 'not drawing — treat ms/frame as meaningless.',
+      // Printed straight from the verdict, so the page cannot disagree with the
+      // function the unit suite falsifies.
+      cost.message,
     ].join('\n'),
-  cost.failed || !cost.controlIsNegligible ? 'bad' : (cost.msPerFrame < 4 ? 'ok' : 'bad'));
+  cost.failed || !cost.ok ? 'bad' : 'ok');
 
   // Live preview, stepped by setInterval: requestAnimationFrame is throttled to near
   // zero in a hidden or backgrounded tab, which is exactly where this page often runs.

@@ -12,8 +12,8 @@
  * component-wise mix along deep -> mid -> bright, and each stop is component-wise
  * greater than the one below it, so `bright` is a hard ceiling on the gradient's
  * luminance — not a sampled maximum but an arithmetic one. That ceiling is the page's
- * whole contrast strategy: at WCAG relative luminance 0.130, --ink (#f5f2fa) measures
- * 5.26:1 against the brightest pixel the gradient can ever draw, so body text sits on
+ * whole contrast strategy: at WCAG relative luminance 0.1307, --ink (#f5f2fa) measures
+ * 5.25:1 against the brightest pixel the gradient can ever draw, so body text sits on
  * the bare gradient at AA with margin and the hero needs no plate, no scrim and no
  * shader vignette to rescue it.
  *
