@@ -23,6 +23,10 @@ export const TARGETS = [
   { name: 'aaron',       file: 'aaron.jpg',       widths: [400, 800],        jpgWidths: [] },
   { name: 'jon',         file: 'jon.jpg',         widths: [400, 800],        jpgWidths: [] },
 
+  // The club's mark, in the nav bar. 128 is the 4x size of a ~32px chip -- the master is
+  // 521x608, and shipping 63KB of PNG for a 32px mark is what the pipeline is for.
+  { name: 'logo', file: 'logo.png', widths: [64, 128], jpgWidths: [] },
+
   // The hero and the events panel. Both sit in a panel's second column -- at most about
   // 700px at 1440 -- so 1600 covers a 2x screen with room to spare.
   { name: 'hero-group',      file: 'hero-group.jpg',      widths: [800, 1600], jpgWidths: [] },

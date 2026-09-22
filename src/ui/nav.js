@@ -1,4 +1,5 @@
-import { SITE } from '../content/index.js';
+import { SITE, LOGO } from '../content/index.js';
+import { buildPicture } from './picture.js';
 
 /**
  * Where the pills go, ordered as the page is.
@@ -90,7 +91,12 @@ export function buildNav({ page = 'home' } = {}) {
   const wordmark = document.createElement('a');
   wordmark.className = 'site-nav-mark';
   wordmark.href = page === 'home' ? '#hero' : PAGES.home;
-  wordmark.textContent = SITE.name;
+  // 'eager': the bar is the first thing painted and a lazy mark would pop in after it.
+  wordmark.append(buildPicture({ ...LOGO, sizes: '32px', loading: 'eager' }));
+  const name = document.createElement('span');
+  name.className = 'site-nav-name';
+  name.textContent = SITE.name;
+  wordmark.append(name);
   nav.append(wordmark);
 
   const pills = document.createElement('div');

@@ -55,6 +55,14 @@ body { overflow-x: hidden; }
   margin-bottom: var(--panel-gap);
 }
 
+/*
+ * ...except after the last one, where it was just trailing space. Between this gap and
+ * the standalone footer strip that used to follow it, the page ended on the better part
+ * of a screen of nothing. The footer is gone (the sign-off is a line inside this panel
+ * now) and the page ends flush on the plate.
+ */
+.section:last-child { margin-bottom: 0; }
+
 .room-head,
 .room-body { min-width: 0; }
 
@@ -1079,23 +1087,28 @@ body { overflow-x: hidden; }
  * not as a second screen. Left-alignment was the house rule; the client overruled it here
  * and only here, which is fair: a single sign-off line has no column to align to.
  */
-.section-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-block: clamp(2.5rem, 6vh, 4rem);
-  padding-inline: var(--gutter);
-  text-align: center;
-}
-
-/* --ink, not --ink-dim. This line is one of exactly two things on the page sitting on
-   bare canvas (the hero's head is the other), and --ink-dim measures 2.37:1 against the
-   gradient's brightest pixel. Held quiet by size and tracking instead. */
+/*
+ * The sign-off, as the last line inside the last panel rather than a strip after it.
+ *
+ * `grid-column: 1 / -1` because the panels it lands in are two-track grids; on the media
+ * page's single-column panel the same declaration is simply the one column. Centred, and
+ * separated by the page's one hairline so it reads as an ending rather than as another
+ * paragraph of the panel it sits in.
+ *
+ * --ink, not --ink-dim, is the rule this line has always carried -- and it is no longer
+ * on bare canvas, so it now clears its requirement by a wider margin than it used to
+ * rather than a narrower one.
+ */
 .footer-line {
+  grid-column: 1 / -1;
+  margin-top: clamp(2rem, 5vh, 3rem);
+  padding-top: clamp(1.1rem, 2.5vh, 1.6rem);
+  border-top: 1px solid var(--hairline);
   font-size: var(--type-micro);
   font-weight: 400;
   letter-spacing: 0.14em;
   color: var(--ink);
+  text-align: center;
 }
 
 /* ---------------------------------------------------------------------------

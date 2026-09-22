@@ -19,7 +19,9 @@ describe('sections', () => {
     // Five panels, not six: media moved to its own page at the client's request.
     renderSections(document.getElementById('content'));
     const found = [...document.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
-    expect(found).toEqual(['hero', 'about', 'events', 'board', 'contact', 'footer']);
+    // No 'footer' entry: the standalone strip is gone and the sign-off is a line inside
+    // the contact panel, which the client asked to be treated as the footer.
+    expect(found).toEqual(['hero', 'about', 'events', 'board', 'contact']);
   });
 
   it('renders the media page, with the videos and the gallery on it', () => {
@@ -29,7 +31,7 @@ describe('sections', () => {
     const root = document.getElementById('content');
     renderMediaPage(root);
     const found = [...root.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
-    expect(found).toEqual(['media', 'footer']);
+    expect(found).toEqual(['media']);
     expect(root.querySelectorAll('[data-video]')).toHaveLength(MEDIA.length);
     expect(root.querySelectorAll('[data-photo]').length).toBeGreaterThan(0);
     // Exactly one h1-less page: the club name belongs to the home page's hero.
@@ -232,13 +234,30 @@ describe('form facades', () => {
   });
 });
 
-describe('footer', () => {
-  it('renders the reassembly footer with the club name and the current, computed year', () => {
-    renderSections(document.getElementById('content'));
-    const footer = document.querySelector('[data-section="footer"]');
-    expect(footer).not.toBeNull();
-    expect(footer.textContent).toContain(SITE.name);
-    expect(footer.textContent).toContain(String(new Date().getFullYear()));
+describe('the sign-off', () => {
+  it('closes each page inside its LAST panel, with the club name and a computed year', () => {
+    // It was a standalone <footer> after the contact panel. Between that panel's own
+    // bottom gap and the strip's padding the page ended on most of a screen of gradient,
+    // so the line moved inside and the strip went. Asserted per page: the media page has
+    // no contact panel, and a sign-off that only ever landed on the home page would
+    // leave that one ending on nothing.
+    for (const [render, lastPanel] of [[renderSections, 'contact'], [renderMediaPage, 'media']]) {
+      const root = document.createElement('main');
+      render(root);
+      expect(root.querySelector('[data-section="footer"]'),
+        'the standalone footer strip is back').toBeNull();
+
+      const line = root.querySelector('.footer-line');
+      expect(line, 'no sign-off on this page at all').not.toBeNull();
+      expect(line.textContent).toContain(SITE.name);
+      expect(line.textContent).toContain(String(new Date().getFullYear()));
+
+      // Inside the last panel, and the last thing in it.
+      const panels = [...root.querySelectorAll('[data-section]')];
+      expect(panels.at(-1).dataset.section).toBe(lastPanel);
+      expect(line.closest('[data-section]')).toBe(panels.at(-1));
+      expect(line.parentElement.lastElementChild).toBe(line);
+    }
   });
 });
 

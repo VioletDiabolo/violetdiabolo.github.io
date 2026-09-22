@@ -1119,3 +1119,65 @@ Everything in §10 stands, plus:
    (track 4,739px, animation `marquee-slide`, two lists, −50%).
 3. **The media page's editorial grid above 900px** is asserted in CSS and was not measured:
    the preview pane was 293px wide for this pass.
+
+
+---
+
+## 15. The mark, and the end of the page
+
+### 15.1 The logo is in the bar
+
+`public/logo.png` was a 521x608 PNG at 63KB, referenced by nothing since the rebuild. It
+goes through the pipeline like every other image now — `logo-64` and `logo-128`, AVIF and
+WebP — and the bar serves the 64 (**5.4KB AVIF** against 63KB of PNG) for a mark that
+paints at 24x28.
+
+`alt=""`. It sits inside the wordmark link, which already carries the text "VIOLET
+DIABOLO"; naming the image as well would have a screen reader announce the club twice for
+one link. Decorative is the accurate description here, not a shortcut.
+
+Its height is `1.75rem`, sized off the text rather than a fixed pixel value, so at 200%
+zoom it grows with the label beside it instead of shrinking into a dot.
+
+**The narrow-screen rule changed sides.** Below 767px the whole chip used to be hidden, on
+the reasoning that the hero's h1 says the club's name sixty pixels below it. That is true
+of the NAME, which is why the name is the half that now goes and the mark stays: the logo
+is ~28px against the 140px the full chip took, so the pill row keeps the width the original
+rationale was protecting.
+
+### 15.2 Contact is the footer
+
+The standalone `<footer>` strip is gone. The sign-off is a line inside whichever panel
+comes last — contact on the home page, media on the other — appended to `.room` so it
+spans both of a grid panel's columns, separated by the page's one hairline, centred.
+
+`.section:last-child { margin-bottom: 0 }` removes the panel gap that used to sit under
+the last panel as well.
+
+| | before | after |
+|---|---|---|
+| space below the last panel | ~400px (gap + strip padding) | **0px** |
+| the page ends on | bare gradient | the contact plate |
+
+**The sign-off got safer by moving.** It was one of exactly two blocks on bare canvas and
+the joint-tightest on the page at **5.25:1** (1.17x margin). On the solid panel it measures
+**16.63:1** (3.70x) and is no longer in the tightest three.
+
+`--bar-edge` became `--hairline` in the same pass: the bar's under-edge and the sign-off's
+rule are the same line, and one token for one thing beats two names for one value.
+
+### 15.3 Re-run
+
+| page | blocks | missing | overflow 375 / 280 | tightest |
+|---|---|---|---|---|
+| index.html | **23 of 23** | none | 0 / 0 | 1.17x (hero tagline) |
+| media.html | **8 of 8** | none | 0 / 0 | 1.35x (nav CTA) |
+
+The sign-off guard is falsified three ways: drop it from the media page, move it off the
+end of its panel, or bring the standalone strip back — each fails.
+
+### 15.4 Still not verified
+
+Everything in §10 and §14.7 stands, including the email sweep, which still needs
+`violetdiabolo@gmail.com` signed in. One new item: the nav mark has not been seen at 200%
+text zoom in a real browser — the `1.75rem` height is reasoned from the rule, not measured.
