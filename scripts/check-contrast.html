@@ -55,6 +55,26 @@
   light text on a dark surface. It is NOT conservative for the near-black-on-light
   pills, which is exactly why those are bounded at `deep` as well.
 
+  SECTION 4 IS A DIFFERENT KIND OF CHECK, added after a reviewer found the nav a second
+  time: the contact panel's mailto: link and the nav's own pill row both painted content
+  outside the viewport at a 32px root font (200% text zoom), silently, because
+  sections.css sets `body { overflow-x: hidden }` -- no scrollbar, just missing content.
+  That combination is exactly what `document.documentElement.scrollWidth >
+  document.documentElement.clientWidth` means, so it is asserted directly at the two
+  narrow widths those fixes were measured against (375 and 280, both 812 tall) rather
+  than trusted to stay fixed. The pass/fail is which of the real page's OWN elements
+  (under #content or .site-nav, including those two themselves, not only their
+  descendants) paint past clientWidth, measuring each one's OWN painted ink via a Range
+  as well as its box -- both were real gaps found writing this section, not hypothetical
+  ones: the nav bar's own unpinned width (base.css's `.site-nav`) is invisible to a scan
+  that only walks descendants, and a heading's overlong single word (base.css's shared
+  `h1, h2, h3` rule) can paint past a box that never itself grows, which a scan of
+  `getBoundingClientRect()` alone cannot see. `scrollWidth`/`clientWidth` are printed
+  alongside for the literal claim the brief asked for, but the verdict is which real
+  elements overflow -- a fixed decorative canvas (`#gradient`) could in principle move
+  that raw pair on its own with nothing behind it to reach, which is why the check does
+  not stop at comparing the two numbers.
+
   RUN IT:  npm run dev  ->  http://localhost:5173/scripts/check-contrast.html
            ?width=1440&height=900&steps=12   (defaults; all three are overridable, so
            the phone case can be re-run without editing this file)
@@ -97,7 +117,10 @@
 <h2>3 &middot; every text block, measured and bounded</h2>
 <pre id="blocks" class="wait">waiting…</pre>
 
-<h2>4 &middot; the page under test</h2>
+<h2>4 &middot; horizontal overflow at 200% text zoom</h2>
+<pre id="overflow" class="wait">waiting…</pre>
+
+<h2>5 &middot; the page under test</h2>
 <div id="stage"><iframe id="page" src="../index.html" title="Violet Diabolo"></iframe></div>
 
 <script type="module">
@@ -363,10 +386,132 @@ function brightestIn(pixels, band) {
   return best;
 }
 
+/* ---------------------------------------------------------------------------
+ * Horizontal overflow at 200% text zoom (section 4). See the header comment for why this
+ * is a page rather than a jsdom unit test: jsdom has no layout, and `document.
+ * documentElement.scrollWidth` is meaningless without one.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * `root` and every element under it whose right edge paints past `clientWidth`.
+ *
+ * `root` itself, not just its descendants: `.site-nav` is `position: fixed` with only
+ * `inset: 0 0 auto 0` and no explicit width failed by its OWN box measuring wider than
+ * the viewport (411px against 375 at 32px root), independent of whether any pill inside
+ * it also overflowed. `root.querySelectorAll('*')` alone -- the first version of this
+ * function -- cannot see that: it walks descendants only, the exact gap this file's own
+ * nav-pill-row guard (tests/visual-language.test.js) was rewritten to close after a
+ * reviewer found path D inspecting zero rules and reporting green.
+ */
+function overflowingElements(root, clientWidth) {
+  const offenders = [];
+  const range = root.ownerDocument.createRange();
+  for (const el of [root, ...root.querySelectorAll('*')]) {
+    const boxRight = el.getBoundingClientRect().right;
+    // The hero h1's own defect, found writing this guard: a long unbreakable word can
+    // paint past its element's box WITHOUT the box itself growing -- "the h1's BOX stays
+    // inside its column while the ink runs out the side, silently" (sections.css's own
+    // comment on --type-hero). getBoundingClientRect() on the ELEMENT reports the box,
+    // not the ink, and reported zero offenders here right up until this Range check was
+    // added: a Range over the element's own children measures what actually painted.
+    // Leaf text nodes only need this once; walking every element's own Range as well
+    // catches it regardless of which level the overflowing text node sits at.
+    range.selectNodeContents(el);
+    const inkRight = el.childNodes.length ? range.getBoundingClientRect().right : 0;
+    const right = Math.max(boxRight, inkRight);
+    if (right > clientWidth + 0.5) {
+      offenders.push({
+        selector: el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : el.tagName.toLowerCase(),
+        right: Math.round(right * 10) / 10,
+        viaInk: inkRight > boxRight + 0.5,
+      });
+    }
+  }
+  return offenders;
+}
+
+/**
+ * Doubles the root font size on the already-loaded page (the same 32px-at-16px-default
+ * stand-in for 200% text zoom the rest of this branch uses) at each of NARROW_WIDTHS, and
+ * reports whether anything a visitor would actually reach paints past the viewport.
+ *
+ * Resizes the iframe element's own width/height attributes rather than reloading it --
+ * `doc`/`win` in main() are long-lived references into this same document, and a second
+ * navigation would leave both dangling. A resize alone is enough: reading a geometry
+ * property after each change (the same `void ...scrollHeight` trick loadPage() uses)
+ * flushes it into a real layout pass, and this was verified live, at each width, against
+ * the real dev server before being written into this probe.
+ */
+async function checkOverflow(frameEl, doc) {
+  const NARROW_WIDTHS = [375, 280];
+  const originalWidth = frameEl.width;
+  const originalHeight = frameEl.height;
+  const rows = [];
+  for (const width of NARROW_WIDTHS) {
+    frameEl.width = width;
+    frameEl.height = 812;
+    void doc.documentElement.scrollHeight;
+    // eslint-disable-next-line no-await-in-loop
+    await settle(50);
+    doc.documentElement.style.fontSize = '32px';
+    void doc.documentElement.scrollHeight;
+    // eslint-disable-next-line no-await-in-loop
+    await settle(50);
+
+    const clientWidth = doc.documentElement.clientWidth;
+    const scrollWidth = doc.documentElement.scrollWidth;
+    const content = doc.getElementById('content');
+    const nav = doc.querySelector('.site-nav');
+    const offenders = [
+      ...(content ? overflowingElements(content, clientWidth) : []),
+      ...(nav ? overflowingElements(nav, clientWidth) : []),
+    ];
+    rows.push({
+      width, clientWidth, scrollWidth,
+      offenders,
+      // The claim this section exists to catch: real content -- not the fixed gradient
+      // backdrop, which carries none -- painting outside the viewport. See the header
+      // comment for why that box is excluded rather than folded into "offenders".
+      pass: offenders.length === 0,
+    });
+
+    doc.documentElement.style.fontSize = '';
+  }
+  // Back to what the rest of the probe wants to measure against.
+  frameEl.width = originalWidth;
+  frameEl.height = originalHeight;
+  void doc.documentElement.scrollHeight;
+  await settle(120);
+  return rows;
+}
+
 /* ------------------------------------------------------------------------- */
 
 async function main() {
   const { doc, win } = await loadPage();
+
+  say('overflow', 'resizing the page under test to check for horizontal overflow…', 'wait');
+  const overflowRows = await checkOverflow($('page'), doc);
+  const overflowFails = overflowRows.filter((r) => !r.pass);
+  say('overflow', [
+    'Real content (#content, .site-nav) painting outside the viewport at a 32px root',
+    'font (200% text zoom), at each width. The verdict is which elements overflow, not',
+    'merely scrollWidth vs clientWidth -- a fixed decorative backdrop could move that raw',
+    'pair on its own with nothing behind it to reach (see the header comment) -- but the',
+    'two are printed together because a real content defect always widens both together.',
+    '',
+    `${'width'.padStart(6)}${'scrollWidth'.padStart(13)}${'clientWidth'.padStart(13)}  verdict`,
+    '-'.repeat(50),
+    ...overflowRows.map((r) => `${String(r.width).padStart(6)}${String(r.scrollWidth).padStart(13)}`
+      + `${String(r.clientWidth).padStart(13)}  ${r.pass ? 'PASS' : 'FAIL'}`
+      + (r.scrollWidth !== r.clientWidth && r.pass
+        ? '  (scrollWidth/clientWidth differ; no content element accounts for it -- see header comment)'
+        : '')),
+    ...overflowFails.flatMap((r) => [
+      `  width ${r.width}: content painting past clientWidth (${r.clientWidth}px):`,
+      ...r.offenders.map((o) => `    ${o.selector.padEnd(28)} right edge ${o.right}px`),
+    ]),
+  ].join('\n'), overflowFails.length ? 'bad' : 'ok');
 
   // Tokens come off the live :root, so a renamed or retuned token shows up here rather
   // than being read from a copy kept in this file.
@@ -521,6 +666,8 @@ async function main() {
     passed: rows.length - fails.length,
     total: rows.length,
     tightestMargin: tightest.margin,
+    overflow: overflowRows,
+    overflowPassed: overflowFails.length === 0,
   };
 }
 

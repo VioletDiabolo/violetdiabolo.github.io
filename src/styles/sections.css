@@ -72,6 +72,19 @@ body { overflow-x: hidden; }
  * is 22px rather than the 18px this shipped at because the ribbons are narrower now --
  * at 18px a ribbon core still read as a hard edge through the panel instead of as a
  * colour in it.
+ *
+ * EXCLUDED FROM THAT ARITHMETIC, ON PURPOSE: `saturate(1.15)` on this same filter, which
+ * runs on the gradient before the glass tint composites over it. Saturating the ceiling
+ * pixel itself, rgb(128, 36, 255), gives approximately rgb(137, 31, 255) -- L 0.135
+ * against the unsaturated 0.1307 the composites in base.css are built from. That is a
+ * higher ceiling than the one certified, so strictly, "a guarantee over every frame" is
+ * very slightly stronger than the arithmetic behind it. It is not folded in because the
+ * margin it could cost is immaterial at the ratios involved (worst case around 15:1;
+ * blur already averages the sampled pixel down from any true peak, which saturate then
+ * has less of a peak to act on) and because doing so would mean re-deriving every glass
+ * composite in base.css from a filtered ground rather than the plain one PALETTE emits --
+ * a second, parallel arithmetic to keep in sync rather than a cheaper way to state the
+ * same guarantee. Recorded here instead, next to the filter that causes it.
  * ------------------------------------------------------------------------- */
 
 [data-surface='solid'] {
@@ -99,9 +112,8 @@ body { overflow-x: hidden; }
  * carry WHITE text instead of black: at alpha 0.76 over the gradient's brightest pixel it
  * composites (source-over, sRGB) to rgb(59, 25, 104), where --ink measures 12.44:1, and
  * over the near-black ground to rgb(30, 17, 46) at 16.14:1. The panel is unmistakably
- * violet at
- * both ends of that range, and the range is narrow enough that the contrast is a fact
- * rather than a hope.
+ * violet at both ends of that range, and the range is narrow enough that the contrast is
+ * a fact rather than a hope.
  *
  * Specificity note: this is (0,2,0) against [data-surface='glass']'s (0,1,0), so it wins
  * the background regardless of source order, and it deliberately does NOT restate
@@ -163,6 +175,25 @@ body { overflow-x: hidden; }
  * card at 768, the narrowest width this side-by-side composition is used at; at 767 and
  * below the panel stacks and the card sits under the headline at full width. Desktop is
  * untouched in practice: 9.6vw reaches the 9rem ceiling at 1500px.
+ *
+ * A THIRD find from the same fix pass that added `overflow-wrap: anywhere` to the contact
+ * block: both `--type-hero` here and the mobile override below are `clamp()`s with a
+ * REM-based floor (3.4rem / 2.9rem) under a VIEWPORT-based preferred value (9.6vw / 15vw).
+ * At a 32px root font (200% text zoom) the rem floor is twice its normal size while the vw
+ * term is untouched, so the floor wins at every width this page ships -- exactly the trap
+ * `--nav-h` fell into before src/ui/nav.js started measuring it. The single word "VIOLET"
+ * (wider than "DIABOLO" in this face) then has no space left to break at and paints past
+ * the column with nothing to stop it -- measured at 375x812, 32px root: ink to x 411.1
+ * against a 375 viewport, exactly the page's whole scrollWidth/clientWidth gap at that
+ * size.
+ *
+ * The fix -- `overflow-wrap: anywhere` -- turned out not to belong here specifically: the
+ * feature panel's "EVENTS" (--type-title, base.css) hit the identical rem-floor trap on a
+ * DIFFERENT clamp, and a per-panel fix on this rule alone did not reach it. It is declared
+ * once, on every heading, in base.css's shared `h1, h2, h3` rule, which is what actually
+ * covers both. That declaration is what makes the club's own name break here at extreme
+ * zoom rather than this one; costs nothing at any width this file has verified, for the
+ * same reason it cost nothing there.
  */
 [data-panel='hero'] h1 {
   font-size: var(--type-hero);
@@ -330,6 +361,20 @@ body { overflow-x: hidden; }
   grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
   column-gap: var(--gutter);
   padding-block: clamp(3.5rem, 11vh, 7rem);
+  /*
+   * A grid item's default automatic minimum size is its own min-content -- the SAME
+   * mechanism `.site-nav-links` already overrides in base.css, here one grid level
+   * further out. Without it, .room (a grid item of the section's own one-cell grid) has
+   * no floor of its own, so it inherits whatever automatic minimum bubbles up from
+   * .board-list's cards -- 200px of nominal track becoming 269.8px at 280x812/32px root,
+   * dragging document.documentElement.scrollWidth to 310 with it, even though no single
+   * card's own content asked for more than ~147px. `min-width: 0` is the same firewall,
+   * one layer higher: it does not change how anything is SIZED (every measured width at
+   * every previously-verified viewport is unaffected, since none of them were ever
+   * bumping into this floor), only how far an unrelated descendant's automatic minimum
+   * can travel before something stops it.
+   */
+  min-width: 0;
   /* Head and body sit side by side in two tracks, so the row still has to size to
      content rather than stretch -- stretched, it would take the room's full height and
      tear the cards away from the top of the title. */
@@ -351,6 +396,33 @@ body { overflow-x: hidden; }
   flex-direction: column;
   align-items: flex-start;
   gap: clamp(0.9rem, 2.2vh, 1.4rem);
+}
+
+/*
+ * The club's email address (CONTACT.email, content/index.js) is one unbreakable token --
+ * no spaces, so nothing upstream of it can create a soft-wrap opportunity inside it. At a
+ * 32px root font (200% text zoom) that token alone is wider than the mobile column, and
+ * because this heading/paragraph/socials stack is a COLUMN flex with `align-items:
+ * flex-start` (not stretch), each child sizes to its own fit-content width rather than
+ * being clamped to the column -- so the paragraph's box grows to match the address and
+ * drags document.documentElement.scrollWidth past clientWidth with it. Measured at
+ * 375x812, 32px root: 434px scrollWidth against 375 clientWidth, 59px clipped by
+ * `body { overflow-x: hidden }` (this file, line 49) rather than scrolled -- silent, not
+ * a scrollbar.
+ *
+ * `overflow-wrap: break-word` -- the declaration most people reach for first -- measures
+ * NO CHANGE AT ALL here (434px before and after): break-word only creates a break at an
+ * otherwise-unbreakable point when the LINE has already wrapped down to just that word,
+ * and it does not feed into the box's min-content size calculation the fit-content
+ * column above is using, so the track this paragraph sizes never shrinks.
+ * `overflow-wrap: anywhere` is different -- it changes the min-content contribution
+ * itself, which is what the fit-content column actually measures against. Measured:
+ * scrollWidth 434 -> 411 (the remainder is the nav's own overflow, fixed separately in
+ * base.css), and the address's own box 394.5px -> 282px.
+ */
+[data-section='contact'] .room-head p,
+[data-section='contact'] .room-head p a {
+  overflow-wrap: anywhere;
 }
 
 /* ---------------------------------------------------------------------------
@@ -447,8 +519,14 @@ body { overflow-x: hidden; }
 .board-list {
   display: grid;
   /* 240px, not the 190px this started at: at 190 a wide screen fits five tracks and each
-     bio wraps at about 25 characters, which is a column of confetti rather than prose. */
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+     bio wraps at about 25 characters, which is a column of confetti rather than prose.
+     min(240px, 100%): a bare 240px floor never shrinks below itself even when the grid's
+     OWN box is narrower than that -- at 280x812/32px root the track is the widest thing
+     on the page (measured 269.8px against a 200px column before this fix). 100% is
+     always at least as narrow as the grid actually is, so wrapping the floor in min()
+     costs nothing at any width wide enough to give 240px on its own -- every width this
+     file has verified -- and only trims it where 240 was never going to fit regardless. */
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
   gap: clamp(1.25rem, 2.5vw, 2.25rem);
   width: 100%;
 }
@@ -510,6 +588,14 @@ body { overflow-x: hidden; }
   border: none;
   border-radius: var(--radius-pill);
   padding: 0.55rem 2.3rem 0.55rem 1.1rem;
+  /* A <select>'s closed-state box has no explicit width, so it sizes to its own content
+     (the longest option's text plus the padding above) regardless of what shrinks around
+     it -- unlike a paragraph, it cannot wrap. At 280x812/32px root that natural width
+     (269.8px, "Fall 2025" plus the chevron gutter) exceeds its 200px column outright.
+     max-width: 100% is the standard fix for a form control in a shrinking container: it
+     caps the box at whatever room actually exists without touching its size anywhere
+     that room was never in short supply. */
+  max-width: 100%;
   font-family: var(--font-body);
   font-weight: 500;
   font-size: 0.85rem;
@@ -539,7 +625,11 @@ body { overflow-x: hidden; }
 
 .media-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  /* min(230px, 100%): see .board-list's identical wrapper above -- the same floor, one
+     card style over. Only 10px of margin protected this one at 280x812/32px root (270px
+     measured against a 280px viewport); the wrapper is what makes that margin a fact
+     rather than a coincidence of today's copy. */
+  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
   gap: clamp(1.25rem, 2.5vw, 2rem);
   width: 100%;
 }
@@ -661,7 +751,20 @@ body { overflow-x: hidden; }
   max-width: none;
 }
 
+/*
+ * The button's label is "Open " plus the form's own title (FORMS, content/index.js) --
+ * e.g. "Open Performance / Teaching Request". .form-card is a column flex with
+ * align-items: flex-start, the same shape as the contact block's room-head, so it sizes
+ * itself to fit-content rather than to its own container: at a 32px root font "Performance"
+ * (the widest unbreakable word in that label) is wide enough on its own to push the
+ * button, and so the card, past a narrow column. Measured at 280x812, 32px root: the card
+ * to x 303.4 against a 280px viewport. overflow-wrap: anywhere is the same fix as the
+ * contact block's, for the same reason -- every word in every label already clears its
+ * line at every width this file has verified, so there is nothing for it to act on until
+ * a column gets this narrow.
+ */
 .form-card button {
+  overflow-wrap: anywhere;
   background: var(--accent);
   color: var(--accent-ink);
   border: none;
@@ -768,5 +871,8 @@ body { overflow-x: hidden; }
 
   .form-list { flex-direction: column; align-items: flex-start; }
 
-  .board-list { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  /* min(150px, 100%): the same wrapper as the base rule, for the same reason -- this
+     override lowers the floor but does not remove it, and a bare floor is one narrower
+     device or one more doubled rem away from binding here too. */
+  .board-list { grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); }
 }

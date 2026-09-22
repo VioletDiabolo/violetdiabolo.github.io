@@ -240,8 +240,18 @@ body {
 #gradient {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  /* vw/vh, not a bare percentage. Found verifying finding 2's overflow fixes: a percentage
+     width on a `position: fixed` box resolves against whatever the browser currently
+     considers the viewport, and while investigating a real, separate overflow at
+     280x812/32px root this measured as 411px against a 375px viewport (and 290 against
+     280) purely from a doubled root font -- no content of its own, nothing else on the
+     page unfixed, the same figure the (real) overflow of the moment happened to reach.
+     vw/vh measured stable at the true viewport size in every one of those same checks.
+     This does not change what is on screen anywhere -- the canvas already filled the
+     viewport exactly -- it only stops it from being a second, decorative place the same
+     class of measurement can go wrong. */
+  width: 100vw;
+  height: 100vh;
   z-index: 0;
   display: block;
   /* The canvas framebuffer is smaller than its CSS box (see render/budget.js);
@@ -269,6 +279,28 @@ h1, h2, h3 {
   margin: 0;
   color: var(--ink);
   line-height: 1.05;
+  /*
+   * Found on the SECOND heading this pass checked, not the first: the hero's own h1 has
+   * this problem (documented in sections.css, next to --type-hero), but so does the
+   * feature panel's "EVENTS" -- one word, no space, set from --type-title, which is
+   * ALSO a rem-floored clamp under a viewport-relative preferred value and hits the same
+   * floor at a 32px root. Measured at 280x812/32px: the h1's own fix does not reach it,
+   * because they are different rules -- "EVENTS" alone painted to x 289.4 against a 280
+   * viewport, which was the page's entire remaining scrollWidth/clientWidth gap once
+   * every OTHER fix in this pass was in place. Both the box-based nav-pill scan and this
+   * file's own earlier overflow guard missed it for the same reason: getBoundingClientRect
+   * on the ELEMENT reports its box, not the ink a long unbreakable word paints past that
+   * box without growing it -- see scripts/check-contrast.html's Range-based check, added
+   * after this was found the same way.
+   *
+   * Set here, on every heading, rather than panel by panel: a title this large, run this
+   * thin, is exactly the shape that can hit an unbreakable-word failure at extreme zoom,
+   * and finding them one at a time by which specific heading someone happened to check is
+   * how "EVENTS" went unnoticed until a page-wide ink sweep -- not just a box sweep --
+   * was run. Every heading already clears its own line at every width this file has
+   * verified, so this changes nothing there.
+   */
+  overflow-wrap: anywhere;
 }
 
 /* The display voice: Inter, run large and thin. Weight comes DOWN as size goes up --
@@ -321,13 +353,32 @@ a:hover {
  * is the gradient's luminance ceiling (see the header comment) -- --chip at alpha 0.82
  * over the brightest pixel the canvas can emit composites to rgb(33, 14, 62), L = 0.0099,
  * where --ink measures 15.84:1. There is no backdrop-filter here and there must not be:
- * blur is
- * reserved for [data-surface='glass'] and a guard enforces it.
+ * blur is reserved for [data-surface='glass'] and a guard enforces it.
  * ------------------------------------------------------------------------- */
 
+/*
+ * `width: 100vw`, not left/right insets alone. Found in the second fix pass, verifying
+ * the report's own "the nav is a mis-scoped defect" note (finding 2): with `inset: 0 0
+ * auto 0` and no explicit width, .site-nav's own box -- not just its pill row -- measured
+ * 411px at 375x812/32px root and 434.5px with the contact panel's own overflow (fixed
+ * separately, sections.css) still live, both against a 375px viewport. `left`/`right`
+ * both at 0 is supposed to solve `width` outright, but a fixed flex container whose
+ * content cannot fit does not reliably land on that solved value -- it grows to its
+ * content instead, taking the bar's pills and call-to-action past the viewport edge with
+ * it, silently, under the same `body { overflow-x: hidden }` that hid the contact
+ * overflow. `100vw` is not a percentage of an ambiguous containing size; it is the
+ * viewport, stated outright, and .site-nav-links' own `min-width: 0` (below) was never
+ * the problem -- it already shrinks correctly once the bar actually offers it 375px to
+ * shrink into. Measured after: bar 411px -> 375px, pill row 363px -> 327px, page
+ * scrollWidth 411 -> 375 (== clientWidth), at both 375 and 280 wide, contact panel either
+ * way. Unmeasurable at a normal (16px) root: the bar's content never approaches the
+ * viewport's width there, so nothing about this changes any previously-verified
+ * measurement.
+ */
 .site-nav {
   position: fixed;
   inset: 0 0 auto 0;
+  width: 100vw;
   z-index: 3;
   display: flex;
   align-items: center;
@@ -418,6 +469,13 @@ a:hover {
  * bar is sized to fit at 320 outright (the @media blocks at the end of this file), and
  * flex-shrink is spread across the items that can afford it instead of being dumped on
  * this one. `overflow: hidden` would have hidden defect 1 and kept defect 2.
+ *
+ * A THIRD defect, found verifying the other two at a 32px root font (200% text zoom): see
+ * .site-nav's own `width: 100vw` above, which is where it was actually fixed. It reads
+ * like a row-shrinking problem from here -- this row measured 363px against a 327px bar
+ * interior -- but `min-width: 0` already does what it is supposed to, and the row shrinks
+ * correctly to whatever width .site-nav actually offers it. The bar itself was the thing
+ * not offering 375px.
  */
 .site-nav-links {
   display: flex;
@@ -564,10 +622,9 @@ a:hover {
  * stage band is the entire visible difference between focused and unfocused there -- and
  * at 3.47:1 it clears WCAG 1.4.11's 3:1 by 0.47, not by the 0.75 this comment used to
  * claim. The margin is real but it is thin, which is the reason the spread below is 7
- * rather than 6. At
- * S = 6 it is ONE CSS pixel wide, and one pixel is not a margin: half a device pixel of
- * rounding, or anyone later widening the outline to 3px "to make focus clearer", erases
- * the only band that can be seen. S = 7 makes it 2px.
+ * rather than 6. At S = 6 it is ONE CSS pixel wide, and one pixel is not a margin: half a
+ * device pixel of rounding, or anyone later widening the outline to 3px "to make focus
+ * clearer", erases the only band that can be seen. S = 7 makes it 2px.
  * ------------------------------------------------------------------------- */
 
 :focus-visible {

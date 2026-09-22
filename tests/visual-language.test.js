@@ -692,11 +692,21 @@ describe('the shader bench', () => {
     // replaces banned the bare substring `input` ANYWHERE in the file, which would have
     // failed on the word "input" in a comment, on `assetsInlineLimit` if it were ever
     // spelled differently, and on any future option whose name contains it.
+    //
+    // A second fix pass found THIS version too narrow rather than too wide. `[^}]*`
+    // cannot cross a closing brace, so it only ever looked inside the FIRST nested block
+    // of `rollupOptions`: `rollupOptions: { output: { manualChunks: undefined },
+    // input: 'x.html' }` -- output before input, an entirely ordinary way to write a
+    // Vite config -- walked straight past it the moment `output` (or any other nested
+    // option) sat between the opening brace and `input`. `[\s\S]*?` has no such wall: it
+    // scans lazily for the first `input:` anywhere after `rollupOptions:`, so a nested
+    // block in between no longer hides it. The comment strip above is what still keeps
+    // this from firing on the word appearing in prose -- that guarantee did not change.
     const config = read('../vite.config.js')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/.*$/gm, '');
     expect(config, 'vite.config.js declares a second rollup entry; scripts/ can reach dist/')
-      .not.toMatch(/rollupOptions\s*:\s*\{[^}]*\binput\b\s*:/);
+      .not.toMatch(/rollupOptions\s*:[\s\S]*?\binput\b\s*:/);
     expect(config, 'vite.config.js sets rollupOptions.input; scripts/ can reach dist/')
       .not.toMatch(/rollupOptions\s*\.\s*input/);
   });
@@ -950,5 +960,145 @@ describe('the story panel', () => {
       'the client replaced with tinted glass').toBeLessThan(1);
     expect(alpha, 'the story tint is too transparent to read as a surface').toBeGreaterThanOrEqual(0.55);
     expect(alpha, 'the story tint is opaque in all but name').toBeLessThanOrEqual(0.9);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The horizontal overflow at 200% text zoom -- fix pass 2.
+ *
+ * The first fix pass measured and RAISED this (its own report: "the horizontal overflow
+ * at 200% zoom is a live defect and I did not fix it... raised separately") but named it
+ * "a type-and-wrapping defect in the contact panel, not the nav". A reviewer's own
+ * measurement found the nav was the LARGER half: with the contact panel hidden entirely,
+ * document.documentElement.scrollWidth was still 411 against a 375 clientWidth, because
+ * .site-nav-links resolved to 363px and .site-nav-cta -- the page's one call to action --
+ * ended at x 387, 12px outside the viewport. Verifying both halves together (see
+ * scripts/check-contrast.html's overflow section, which is the guard that can actually
+ * run a real layout) turned up five more instances of the identical failure shape: the
+ * shared heading rule's single unbreakable word (the hero's "VIOLET DIABOLO" and,
+ * separately, the feature panel's one-word "EVENTS" -- caught only once this file's own
+ * overflow guard learned to measure a Range over an element's ink rather than only its
+ * box, since a long word can paint past a box that never itself grows), a form button's
+ * label, a card grid's own automatic minimum size, and a <select> that cannot wrap its
+ * closed-state text -- all silenced by the same `body { overflow-x: hidden }`
+ * (sections.css) that hid the other two.
+ *
+ * These are static, source-level guards for the declarations each fix depends on -- the
+ * real, load-bearing assertion is scripts/check-contrast.html's, because jsdom cannot lay
+ * out real text or resolve `vw` against a real viewport. What these guard against is a
+ * refactor quietly dropping the one declaration each fix actually is.
+ * ------------------------------------------------------------------------- */
+
+describe('the horizontal overflow at 200% text zoom', () => {
+  it('lets the contact block break its one unbreakable word, with the declaration that measurably works', () => {
+    // overflow-wrap: break-word was measured and rejected: 434px before, 434px after,
+    // because break-word does not feed the box's min-content the way this column reads
+    // it. Only `anywhere` moves the number (434 -> 411), so break-word here is a defect,
+    // not a milder version of the fix.
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = css.match(/\[data-section='contact'\]\s*\.room-head\s*p\s*,\s*\[data-section='contact'\]\s*\.room-head\s*p\s*a\s*\{([^}]*)\}/);
+    expect(rule, 'no rule sets overflow-wrap on the contact paragraph and its link').not.toBeNull();
+    expect(rule[1], 'the contact block reads break-word, which measured NO CHANGE at all (434px -> 434px)')
+      .not.toMatch(/overflow-wrap:\s*break-word/);
+    expect(rule[1], 'the contact block no longer breaks its one unbreakable word')
+      .toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it('lets every heading break, only where a rem-floored clamp forces it to', () => {
+    // --type-hero and --type-title are both clamp()s with a REM floor under a VIEWPORT
+    // preferred value; at a 32px root the floor wins at every width this page ships,
+    // exactly the trap --nav-h fell into before nav.js measured it. Two DIFFERENT
+    // headings hit it on two DIFFERENT clamps -- the hero's "VIOLET DIABOLO" and the
+    // feature panel's one-word "EVENTS" -- which is why this is one declaration on every
+    // heading (base.css) rather than a per-panel fix repeated for each clamp that turns
+    // out to have the same shape: a per-panel version of this fix, on the hero's own h1
+    // rule, did not reach "EVENTS" at all, and "EVENTS" alone accounted for the page's
+    // entire remaining scrollWidth/clientWidth gap at 280x812/32px once every other fix
+    // in this pass was in place. overflow-wrap: anywhere costs nothing at any verified
+    // width -- every heading already clears its own line by measurement -- and only
+    // engages at the zoom level nobody had tested against either clamp.
+    const base = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = base.match(/(?:^|\n)h1,\s*h2,\s*h3\s*\{([^}]*)\}/);
+    expect(rule, 'the shared h1, h2, h3 rule is gone').not.toBeNull();
+    expect(rule[1], 'headings no longer break a word that has run out of column')
+      .toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it("lets a form button's label break, the same fix as the contact block, one column further in", () => {
+    // .form-card is align-items: flex-start, same fit-content shape as the contact
+    // block's room-head, so the widest single word in "Open <form title>" can push the
+    // whole card past a narrow column exactly the same way.
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = css.match(/\.form-card button\s*\{([^}]*)\}/);
+    expect(rule, 'the form button has no rule of its own any more').not.toBeNull();
+    expect(rule[1], 'the form button label can push its card past a narrow column again')
+      .toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it('gives the nav bar an explicit, viewport-anchored width, not just insets', () => {
+    // Measured: .site-nav with only `inset: 0 0 auto 0` and no explicit width came in at
+    // 411px (and 434.5px with the contact overflow also live) against a 375px viewport --
+    // the bar's own box, not merely its pill row, failed to land on the width its insets
+    // are supposed to solve for. `100vw` is not a percentage of an ambiguous containing
+    // size; it is the viewport, stated outright.
+    const base = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = base.match(/(?:^|\n)\.site-nav\s*\{[^}]*\}/);
+    expect(rule, 'the .site-nav rule is gone').not.toBeNull();
+    expect(rule[0], "the nav bar's own box can grow past the viewport again")
+      .toMatch(/width:\s*100vw/);
+  });
+
+  it("does not let a card grid's automatic minimum size push its own ancestor wider than the viewport", () => {
+    // A grid item's default automatic minimum size is its own min-content, the same
+    // mechanism .site-nav-links already overrides -- here one grid level further out.
+    // Measured: without it, .room (a grid item of the section's own one-cell grid)
+    // inherited whatever automatic minimum bubbled up from .board-list's cards, taking a
+    // 200px nominal track to 269.8px at 280x812/32px root.
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = css.match(/\[data-panel='grid'\]\s*\.room\s*\{([^}]*)\}/);
+    expect(rule, "[data-panel='grid'] .room has no rule of its own any more").not.toBeNull();
+    expect(rule[1], 'a grid panel\'s .room can be pushed past the viewport by its own cards again')
+      .toMatch(/min-width:\s*0/);
+  });
+
+  it("floors a card grid's column at its own container's width, not a bare pixel value", () => {
+    // minmax(240px, 1fr) never shrinks below 240px even when the grid's own box is
+    // narrower than that. Wrapping the floor in min(240px, 100%) costs nothing at any
+    // width wide enough to give 240px on its own, and only trims it where 240 was never
+    // going to fit regardless -- exactly the shape of every other fix in this group.
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const [name, px] of [['board-list', 240], ['media-list', 230]]) {
+      const rule = css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`));
+      expect(rule, `.${name} has no base rule any more`).not.toBeNull();
+      expect(rule[1], `.${name}'s column floor can push its grid past the viewport again`)
+        .toMatch(new RegExp(`minmax\\(\\s*min\\(\\s*${px}px\\s*,\\s*100%\\s*\\)`));
+    }
+  });
+
+  it('caps the semester select at its own container, since a form control cannot wrap', () => {
+    // Unlike a paragraph, a <select> cannot wrap its closed-state text -- it sizes to its
+    // widest option plus its own padding regardless of what shrinks around it. Measured:
+    // 269.8px natural width against a 200px column at 280x812/32px root.
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = css.match(/\.semester-select\s*\{([^}]*)\}/);
+    expect(rule, 'the semester select has no rule of its own any more').not.toBeNull();
+    expect(rule[1], 'the semester select can outgrow its own column again')
+      .toMatch(/max-width:\s*100%/);
+  });
+
+  it('anchors the gradient canvas to the viewport the same way the nav bar is anchored', () => {
+    // A bare percentage width on a `position: fixed` box resolves against whatever the
+    // browser currently considers the viewport, which is not always document.
+    // documentElement.clientWidth once something else on the page has overflowed --
+    // measured at 411px (and 290px at 280 wide) against the real, current viewport while
+    // investigating the fixes above. vw/vh measured stable in every one of the same
+    // checks.
+    const base = read('../src/styles/base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = base.match(/(?:^|\n)#gradient\s*\{([^}]*)\}/);
+    expect(rule, 'the #gradient rule is gone').not.toBeNull();
+    expect(rule[1], 'the gradient canvas is back on a bare percentage width')
+      .toMatch(/width:\s*100vw/);
+    expect(rule[1], 'the gradient canvas is back on a bare percentage height')
+      .toMatch(/height:\s*100vh/);
   });
 });
