@@ -23,6 +23,17 @@ export const TARGETS = [
   { name: 'aaron',       file: 'aaron.jpg',       widths: [400, 800],        jpgWidths: [] },
   { name: 'jon',         file: 'jon.jpg',         widths: [400, 800],        jpgWidths: [] },
 
+  // The hero and the events panel. Both sit in a panel's second column -- at most about
+  // 700px at 1440 -- so 1600 covers a 2x screen with room to spare.
+  { name: 'hero-group',      file: 'hero-group.jpg',      widths: [800, 1600], jpgWidths: [] },
+  { name: 'events-practice', file: 'events-practice.jpg', widths: [800, 1600], jpgWidths: [] },
+
+  // Board portraits, at the same two widths as the two that predate them: the card crops
+  // to 4:5 at a track of at most 320px, so 800 is already the 2x size.
+  { name: 'board-barry',  file: 'board-barry.jpg',  widths: [400, 800], jpgWidths: [] },
+  { name: 'board-evan',   file: 'board-evan.jpg',   widths: [400, 800], jpgWidths: [] },
+  { name: 'board-hannah', file: 'board-hannah.jpg', widths: [400, 800], jpgWidths: [] },
+
   // The practice gallery. 1000 is the ceiling because a cell is at most ~30vw on a
   // desktop grid -- roughly 430px at 1440 -- so 1000 already covers a 2x screen. No
   // last-resort JPEG: these arrived in 2026 and nothing that renders neither AVIF nor
@@ -30,7 +41,9 @@ export const TARGETS = [
   { name: 'practice-throw',    file: 'practice-throw.jpg',    widths: [500, 1000], jpgWidths: [] },
   { name: 'practice-sylvette', file: 'practice-sylvette.jpg', widths: [500, 1000], jpgWidths: [] },
   { name: 'practice-reach',    file: 'practice-reach.jpg',    widths: [500, 1000], jpgWidths: [] },
-  { name: 'practice-spin',     file: 'practice-spin.jpg',     widths: [500, 1000], jpgWidths: [] },
+  // practice-pair replaced practice-spin here: that master is now board-hannah, and one
+  // photograph doing both jobs put the same picture on the page twice.
+  { name: 'practice-pair',     file: 'practice-pair.jpg',     widths: [500, 1000], jpgWidths: [] },
   { name: 'practice-back',     file: 'practice-back.jpg',     widths: [500, 1000], jpgWidths: [] },
   { name: 'practice-team',     file: 'practice-team.jpg',     widths: [500, 1000], jpgWidths: [] },
 ];

@@ -668,10 +668,13 @@ a:hover {
  * gave the two-band treatment only to `.site-nav` and `[data-panel='story']`, on the
  * reasoning that those were the only places whose ground was unpredictable. That was
  * true when the gradient's peak was a pale lilac confined behind glass. It is not true
- * now: the hero's own teaser link sits on a card over bare gradient, and any link added
- * anywhere is one scroll position away from having a ribbon behind it. A ring that is
- * correct everywhere costs one declaration; a ring that is correct in two named places
- * costs an audit every time the markup grows.
+ * now: any link added anywhere is one scroll position away from having a ribbon behind
+ * it. A ring that is correct everywhere costs one declaration; a ring that is correct in
+ * two named places costs an audit every time the markup grows -- which is exactly what
+ * happened to the example this paragraph used to cite. It named the hero's teaser link,
+ * on a card over bare gradient. That card has since been replaced by a photograph and
+ * the link no longer exists; the argument it illustrated is unaffected, which is rather
+ * the point of not scoping the ring to a list of places.
  *
  * Measured outward from the border box, with `outline: 2px` at `outline-offset: 3px`
  * over a shadow spread of S, the painted bands are:

@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, SECTION_HEADINGS, PHOTOS,
-  HERO_TEASER, PRACTICE_PHOTOS,
+  PRACTICE_PHOTOS,
 } from '../src/content/index.js';
 
 describe('content', () => {
@@ -29,18 +29,19 @@ describe('content', () => {
     expect(EVENTS.body).toContain('Bust of Sylvette');
   });
 
-  it('claims nothing in the hero teaser that the events copy does not also say', () => {
-    // HERO_TEASER's own doc comment promises exactly this — that the card restates
-    // EVENTS.body and never adds a fact of its own — and nothing checked it until both
-    // were rewritten at once. A teaser that drifts from the section it summarises is a
-    // club page telling a visitor two different days to turn up.
-    const teaser = `${HERO_TEASER.heading} ${HERO_TEASER.detail}`;
-    for (const fact of ['Sundays', 'Fridays', '3–5PM', '5–7PM', 'Kimmel 606', 'Bust of Sylvette']) {
-      expect(teaser, `"${fact}" is not in the teaser`).toContain(fact);
+  it('gives the hero and the events panel a photograph each, with alt text', () => {
+    // The hero's practice card is gone -- the times live in the events panel alone now,
+    // and the first screen carries a photograph instead. These two entries are what the
+    // hero and events panels render in its place, and an alt-less photograph in either
+    // is a silent screen for anyone not looking at it.
+    for (const key of ['hero', 'events']) {
+      const photo = PHOTOS[key];
+      expect(photo, `PHOTOS.${key} is missing`).toBeDefined();
+      expect(photo.alt.length, `PHOTOS.${key} has no alt text`).toBeGreaterThan(0);
+      expect(photo.base).not.toMatch(/[/.]/);
+      expect(Number.isFinite(photo.width) && Number.isFinite(photo.height),
+        `PHOTOS.${key} has no intrinsic size, so its panel will jump when it loads`).toBe(true);
     }
-    // The card pairs each day with its own time, for the same reason as above.
-    expect(HERO_TEASER.detail).toContain('Sundays 3–5PM at Kimmel 606');
-    expect(HERO_TEASER.detail).toContain('Fridays 5–7PM at the Bust of Sylvette');
   });
 
   it('lists all ten videos with plausible YouTube ids', () => {

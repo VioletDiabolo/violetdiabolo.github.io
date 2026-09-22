@@ -1,5 +1,5 @@
 import {
-  SITE, ABOUT, EVENTS, CONTACT, SOCIALS, SECTION_HEADINGS, PHOTOS, HERO_TEASER,
+  SITE, ABOUT, EVENTS, CONTACT, SOCIALS, SECTION_HEADINGS, PHOTOS,
 } from '../content/index.js';
 import { mountBoard } from './board.js';
 import { mountMedia } from './media.js';
@@ -70,36 +70,13 @@ function figure(photo, sizes, loading) {
   return fig;
 }
 
-/**
- * The hero's one piece of furniture: a small card carrying when and where to turn up,
- * and a link to the section that says more. Its copy is content/'s (HERO_TEASER), never
- * this module's.
- */
-function teaser() {
-  const card = document.createElement('div');
-  card.className = 'teaser';
-
-  const when = document.createElement('p');
-  when.className = 'teaser-when';
-  when.textContent = HERO_TEASER.heading;
-
-  const where = document.createElement('p');
-  where.className = 'teaser-where';
-  where.textContent = HERO_TEASER.detail;
-
-  const link = document.createElement('a');
-  link.className = 'teaser-link';
-  link.href = `#${HERO_TEASER.action.target}`;
-  link.textContent = HERO_TEASER.action.label;
-
-  card.append(when, where, link);
-  return card;
-}
-
 export function renderSections(root) {
   const hero = section('hero', SITE.name, 'hero', undefined, 'h1');
   hero.head.append(paragraph(SITE.tagline));
-  hero.body.append(teaser());
+  // 'eager', unlike every other photograph on the page: this one is above the fold, and
+  // buildPicture defaults to lazy, which would leave the first screen half empty while
+  // the browser decided it was needed after all.
+  hero.body.append(figure(PHOTOS.hero, '(max-width: 767px) 92vw, 46vw', 'eager'));
 
   const about = section('about', ABOUT.heading, 'story', 'glass');
   about.head.append(paragraph(ABOUT.body));
@@ -107,6 +84,7 @@ export function renderSections(root) {
 
   const events = section('events', EVENTS.heading, 'feature', 'glass');
   events.body.append(paragraph(EVENTS.body));
+  events.body.append(figure(PHOTOS.events, '(max-width: 767px) 92vw, 46vw', 'lazy'));
   mountForms(events.body);
 
   const media = section('media', SECTION_HEADINGS.media, 'grid', 'solid');
