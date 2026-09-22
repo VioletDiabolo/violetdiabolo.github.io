@@ -291,38 +291,53 @@ describe('the performed-for marquee', () => {
     expect(lists[0].querySelectorAll('li')).toHaveLength(PERFORMED_FOR.length);
   });
 
-  it('renders a name as text and a logo as a picture that still carries the name', () => {
+  it('names every organisation in text, whether or not a mark was found', () => {
     const root = render();
     for (const org of PERFORMED_FOR) {
       const li = [...root.querySelectorAll('.marquee-list:not([aria-hidden]) li')]
-        .find((x) => x.dataset.logo === org.logo || x.textContent === org.name);
+        .find((x) => x.querySelector('.marquee-name')?.textContent === org.name);
       expect(li, `${org.name} is not in the strip`).toBeDefined();
+      // The name is the constant. A mark is an addition beside it, so a chip with no
+      // artwork still reads — which is the whole reason eight missing logos did not
+      // have to become eight missing credits.
+      expect(li.querySelector('.marquee-name').textContent).toBe(org.name);
       if (org.logo) {
-        const img = li.querySelector('img');
-        expect(img, `${org.name} has a logo configured but renders no image`).not.toBeNull();
-        // The strip must read as a list of ORGANISATIONS however it looks on screen.
-        expect(img.alt).toBe(org.name);
+        expect(li.querySelector('img'), `${org.name} has a logo configured but renders none`)
+          .not.toBeNull();
+        expect(li.dataset.logo).toBe(org.logo);
       } else {
-        expect(li.textContent).toBe(org.name);
-        expect(li.querySelector('img')).toBeNull();
+        expect(li.querySelector('img'), `${org.name} has no logo but rendered one`).toBeNull();
       }
     }
+  });
+
+  it('says each organisation exactly once to a screen reader', () => {
+    // The mark is decorative (alt="") precisely BECAUSE the name is beside it in text.
+    // Give the image the name as well and every logo chip is read twice — which is what
+    // the first version of this did, and what the nav's own logo rule already avoids.
+    const root = render();
+    for (const img of root.querySelectorAll('.marquee-list img')) {
+      expect(img.getAttribute('alt'), 'a marquee mark announces itself as well as its name')
+        .toBe('');
+    }
+    const withLogos = PERFORMED_FOR.filter((o) => o.logo).length;
+    expect(withLogos, 'no logo chips left — this guard is checking nothing').toBeGreaterThan(0);
   });
 
   it('builds a logo chip that still carries the organisation name', () => {
     // Called directly, because every entry is name-only today and the logo branch is
     // therefore unreachable through renderSections. Without this the marquee would ship
     // a path nothing had ever run, to be discovered on the day the first mark arrives.
-    const li = marqueeItem({ name: 'Chinatown Beautification Day', logo: 'logo' });
+    const li = marqueeItem({ name: 'Chinatown Beautification Day', logo: 'logo-cyi' });
     const img = li.querySelector('img');
     expect(img, 'a configured logo rendered no image').not.toBeNull();
-    expect(img.alt).toBe('Chinatown Beautification Day');
-    expect(li.dataset.logo).toBe('logo');
-    expect(li.textContent.trim()).toBe('');
+    expect(img.getAttribute('alt')).toBe('');
+    expect(li.dataset.logo).toBe('logo-cyi');
+    expect(li.querySelector('.marquee-name').textContent).toBe('Chinatown Beautification Day');
     // And the other branch, from the same entry point, so this test sees both.
     const plain = marqueeItem({ name: 'NYU Welcome', logo: null });
     expect(plain.querySelector('img')).toBeNull();
-    expect(plain.textContent).toBe('NYU Welcome');
+    expect(plain.querySelector('.marquee-name').textContent).toBe('NYU Welcome');
   });
 });
 

@@ -556,21 +556,29 @@ body { overflow-x: hidden; }
   list-style: none;
 }
 
-/* A logo chip, for whenever PERFORMED_FOR starts carrying marks. Capped by HEIGHT, not
-   width: logos arrive at every aspect ratio, and a shared height is the only thing that
-   makes a row of them look like one row. */
+/*
+ * A mark beside its name.
+ *
+ * Capped by HEIGHT, not width: these arrive at every aspect ratio — a 1:1 club avatar, a
+ * 3.5:1 wordmark — and a shared height is the only thing that makes a row of them read as
+ * one row. In their own colours, which is the point of showing them at all; the two that
+ * were invisible on this ground were re-coloured in the ASSET rather than filtered here,
+ * because a filter that rescues one mark wrecks the nine beside it.
+ *
+ * The radius is for the club avatars, which are square cards; on a transparent wordmark
+ * it rounds nothing.
+ */
 .marquee-list li[data-logo] img {
   display: block;
   width: auto;
   height: 1.75rem;
-  /* These arrive as full-colour marks on a page that is near-black. Until someone says
-     otherwise they are knocked back to the page's own ink so the strip reads as one
-     thing; delete these two lines to show them in their own colours. */
-  filter: grayscale(1) brightness(1.9);
-  opacity: 0.75;
+  border-radius: 4px;
 }
 
 .marquee-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   white-space: nowrap;
   font-size: var(--type-micro);
   font-weight: 500;
@@ -583,13 +591,12 @@ body { overflow-x: hidden; }
    seven names interleaved with bullets. */
 .marquee-list li + li::before {
   content: '';
-  display: inline-block;
+  flex: 0 0 auto;
   width: 4px;
   height: 4px;
   margin-right: clamp(1.75rem, 4vw, 3.25rem);
   border-radius: 50%;
   background: var(--accent);
-  vertical-align: middle;
 }
 
 @keyframes marquee-slide {

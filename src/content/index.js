@@ -63,33 +63,43 @@ export const SECTION_HEADINGS = {
  * both looked like performances from the subject line alone, which is why subject lines
  * were not good enough.
  *
- * `logo` is the base name of a mark in the asset pipeline, or null for a name-only chip.
- * All null today: these are student clubs, public schools and neighbourhood non-profits,
- * and their marks are theirs to give rather than ours to take off an Instagram page. The
- * marquee renders whichever it is given (src/ui/sections.js), so adding one later is a
- * file in assets-src, a line in scripts/build-assets.mjs and a base name here.
+ * `logo` is the base name of a mark in the asset pipeline, or null. The NAME always
+ * shows; a logo is an addition beside it, never a replacement for it, so a chip without
+ * one still reads and the strip does not depend on how many marks could be found.
+ *
+ * WHERE THEY CAME FROM: each organisation's own published mark — NYU Engage profiles for
+ * the student groups, the organisation's own site for the rest. Two were re-coloured, and
+ * only in VALUE: TAP's black wordmark and CYI's black paths are invisible on this page's
+ * ground, so both are shown in the opposite polarity. That is the same mark, not a
+ * redrawing of it.
+ *
+ * EIGHT ARE DELIBERATELY null. Kappa Phi Lambda and Tisch Talent Guild publish none that
+ * could be found; Columbia Wushu's site no longer resolves; the two public schools and
+ * USADA were not pursued. NYU VSA's is near-white artwork on white and disappears at
+ * 28px, and NYU OGS's is a grey skyline banner rather than a mark — both were found and
+ * both were left out, because an illegible logo is worse than the name it replaced.
  */
 export const PERFORMED_FOR = Object.freeze([
   // --- NYU ---------------------------------------------------------------
-  { name: 'NYU Welcome', logo: null },              // Club Showcase, Kimmel E&L, Sept 2026
-  { name: 'NYU Asian Heritage Month', logo: null }, // Fall Fest, 2019 and since
-  { name: 'NYU VSA', logo: null },                  // Minh 2022; Holiday Night Market 2024
-  { name: 'NYU CSS', logo: null },                  // LNY Gala 2024; DynamiCSS 2024
-  { name: 'NYU KSA', logo: null },                  // Koreating, March 2026
-  { name: 'NYU HKSA', logo: null },                 // Sensations, April 2025
-  { name: 'NYU ACU', logo: null },                  // ACU Idol, 2022
-  { name: 'NYU Kappa Phi Lambda', logo: null },     // Kappa Kafe, April 2023
-  { name: 'NYU OGS', logo: null },                  // Lunar New Year Celebration 2024
-  { name: 'Tisch Talent Guild', logo: null },       // Holiday Cabaret, 2022
+  { name: 'NYU Welcome', logo: 'logo-nyu-welcome' },   // Club Showcase, Kimmel E&L, Sept 2026
+  { name: 'NYU Asian Heritage Month', logo: 'logo-nyu-ahm' }, // Fall Fest, 2019 and since
+  { name: 'NYU VSA', logo: null },                     // Minh 2022; Holiday Night Market 2024 (mark too pale)
+  { name: 'NYU CSS', logo: 'logo-nyu-css' },           // LNY Gala 2024; DynamiCSS 2024
+  { name: 'NYU KSA', logo: 'logo-nyu-ksa' },           // Koreating, March 2026
+  { name: 'NYU HKSA', logo: 'logo-nyu-hksa' },         // Sensations, April 2025
+  { name: 'NYU ACU', logo: 'logo-nyu-acu' },           // ACU Idol, 2022
+  { name: 'NYU Kappa Phi Lambda', logo: null },        // Kappa Kafe, April 2023 (no published mark)
+  { name: 'NYU OGS', logo: null },                     // LNY Celebration 2024 (banner, not a mark)
+  { name: 'Tisch Talent Guild', logo: null },          // Holiday Cabaret, 2022 (no published mark)
 
   // --- Beyond NYU --------------------------------------------------------
-  { name: 'Columbia Wushu', logo: null },                    // Showcase, Feb 2026
-  { name: 'Brooklyn Conservatory of Music', logo: null },    // LNY Feb 2026; Open Stages May 2026
-  { name: 'NYC Mid-Autumn Festival', logo: null },           // Moonlite, Oct 2025
-  { name: 'Chinatown Beautification Day', logo: null },      // 2023 and 2024
+  { name: 'Columbia Wushu', logo: null },                       // Showcase, Feb 2026 (site gone)
+  { name: 'Brooklyn Conservatory of Music', logo: 'logo-bkcm' }, // LNY Feb 2026; Open Stages May 2026
+  { name: 'NYC Mid-Autumn Festival', logo: 'logo-moonlite' },   // Moonlite, Oct 2025
+  { name: 'Chinatown Beautification Day', logo: 'logo-cyi' },   // CYI, 2023 and 2024
   { name: 'PS 124 Yung Wing School', logo: null },           // Lunar New Year
   { name: 'PS 184M Shuang Wen', logo: null },                // Spring Bash, June 2026
-  { name: 'TAP New York', logo: null },                      // Lunar New Year Banquet 2024
+  { name: 'TAP New York', logo: 'logo-tap' },                   // Lunar New Year Banquet 2024
   { name: 'USADA Nationals', logo: null },                   // National Diabolo Competition 2024
 ]);
 

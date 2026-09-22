@@ -33,6 +33,30 @@ describe('image pipeline', () => {
     // its body can see is the failure mode this suite exists to avoid.
   });
 
+  it('builds every image the CONTENT asks for, by name', async () => {
+    // The gap this closes: a base name in src/content/index.js that the pipeline has no
+    // target for renders a <picture> whose every source 404s. Nothing else here would
+    // have said so — a mutation pointing a marquee logo at 'logo-does-not-exist' passed
+    // the whole suite, because every other guard checks the pipeline against ITSELF and
+    // the DOM against content, and nobody checked content against the pipeline.
+    const content = await import('../src/content/index.js');
+    const built = new Set(TARGETS.map((t) => t.name));
+
+    const referenced = new Map();
+    const note = (base, where) => { if (base) referenced.set(base, where); };
+    for (const photo of Object.values(content.PHOTOS)) note(photo.base, 'PHOTOS');
+    for (const photo of content.PRACTICE_PHOTOS.photos) note(photo.base, 'PRACTICE_PHOTOS');
+    for (const org of content.PERFORMED_FOR) note(org.logo, `PERFORMED_FOR (${org.name})`);
+    for (const member of Object.values(content.BOARD).flat()) note(member.image, `BOARD (${member.name})`);
+    note(content.LOGO.base, 'LOGO');
+
+    expect(referenced.size, 'no content image names resolved — this guard is reading nothing')
+      .toBeGreaterThan(15);
+    const missing = [...referenced].filter(([base]) => !built.has(base))
+      .map(([base, where]) => `${base} — referenced by ${where}`);
+    expect(missing, 'content references images the pipeline never builds').toEqual([]);
+  });
+
   it('declares every master that content references', () => {
     const names = TARGETS.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['group-usadc', 'usadc-wide', 'aaron', 'jon']));
