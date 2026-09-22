@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 238 tests, all passing**, and with no stderr noise (was 216 at merge; §11 added 16, §12 added 6) |
+| Unit suite | `npx vitest run` → **17 files, 239 tests, all passing**, and with no stderr noise (was 216 at merge; §11–§14 added 23) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -1012,3 +1012,110 @@ This one is worth naming for what it says about the §11.5 coverage guards: they
 tile's text was *measured*, and measured correctly. They cannot see that a box is the same
 colour as its background, because that is not a contrast failure — it is a design failure
 that happens to pass every contrast check. It took looking at the page.
+
+
+---
+
+## 14. Design pass — caps, weight, a real bar, and a second page
+
+### 14.1 What the client asked for, and what each one cost
+
+| Asked | Done | Caught on the way |
+|---|---|---|
+| Nav pills in caps | `text-transform` + 0.09em tracking, weight 600 | — |
+| Thicker wordmark | Inter 400, up from 200 | **`--wordmark-em` had to be re-measured** — see 14.2 |
+| Headings not all one weight | h1/h2 → Inter 700; hero 400; cards 500 | ABOUT US was Instrument Serif, which has no bold |
+| An actual nav bar | `--bar` (--stage at 0.82) + 18px blur + hairline | the blur guard's allowlist, widened by one |
+| About: less gap, shorter copy | column-gap 80px → 38px; 100 words → 54 | — |
+| A performed-for marquee | seven names, duplicated track, −50% loop | **the overflow scan could not see clipping** — 14.3 |
+| Events: text left, photo right | copy + forms into the head; figure capped at 24rem | the probe's `#events .room-body > p` went dead |
+| Media on its own page | `media.html`, one boot, `data-page` | the probe measured one hardcoded page |
+| Social icons | inline SVG, `currentColor`, 44px targets | `icon` had been dead data since the rebuild |
+| Footer shorter and centred | `min-height: 40vh` deleted; 395px → 124px | — |
+| GitHub gone | removed from SOCIALS | — |
+
+### 14.2 A constant that was coupled to a weight, and said so nowhere
+
+`--wordmark-em` is the divisor that keeps "DIABOLO" on one line. It was **4.15**, measured at
+Inter **200** where the word is 4.004em wide.
+
+Going to weight 400 widened the word to **4.086em**. Nothing failed, nothing warned: the
+cap still fitted, on 1.6% of margin instead of 3.6%. Re-measured and raised to **4.25**,
+and the guard's floor moved from 4.004 to 4.086 so the next weight change cannot pass
+silently either. Verified at 1024 / 375 / 280, each at a 16px and a 32px root: two lines,
+no mid-word break, smallest clearance 7.7px, no overflow.
+
+### 14.3 The marquee broke the overflow scan, and the fix had to be proved not to gut it
+
+A 4,700px track inside a 375px `overflow: hidden` strip is what a marquee IS. The scan
+reported **nineteen offenders out to x 8228** while `scrollWidth === clientWidth` — it had
+no idea anything was clipped. Three changes:
+
+1. An element inside a clipping ancestor is skipped. The walk stops at `body`, because
+   base.css puts `overflow-x: hidden` there and walking past it would mark the entire page
+   as clipped and report green forever.
+2. An element that clips its own overflow is measured by its box, not its ink.
+3. **Ink is measured from an element's own direct text nodes**, not `selectNodeContents`.
+   A Range over a whole subtree reads straight through a clip, which is how `main`,
+   `.section-about` and `.room` each reported the track's width as their own. Nothing is
+   lost: every element is scanned, so an overflowing text node is still caught on the
+   element that holds it — which is where the hero h1's ink defect lived when this check
+   first found it.
+
+**Proved not vacuous, in the browser, twice.** With the page at rest: 0 offenders. Inject a
+`width: clientWidth + 400` box → caught. Inject a 200-character unbreakable word in a 40px
+box → caught. Both shapes the scan exists for still fail it.
+
+A fourth case fell out of the same work: `.visually-hidden` (the social icons' text labels)
+measured its *unclipped* `nowrap` string through a `clip-path`, reporting ink at x 320 in a
+280px viewport. Anything a clip-path hides is now skipped.
+
+### 14.4 An `about:blank` race I introduced and caught on the first run
+
+Making the probe's page a `?page=` parameter meant setting `frame.src` from script. The
+existing wait was `if (readyState === 'complete') resolve(); else wait for load` — correct
+while the src sat in the markup, a **race** once script sets it: a frame with no src holds
+`about:blank`, whose readyState is `complete` immediately, so the probe measured a page
+that had not loaded. It threw on the first run, which was luck; the quiet version is
+"0 of 27 blocks resolved" against a page that simply was not there. The listener is now
+attached before the src is set and the short-circuit is gone.
+
+### 14.5 Three guards that failed on correct work
+
+All three were reading the file too loosely, and all three are now reading what they claim:
+
+- **The sticky scan** treated `@keyframes marquee-slide` as a media query it had never been
+  taught. `@keyframes` blocks hold keyframe selectors, not rules that match elements, and
+  `position` is not animatable — skipped. It also learned `(prefers-reduced-motion: reduce)`
+  and `(min-width: 900px)`, both false at 375.
+- **The card-grid floor guard** matched any rule whose selector *ends* in `.media-list`, so
+  the media page's override — which sits earlier in the file and deliberately has no floor —
+  was read instead of the base rule. Anchored to the rule whose selector IS `.media-list`.
+- **The "no second rollup entry" guard** banned `rollupOptions.input` outright, on the
+  premise that Vite's only entry was index.html. media.html made the premise false while the
+  risk it stood for (scripts/ reaching dist/) did not change. It now checks the entries
+  themselves: each must be a root-level `.html`, none under `scripts/`, and none may
+  reference a probe.
+
+### 14.6 Contrast, both pages
+
+| page | blocks | missing | overflow at 375 / 280 | tightest |
+|---|---|---|---|---|
+| index.html | **23 of 23** | none | 0 / 0 offenders | 1.17× (footer line, hero tagline) |
+| media.html | **8 of 8** | none | 0 / 0 offenders | 1.17× (footer line) |
+
+The marquee's names measure **5.62:1** against a 4.5 requirement.
+
+### 14.7 Still not verified
+
+Everything in §10 stands, plus:
+
+1. **The email sweep the client asked for did not happen.** `violetdiabolo@gmail.com` was
+   not signed in; the browser reached Barry's personal account, where the only club mail in
+   two years was one forwarded booking (NYU Welcome, 25 Aug 2026). `PERFORMED_FOR` is
+   therefore evidenced from the media list plus that one email, and is marked incomplete in
+   `src/content/index.js` rather than padded.
+2. **The marquee has not been watched running in a foregrounded tab**, only measured
+   (track 4,739px, animation `marquee-slide`, two lists, −50%).
+3. **The media page's editorial grid above 900px** is asserted in CSS and was not measured:
+   the preview pane was 293px wide for this pass.

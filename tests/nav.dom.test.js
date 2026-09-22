@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NAV_LINKS, CTA, buildNav, observeNavHeight } from '../src/ui/nav.js';
 import { renderSections } from '../src/ui/sections.js';
@@ -52,7 +55,22 @@ describe('buildNav', () => {
     // A query that silently matched nothing would pass this loop vacuously.
     expect(links.length).toBeGreaterThan(0);
     for (const a of links) {
-      const id = a.getAttribute('href').slice(1);
+      const href = a.getAttribute('href');
+      // Media leaves the home page now. A cross-page link is checked as a FILE that
+      // exists rather than as a section id — treating it as an id would have looked for
+      // an element called `.media` and failed for the wrong reason.
+      if (!href.startsWith('#')) {
+        expect(href, `${href} is neither an anchor nor a page`).toMatch(/^\.\/[\w-]+\.html(#|$)/);
+        const file = href.replace(/^\.\//, '').split('#')[0];
+        // A plain path, not `new URL(..., import.meta.url)`: under jsdom Vitest's global
+        // URL shim resolves a relative file: URL against http://localhost:3000, so
+        // existsSync() is handed an http URL and answers false for every file on disk.
+        // The same workaround is documented in ui.dom.test.js and sections-layout.
+        const abs = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', file);
+        expect(existsSync(abs), `${file} does not exist`).toBe(true);
+        continue;
+      }
+      const id = href.slice(1);
       expect(content.querySelector(`#${id}`), `${id} has no section`).not.toBeNull();
     }
   });

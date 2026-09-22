@@ -144,7 +144,10 @@ describe('content', () => {
     expect(CONTACT.email).toBe('violetdiabolo@gmail.com');
     expect(FORMS).toHaveLength(2);
     for (const f of FORMS) expect(f.url).toContain('docs.google.com/forms');
-    expect(SOCIALS.map((s) => s.label)).toEqual(['Instagram', 'YouTube', 'NYU Engage', 'GitHub']);
+    // GitHub is gone at the client's request. Kept as an exact list rather than a
+    // length: the ORDER is the reading order of the icon row.
+    expect(SOCIALS.map((s) => s.label)).toEqual(['Instagram', 'YouTube', 'NYU Engage']);
+    expect(SOCIALS.some((s) => /github/i.test(s.href)), 'a GitHub link came back').toBe(false);
   });
 
   it("preserves the source apostrophes exactly, curly and ASCII alike", () => {

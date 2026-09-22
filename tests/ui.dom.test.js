@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderSections } from '../src/ui/sections.js';
+import { renderSections, renderMediaPage } from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
 import { mountMedia } from '../src/ui/media.js';
 import { mountGallery } from '../src/ui/gallery.js';
@@ -16,9 +16,24 @@ beforeEach(() => { document.body.innerHTML = '<main id="content"></main>'; });
 
 describe('sections', () => {
   it('renders every scroll section with a data-section hook', () => {
+    // Five panels, not six: media moved to its own page at the client's request.
     renderSections(document.getElementById('content'));
     const found = [...document.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
-    expect(found).toEqual(['hero', 'about', 'events', 'media', 'board', 'contact', 'footer']);
+    expect(found).toEqual(['hero', 'about', 'events', 'board', 'contact', 'footer']);
+  });
+
+  it('renders the media page, with the videos and the gallery on it', () => {
+    // The other half of that move, and the reason it is asserted here rather than left
+    // implied: deleting the media panel from renderSections passes its own test whether
+    // or not anything renders the videos anywhere else.
+    const root = document.getElementById('content');
+    renderMediaPage(root);
+    const found = [...root.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
+    expect(found).toEqual(['media', 'footer']);
+    expect(root.querySelectorAll('[data-video]')).toHaveLength(MEDIA.length);
+    expect(root.querySelectorAll('[data-photo]').length).toBeGreaterThan(0);
+    // Exactly one h1-less page: the club name belongs to the home page's hero.
+    expect(root.querySelectorAll('h1')).toHaveLength(0);
   });
 
   it('puts the club name in the one and only h1', () => {

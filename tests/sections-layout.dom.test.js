@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { renderSections } from '../src/ui/sections.js';
+import { renderSections, renderMediaPage } from '../src/ui/sections.js';
 import { buildNav } from '../src/ui/nav.js';
 
 // A plain path, not `new URL(..., import.meta.url)`: under this file's jsdom environment,
@@ -106,6 +106,16 @@ const NARROW_CONDITIONS = new Map([
   // Declares nothing positional, and true for a visitor who has not asked for less
   // motion -- which is the case this guard is about.
   ['(prefers-reduced-motion: no-preference)', true],
+  // The other side of the same switch, and FALSE for the same reason: this guard ranks
+  // rules as a default visitor sees them. Added when the marquee brought a `reduce` block
+  // into sections.css. Taking it as false narrows the evaluated set, which is the
+  // direction that can hide a rule -- so it is worth saying that the block it excludes
+  // declares `overflow-x` and `animation` and nothing positional at all.
+  ['(prefers-reduced-motion: reduce)', false],
+  // The media page's editorial grid, where the lead video takes a 2x2 cell. False at
+  // 375 -- and the block declares grid-column, grid-row, flex and aspect-ratio, none of
+  // which is `position`.
+  ['(min-width: 900px)', false],
 ]);
 
 /**
@@ -129,6 +139,12 @@ function leafRulesWithMedia(css, sheet) {
         j++;
       }
       const body = source.slice(brace + 1, j - 1);
+      // @keyframes is not a conditional group: its inner blocks are keyframe selectors
+      // (`from`, `to`, `40%`), not rules that match elements, and `position` is not an
+      // animatable property in the first place. Skipped rather than descended into --
+      // left in, the prelude became a "condition" NARROW_CONDITIONS had never heard of
+      // and the non-vacuity check failed on the marquee's own animation.
+      if (/^@keyframes\b/i.test(prelude)) { i = j; continue; }
       if (body.includes('{')) scan(body, prelude.replace(/^@media\s*/, ''));
       else rules.push({ sheet, condition, selector: prelude, body });
       i = j;
@@ -315,13 +331,18 @@ describe('the hero wordmark size cap', () => {
   });
 
   it('keeps --wordmark-em at or above the width the word actually needs', () => {
-    // 4.004em is "DIABOLO" measured in a real browser at Inter 200 with the hero's
-    // -0.045em tracking; "VIOLET" is 3.179em, so DIABOLO binds. A divisor below the
-    // measurement is a cap that does not fit its own word -- which is the original bug
+    // 4.086em is "DIABOLO" measured in a real browser at the hero's LIVE weight and
+    // tracking (Inter 400 / -0.045em); "VIOLET" is 3.265em, so DIABOLO binds. A divisor
+    // below the measurement is a cap that does not fit its own word -- the original bug
     // wearing the fix's clothes.
+    //
+    // This floor moved once already. It was 4.004, measured at weight 200; the client
+    // asked for a thicker wordmark, 400 widened the word to 4.086, and the cap silently
+    // went from 3.6% of margin to 1.6% with no code change anywhere. The weight and this
+    // number are coupled — change one and re-measure the other.
     const value = strip(BASE_CSS).match(/--wordmark-em\s*:\s*([0-9.]+)\s*;/);
     expect(value, '--wordmark-em is gone; the hero cap has no divisor').not.toBeNull();
-    expect(Number(value[1])).toBeGreaterThanOrEqual(4.004);
+    expect(Number(value[1])).toBeGreaterThanOrEqual(4.086);
   });
 });
 
@@ -340,52 +361,64 @@ describe('the hero wordmark size cap', () => {
 const PROBE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../scripts/check-contrast.html');
 
 describe("the contrast probe's block list", () => {
-  /** The [label, selector] pairs out of check-contrast.html's BLOCKS array. */
+  /** The [label, selector, page] triples out of check-contrast.html's BLOCKS array. */
   const blocks = () => {
     const src = readFileSync(PROBE, 'utf8');
     const body = /const BLOCKS = \[([\s\S]*?)\n\];/.exec(src);
     expect(body, 'BLOCKS is gone or no longer a flat array literal').not.toBeNull();
-    const pairs = [...body[1].matchAll(/\[\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*\]/g)]
-      .map((m) => [m[1], m[2].replace(/\\'/g, "'")]);
-    expect(pairs.length, 'parsed no blocks out of BLOCKS').toBeGreaterThan(20);
+    const pairs = [...body[1].matchAll(
+      /\[\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*,\s*'(both|index|media)'\s*\]/g,
+    )].map((m) => ({ label: m[1], selector: m[2].replace(/\\'/g, "'"), page: m[3] }));
+    expect(pairs.length, 'parsed no blocks out of BLOCKS — the third column may be missing')
+      .toBeGreaterThan(20);
     return pairs;
   };
 
-  it('covers every element on the page that paints text', () => {
-    const selectors = blocks().map(([, sel]) => sel);
+  /** Each page as it actually renders, so the guard sees the whole site and not half of it. */
+  const pages = () => {
+    const built = {};
+    for (const [page, render] of [['index', renderSections], ['media', renderMediaPage]]) {
+      const root = document.createElement('main');
+      render(root);
+      const body = document.createElement('body');
+      body.append(buildNav({ page }), root);
+      built[page] = body;
+    }
+    return built;
+  };
 
-    const root = document.createElement('main');
-    renderSections(root);
-    document.body.replaceChildren(buildNav(), root);
-
-    // Elements holding a direct, non-whitespace text node: the leaves that actually
-    // paint. A container whose text comes from a child is covered by that child.
-    const painters = [...document.querySelectorAll('body *')].filter((el) =>
-      [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 0));
-
-    const uncovered = painters
-      .filter((el) => !selectors.some((sel) => el.matches(sel) || el.closest(sel)))
-      .map((el) => {
+  it('covers every element on either page that paints text', () => {
+    const all = blocks();
+    const uncovered = [];
+    for (const [page, body] of Object.entries(pages())) {
+      const selectors = all.filter((b) => b.page === 'both' || b.page === page).map((b) => b.selector);
+      // Elements holding a direct, non-whitespace text node: the leaves that paint. A
+      // container whose text comes from a child is covered by that child.
+      const painters = [...body.querySelectorAll('*')].filter((el) =>
+        [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 0));
+      for (const el of painters) {
+        if (selectors.some((sel) => el.matches(sel) || el.closest(sel))) continue;
         const cls = String(el.className || '').trim().split(/\s+/).filter(Boolean).join('.');
-        return `${el.tagName.toLowerCase()}${cls ? `.${cls}` : ''} — "${el.textContent.trim().slice(0, 40)}"`;
-      });
-
-    expect([...new Set(uncovered)], 'these paint text that scripts/check-contrast.html ' +
-      'never measures — add a [label, selector] pair to its BLOCKS array, or the next ' +
-      '"N of N blocks pass" will be true and incomplete at the same time').toEqual([]);
+        uncovered.push(`${page}.html  ${el.tagName.toLowerCase()}${cls ? `.${cls}` : ''}`
+          + ` — "${el.textContent.trim().slice(0, 40)}"`);
+      }
+    }
+    expect([...new Set(uncovered)], 'these paint text that scripts/check-contrast.html '
+      + 'never measures — add a [label, selector, page] triple to its BLOCKS array, or the '
+      + 'next "N of N blocks pass" will be true and incomplete at the same time').toEqual([]);
   });
 
-  it('lists no selector that matches nothing on the page', () => {
-    // The other direction, and the reason the probe reports a `missing` array at all: a
-    // selector kept after its element was renamed measures nothing while still counting
-    // toward the denominator.
-    const root = document.createElement('main');
-    renderSections(root);
-    document.body.replaceChildren(buildNav(), root);
-
+  it('lists no selector that matches nothing on the page it claims', () => {
+    // The other direction. Page-aware since the site stopped being one page: four MEDIA
+    // selectors resolve on media.html and nowhere else, and calling those dead because
+    // the home page has no #media would be the guard misreading a correct list.
+    const built = pages();
     const dead = blocks()
-      .filter(([, sel]) => document.querySelector(sel) === null)
-      .map(([label, sel]) => `${label} (${sel})`);
-    expect(dead, 'these BLOCKS selectors match nothing the page renders').toEqual([]);
+      .filter(({ selector, page }) => {
+        const where = page === 'both' ? ['index', 'media'] : [page];
+        return where.every((k) => built[k].querySelector(selector) === null);
+      })
+      .map(({ label, selector, page }) => `${label} (${selector}) — claimed on ${page}`);
+    expect(dead, 'these BLOCKS selectors match nothing the page they name renders').toEqual([]);
   });
 });

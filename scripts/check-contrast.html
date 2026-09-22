@@ -83,7 +83,7 @@
            ?width=1440&height=900&steps=12   (defaults; all three are overridable, so
            the phone case can be re-run without editing this file)
 
-  Not part of the build: Vite's only entry is index.html, and vite.config.js declares no
+  Not part of the build: vite.config.js's entries are index.html and media.html, and neither
   rollupOptions.input. Not a CI gate -- the unit suite cannot run WebGL and cannot
   resolve getComputedStyle against real layout, which is the whole reason this is a page.
 
@@ -125,7 +125,7 @@
 <pre id="overflow" class="wait">waiting…</pre>
 
 <h2>5 &middot; the page under test</h2>
-<div id="stage"><iframe id="page" src="../index.html" title="Violet Diabolo"></iframe></div>
+<div id="stage"><iframe id="page" title="Violet Diabolo"></iframe></div>
 
 <script type="module">
 import { PALETTE } from '../src/gradient/palette.js';
@@ -197,33 +197,55 @@ const STOP_NAMES = Object.keys(STOPS);
  * The design contract: which blocks have to be readable. Selectors only -- colour,
  * size, weight and surface chain all come off the live page.
  * ------------------------------------------------------------------------- */
+/*
+ * Third column: which page the block lives on. 'both' is the chrome that every page
+ * carries; 'index' and 'media' are that page's own content.
+ *
+ * It exists because the site stopped being one page. Without it, running the probe over
+ * index.html reported four MEDIA selectors as "matched nothing" -- a loud failure about
+ * a page that was simply somewhere else -- and running it over media.html would have
+ * reported twenty. A selector is only wrong when it matches nothing on the page it
+ * claims.
+ */
 const BLOCKS = [
-  ['nav wordmark', '.site-nav-mark'],
-  ['nav pill', '.site-nav-links a'],
-  ['nav CTA "Join us"', '.site-nav-cta'],
-  ['hero h1', '#hero h1'],
-  ['hero tagline', '#hero .room-head p'],
-  ['story h2 (ABOUT US)', '#about h2'],
-  ['story body (serif)', '#about .room-head p'],
-  ['feature h2 (EVENTS)', '#events h2'],
-  ['feature body', '#events .room-body > p'],
-  ['form card label', '.form-card h3'],
-  ['form button label', '.form-card button'],
-  ['grid h2 (MEDIA)', '#media h2'],
-  ['media card title', '.media-card h3'],
-  ['gallery heading', '.gallery-heading'],
-  ['grid h2 (BOARD)', '#board h2'],
-  ['semester select', '.semester-select'],
-  ['board name', '.board-card h3'],
-  ['board position', '.board-position'],
-  ['board pending initials', '.board-photo-pending span'],
-  ['board bio', '.board-card p:not(.board-position)'],
-  ['grid h2 (CONTACT US)', '#contact h2'],
-  ['contact line', '#contact .room-head > p'],
-  ['contact email link', '#contact .room-head > p a'],
-  ['socials link', '.socials a'],
-  ['footer line', '.footer-line'],
+  ['nav wordmark', '.site-nav-mark', 'both'],
+  ['nav pill', '.site-nav-links a', 'both'],
+  ['nav CTA "Join us"', '.site-nav-cta', 'both'],
+  ['footer line', '.footer-line', 'both'],
+
+  ['hero h1', '#hero h1', 'index'],
+  ['hero tagline', '#hero .room-head p', 'index'],
+  ['story h2 (ABOUT US)', '#about h2', 'index'],
+  ['story body (serif)', '#about .room-head p', 'index'],
+  ['performed-for item', '.marquee-list li', 'index'],
+  ['feature h2 (EVENTS)', '#events h2', 'index'],
+  ['feature body', '#events .room-head > p', 'index'],
+  ['form card label', '.form-card h3', 'index'],
+  ['form button label', '.form-card button', 'index'],
+  ['grid h2 (BOARD)', '#board h2', 'index'],
+  ['semester select', '.semester-select', 'index'],
+  ['board name', '.board-card h3', 'index'],
+  ['board position', '.board-position', 'index'],
+  ['board pending initials', '.board-photo-pending span', 'index'],
+  ['board bio', '.board-card p:not(.board-position)', 'index'],
+  ['grid h2 (CONTACT US)', '#contact h2', 'index'],
+  ['contact line', '#contact .room-head > p', 'index'],
+  ['contact email link', '#contact .room-head > p a', 'index'],
+  ['socials link', '.socials a', 'index'],
+
+  ['media h2', '#media h2', 'media'],
+  ['media intro', '#media .room-head > p', 'media'],
+  ['media card title', '.media-card h3', 'media'],
+  ['gallery heading', '.gallery-heading', 'media'],
 ];
+
+/** ?page=index (default) or ?page=media. Anything else falls back rather than 404s. */
+const PAGE = ['index', 'media'].includes(new URLSearchParams(location.search).get('page'))
+  ? new URLSearchParams(location.search).get('page')
+  : 'index';
+
+/** The blocks that apply to the page under test. */
+const PAGE_BLOCKS = BLOCKS.filter(([, , on]) => on === 'both' || on === PAGE);
 
 /** WCAG 1.4.3: 18pt (24px), or 14pt bold (18.66px), drops the requirement to 3:1. */
 const requirement = (px, weight) => (px >= 24 || (px >= 18.66 && weight >= 700) ? 3 : 4.5);
@@ -238,10 +260,18 @@ async function loadPage() {
   frame.width = W;
   frame.height = H;
   frame.style.transform = `scale(${Math.min(1, (document.body.clientWidth - 48) / W)})`;
-  await new Promise((resolve) => {
-    if (frame.contentDocument?.readyState === 'complete') resolve();
-    else frame.addEventListener('load', resolve, { once: true });
-  });
+
+  // The listener is attached BEFORE the src is set, and the readyState short-circuit that
+  // used to live here is gone. It was correct while the src sat in the markup -- the frame
+  // was already loading and might already be done. It is a race now that ?page= sets the
+  // src from script: a frame with no src holds about:blank, whose readyState is 'complete'
+  // immediately, so the check passed against a blank document and the probe measured a
+  // page that had not loaded. Observed as a throw on the first run, which was luck; the
+  // quieter outcome was "0 of 27 blocks resolved" against a page that was simply not there
+  // yet. Setting src always starts a navigation, so the load event always comes.
+  const loaded = new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }));
+  frame.src = `../${PAGE}.html`;
+  await loaded;
   const doc = frame.contentDocument;
   const win = frame.contentWindow;
   // main.js boots on DOMContentLoaded and renders synchronously; give the font loader
@@ -409,10 +439,37 @@ function brightestIn(pixels, band) {
  * nav-pill-row guard (tests/visual-language.test.js) was rewritten to close after a
  * reviewer found path D inspecting zero rules and reporting green.
  */
+/**
+ * Does anything between `el` and `stop` CLIP horizontally?
+ *
+ * A child of an `overflow-x: hidden` box cannot make the page wider — the box bounds it,
+ * and the box is scanned on its own account. Without this the marquee reported nineteen
+ * offenders out to x 8228 while `scrollWidth === clientWidth`: a 4700px track inside a
+ * 375px clipped strip, which is what a marquee IS.
+ *
+ * `stop` is the body, deliberately. base.css puts `overflow-x: hidden` on the body to
+ * catch exactly the silent overflow this scan exists to find, so walking all the way up
+ * would mark every element on the page as clipped and report green forever.
+ */
+function clippedBy(el, stop) {
+  for (let n = el.parentElement; n && n !== stop && n !== stop.ownerDocument.documentElement; n = n.parentElement) {
+    const o = getComputedStyle(n);
+    if (o.overflowX !== 'visible') return true;
+  }
+  return false;
+}
+
 function overflowingElements(root, clientWidth) {
   const offenders = [];
-  const range = root.ownerDocument.createRange();
+  const doc = root.ownerDocument;
+  const range = doc.createRange();
   for (const el of [root, ...root.querySelectorAll('*')]) {
+    const cs = getComputedStyle(el);
+    // Clipped to nothing on purpose (the .visually-hidden label behind each social icon):
+    // its box is 1px but a Range over its `nowrap` contents measures the whole unclipped
+    // string, which is ink no visitor can see. Nothing a clip-path hides can overflow.
+    if (cs.clipPath && cs.clipPath !== 'none') continue;
+    if (clippedBy(el, doc.body)) continue;
     const boxRight = el.getBoundingClientRect().right;
     // The hero h1's own defect, found writing this guard: a long unbreakable word can
     // paint past its element's box WITHOUT the box itself growing -- "the h1's BOX stays
@@ -422,8 +479,29 @@ function overflowingElements(root, clientWidth) {
     // added: a Range over the element's own children measures what actually painted.
     // Leaf text nodes only need this once; walking every element's own Range as well
     // catches it regardless of which level the overflowing text node sits at.
-    range.selectNodeContents(el);
-    const inkRight = el.childNodes.length ? range.getBoundingClientRect().right : 0;
+    // The element's OWN text nodes, not selectNodeContents(el).
+    //
+    // A Range over an element's whole subtree ignores clipping inside it, so `main`,
+    // `.section-about` and `.room` each reported ink out at x 8202 — the marquee's track,
+    // measured through the `overflow: hidden` that cuts it. Ancestors of the
+    // `.visually-hidden` social labels did the same at 280.
+    //
+    // Nothing is lost by narrowing it: every element is scanned, so a text node that
+    // overflows is still measured — on the element that actually holds it. That is where
+    // the hero h1's ink defect lived when this check first found it, and it is still
+    // caught (the h1's text node is its own direct child).
+    //
+    // An element that clips its own overflow is measured by its box alone: its text is
+    // real but cut at the box edge.
+    const clipsItself = cs.overflowX !== 'visible';
+    let inkRight = 0;
+    if (!clipsItself) {
+      for (const node of el.childNodes) {
+        if (node.nodeType !== 3 || !node.textContent.trim()) continue;
+        range.selectNode(node);
+        inkRight = Math.max(inkRight, range.getBoundingClientRect().right);
+      }
+    }
     const right = Math.max(boxRight, inkRight);
     // 0.05px, not 0.5: this is the tolerance the report claims ("0.05px tolerance") for
     // the exhaustive scan it describes, and a 0.5px window is wide enough to hide a real
@@ -542,6 +620,7 @@ async function main() {
   const accentInk = anyColor(tokens['--accent-ink']);
 
   say('tokens', [
+    `page under test        : ${PAGE}.html`,
     `viewport under test    : ${W}x${H}   time steps: ${STEPS} x ${STEP_UNITS} units`,
     `contrast.js TIME_STEPS : ${TIME_STEPS}`,
     '',
@@ -598,7 +677,7 @@ async function main() {
   // failure rather than a silently shorter table.
   const resolved = [];
   const missing = [];
-  for (const [label, selector] of BLOCKS) {
+  for (const [label, selector] of PAGE_BLOCKS) {
     const el = doc.querySelector(selector);
     if (!el) { missing.push(`${label}  (${selector})`); continue; }
     const cs = getComputedStyle(el);
@@ -668,12 +747,14 @@ async function main() {
       + lpad(`${r.margin.toFixed(2)}x`, 8)
       + `  ${r.layers}${r.pass ? '' : '   <-- FAILS'}`),
     '',
-    `${rows.length} of ${BLOCKS.length} blocks resolved; ${rows.length - fails.length} of ${rows.length} pass on the BOUND.`,
+    `page under test : ${PAGE}.html`,
+    `${rows.length} of ${PAGE_BLOCKS.length} blocks resolved; ${rows.length - fails.length} of ${rows.length} pass on the BOUND.`,
     `tightest margin : ${tightest.margin.toFixed(2)}x  (${tightest.label}, ${tightest.boundRatio.toFixed(2)}:1 against ${tightest.needs})`,
     `lowest measured : ${Math.min(...rows.map((r) => r.measuredRatio)).toFixed(2)}:1`,
   ].join('\n'), fails.length || missing.length ? 'bad' : 'ok');
 
   return {
+    page: PAGE,
     viewport: { width: W, height: H, steps: STEPS, stepUnits: STEP_UNITS },
     tokens,
     stops: STOPS,
