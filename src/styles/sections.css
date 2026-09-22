@@ -573,8 +573,18 @@ body { overflow-x: hidden; }
  * picture would occupy, so a half-photographed roster keeps its rows level instead of
  * standing 300px short in the cards that have nothing.
  *
- * --surface, the same fill the panels use, rather than a tint of --accent: this is an
- * absence, and a violet tile would read as a design element someone chose.
+ * --stage, and NOT --surface as this first shipped. Measured on the live page: --surface
+ * is #16121f and a solid panel's background is #16121f, so the tile was exactly the
+ * colour of the thing it sat on and the initials floated in nothing. --stage is the
+ * page's own ground, so the tile now reads as a hole punched through the panel -- which
+ * is both visible and a fair description of what it is.
+ *
+ * A fill rather than a border, because .board-card's own rule is "no fill and no border"
+ * on the grounds that a photograph is already a shape. This has to BE the shape a
+ * photograph would have been, and a framed empty box is the card kit that rule rejects.
+ *
+ * Not a tint of --accent either: this is an absence, and a violet tile would read as a
+ * design element someone chose.
  */
 .board-photo-pending {
   display: grid;
@@ -583,7 +593,7 @@ body { overflow-x: hidden; }
   aspect-ratio: 4 / 5;
   margin-bottom: 0.45rem;
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--stage);
 }
 
 .board-photo-pending span {

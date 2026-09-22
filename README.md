@@ -11,7 +11,7 @@ npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (runs `npm run assets` first)
 npm run preview      # Serve the built dist/ locally
-npm test             # 237 tests across 17 test files
+npm test             # 238 tests across 17 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -42,7 +42,7 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | `scripts/check-shader.html` | Dev-time shader bench: compile, frame cost with a zero-render control, luminance histogram. |
 | `scripts/check-contrast.html` | Dev-time contrast probe over the real page. Needs `npm run dev` — it imports `contrast.js`, which the build excludes. |
 | `scripts/bench-verdict.mjs` | The pass/fail decision the shader bench calls, as a module so the suite can falsify it. |
-| `tests/` | 237 tests across 17 files — see **Testing**. |
+| `tests/` | 238 tests across 17 files — see **Testing**. |
 | `public/images/` | Generated derivatives (`npm run assets`). Masters live in `assets-src/`. |
 | `docs/VERIFICATION.md` | What was measured in a real browser, on a named GPU, and what could not be. |
 
@@ -158,7 +158,7 @@ Widths cap at 2000 px, not 2400. Measured on the 4032×3024 master: at 2400 the 
 npm test
 ```
 
-**237 tests across 17 files**, all passing, with no stderr noise.
+**238 tests across 17 files**, all passing, with no stderr noise.
 
 | file | tests | covers |
 |---|---|---|
@@ -173,7 +173,7 @@ npm test
 | `content.test.js` | 14 | apostrophe preservation, board structure, the practice timetable, media list, photograph alt text, contact details |
 | `budget.test.js` | 9 | the frame cap's accumulation and `renderSize`'s clamp |
 | `reveal.dom.test.js` | 9 | the reveal's pending/visible classes, one-shot unobserve, reduced motion, and the no-`IntersectionObserver` guard |
-| `assets.test.js` | 8 | the image pipeline's derivatives, EXIF orientation, and the 400 KB budget |
+| `assets.test.js` | 9 | the image pipeline's derivatives, EXIF orientation, each derivative's width against its own srcset descriptor, and the 400 KB budget |
 | `palette.test.js` | 5 | three stops, ordering, range, and that it is violet rather than blue |
 | `panels.dom.test.js` | 5 | `data-panel` / `data-surface` stamping |
 | `sections-layout.dom.test.js` | 9 | the grid panel's title size, the hero wordmark's size cap, that nothing resolves to sticky, that the scan proving it is not blind, and that the contrast probe's block list covers every element that paints text |

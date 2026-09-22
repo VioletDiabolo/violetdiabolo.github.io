@@ -75,6 +75,32 @@ describe('image pipeline', () => {
       expect(oversize, `over the ${BUDGET} byte budget:\n${oversize.join('\n')}`).toEqual([]);
     });
 
+    it('emits each derivative at the width its filename claims', async () => {
+      // The srcset `w` descriptor is built from the filename (src/ui/picture.js), so a
+      // file narrower than its own name is a lie the browser acts on: it picks a
+      // candidate believing it is wide enough and gets something smaller.
+      //
+      // The way this happens is `withoutEnlargement: true` in the pipeline meeting a
+      // master that is smaller than a configured width. It nearly shipped: the events
+      // photograph was configured at [800, 1600] while landscape, then replaced with a
+      // PORTRAIT whose master is 1500x2000 — the 1600 derivative would have been written
+      // at 1500 and advertised as 1600w.
+      const { default: sharp } = await import('sharp');
+      const wrong = [];
+      for (const t of TARGETS) {
+        for (const w of [...t.widths, ...t.jpgWidths]) {
+          for (const ext of t.jpgWidths.includes(w) ? ['avif', 'webp', 'jpg'] : ['avif', 'webp']) {
+            const file = `${t.name}-${w}.${ext}`;
+            if (!existsSync(`${OUT}/${file}`)) continue; // 'emits every configured derivative' owns that
+            const meta = await sharp(`${OUT}/${file}`).metadata();
+            if (meta.width !== w) wrong.push(`${file} is ${meta.width}px wide, not ${w}`);
+          }
+        }
+      }
+      expect([...new Set(wrong)], 'these ship a width their srcset descriptor contradicts')
+        .toEqual([]);
+    });
+
     it('emits every configured derivative', () => {
       const present = new Set(readdirSync(OUT));
       for (const t of TARGETS) {

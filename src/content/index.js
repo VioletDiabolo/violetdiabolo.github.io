@@ -117,11 +117,10 @@ const FALL_2026 = [
   { name: 'Hannah Chen', position: 'Logistics', image: 'board-hannah', description: filler(30) },
   { name: 'Emily Chen', position: 'Media', image: null, description: filler(24) },
   { name: 'Megan Kim', position: 'Media', image: null, description: filler(28) },
-  // Aaron has a photograph -- it is on every roster below -- but it is a distant indoor
-  // full-body shot from the old site, and beside three close outdoor portraits from the
-  // 2026 shoot it reads as a mistake rather than a picture. Placeholder here, kept where
-  // it belongs, on the semesters it was taken for.
-  { name: 'Aaron Hui', position: 'Treasurer', image: null, description: filler(20) },
+  // Aaron's photograph is the one from the previous site -- a different shoot from the
+  // three above it, and the client's call to keep it rather than stand a tile in its
+  // place. AARON.image rather than the literal, so the two never drift.
+  { name: 'Aaron Hui', position: 'Treasurer', image: AARON.image, description: filler(20) },
 ];
 
 export const BOARD = {
@@ -201,5 +200,5 @@ export const PHOTOS = {
   group: { base: 'group-usadc', widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo performing together at the USADA National Diabolo Competition' },
   wide:  { base: 'usadc-wide',  widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo on stage at the USADA National Diabolo Competition' },
   hero:  { base: 'hero-group', widths: [800, 1600], width: 1600, height: 1200, alt: 'Five Violet Diabolo members on the lawn after practice, diabolos spinning' },
-  events: { base: 'events-practice', widths: [800, 1600], width: 1600, height: 1200, alt: 'A club member spinning a diabolo on the lawn outside the Kimmel Center' },
+  events: { base: 'events-practice', widths: [600, 1200], width: 1200, height: 1600, alt: 'Two club members practising together on the lawn, a diabolo on the string between them' },
 };
