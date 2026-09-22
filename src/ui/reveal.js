@@ -16,22 +16,56 @@ export const PENDING_CLASS = 'reveal-pending';
 export const VISIBLE_CLASS = 'reveal-visible';
 
 /**
+ * The real observer, hoisted to a named constant so `initReveal` can tell "nobody
+ * injected a factory" from "somebody did". The guard below must apply only to this one:
+ * an injected factory is the caller's own observer and needs no global to exist.
+ */
+const realObserverFactory = (cb) =>
+  new IntersectionObserver(cb, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+
+/**
  * Fades + rises each section's direct children into place, once, via IntersectionObserver.
- * The CSS that actually hides `.reveal-pending` lives entirely inside a
- * `prefers-reduced-motion: no-preference` block (see sections.css), so a browser with no
- * JS at all -- or an observer that never fires -- leaves content fully visible. This
- * function goes one step further and skips the pending class altogether for a
- * reduced-motion visitor, so there is never even a themed no-op class on the element.
+ *
+ * WHAT HIDES THE CONTENT, AND WHAT IS ON THE HOOK TO SHOW IT AGAIN. `.reveal-pending` is
+ * `opacity: 0` -- the rule is in **base.css** (search "Scroll reveal"), inside a
+ * `prefers-reduced-motion: no-preference` block. Two consequences, and the second is the
+ * reason the guard below exists:
+ *
+ *   - A browser that never runs this JS at all never gets the class, so it never hides
+ *     anything. That path is safe by construction, and always was.
+ *   - The class is added SYNCHRONOUSLY, here, and the only thing that ever takes it back
+ *     off is an IntersectionObserver callback. So wherever the observer cannot exist,
+ *     adding the class hides every room with nothing left that could reveal it. Since the
+ *     panel patterns landed that is one `.room` per section at `min-height: 100dvh`: one
+ *     missed element is a full viewport of blank page, and a missing constructor is all
+ *     six at once. Measured, before this guard: six rooms at `opacity: 0`.
+ *
+ * So: no `IntersectionObserver`, no pending class. Content stays visible and this reduces
+ * to a no-op, which is the right degradation for a decorative fade.
+ *
+ * This guards the constructor's EXISTENCE, which is NOT the same claim as "an observer
+ * that never fires leaves content visible" -- an earlier version of this comment said
+ * that, and it was false. An observer that exists but never delivers does leave the page
+ * hidden. In a real browser a visitor cannot reach that: IntersectionObserver delivery is
+ * a step of "update the rendering", so a browser that never delivers an entry is one that
+ * never painted the frame the content would have appeared in. It IS reachable in
+ * automation -- this branch's own verification host throttles both to zero until a paint
+ * is forced -- which is why the distinction is written down rather than assumed.
  *
  * Mirrors createLifecycle's dependency-injection shape (observerFactory/doc) so it is
  * testable without a real IntersectionObserver.
  */
 export function initReveal({
   root = document,
-  observerFactory = (cb) => new IntersectionObserver(cb, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }),
+  observerFactory = realObserverFactory,
   reducedMotion = prefersReducedMotion(),
 } = {}) {
   if (reducedMotion) return { dispose() {} };
+  // Before the pending class, never after: the class is the hiding, so a bail-out that
+  // ran later would already have blanked the page.
+  if (observerFactory === realObserverFactory && typeof IntersectionObserver === 'undefined') {
+    return { dispose() {} };
+  }
 
   const targets = [...root.querySelectorAll(REVEAL_SELECTOR)];
   if (targets.length === 0) return { dispose() {} };

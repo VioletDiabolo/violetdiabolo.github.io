@@ -229,4 +229,35 @@ describe('nothing sticks to the viewport', () => {
     }
     expect(stuck, stuck.join('\n')).toEqual([]);
   });
+
+  it('still resolves .site-nav to position: fixed, so the scan above is not blind', () => {
+    // THE NON-VACUITY CONTROL. The test above is purely negative: it passes when it finds
+    // no sticky element, and it passes just as happily when it finds NOTHING AT ALL. A
+    // stylesheet rename, a nesting syntax the brace scanner in leafRulesWithMedia walks
+    // past, a selector Element.matches throws on -- any of those empties the candidate
+    // set and reports green over a page full of sticky. NARROW_CONDITIONS guards against
+    // an @media this file has not been taught; it cannot notice the machinery going dark.
+    //
+    // The paired positive assertion this file used to carry was deleted with the pinned
+    // rooms it was about, correctly -- there is no sticky element left to assert. This is
+    // its replacement, and it is chosen to be the cheapest thing that exercises the exact
+    // same path: `.site-nav { position: fixed }` is a TOP-LEVEL rule in base.css under no
+    // media condition, so it is ranked by the same winningDeclaration call, off the same
+    // leafRulesWithMedia output, against an element from the same fixture. If this says
+    // `fixed`, the scan above was reading real rules against real elements.
+    const rules = STYLESHEETS.flatMap((s) => leafRulesWithMedia(s.css, s.name));
+    const root = document.createElement('main');
+    renderSections(root);
+    document.body.replaceChildren(buildNav(), root);
+
+    const nav = document.querySelector('.site-nav');
+    expect(nav, 'buildNav() put no .site-nav in the fixture').not.toBeNull();
+
+    const position = winningDeclaration(nav, 'position', rules);
+    expect(position, 'winningDeclaration resolved no `position` for .site-nav at all -- ' +
+      'the rule scan or the selector matching is broken, and the sticky scan above is ' +
+      'therefore meaningless').not.toBeNull();
+    expect(position.value, `.site-nav resolved to "${position?.value}" via ` +
+      `"${position?.selector}" (${position?.rule.sheet})`).toBe('fixed');
+  });
 });

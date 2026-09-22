@@ -8,9 +8,16 @@ void main() { gl_Position = vec4(a_position, 0.0, 1.0); }
  *
  * THE PICTURE THIS DRAWS, because a shader's look cannot be read off its source: a
  * near-black field with two or three bright violet ribbons swinging through it. Most of
- * the frame is the ground. Measured over twelve time steps at 16:10, 89% of pixels sit
- * below WCAG relative luminance 0.02 and the median pixel is exactly `u_deep`; see
+ * the frame is the ground. Measured over twelve time steps at 16:10, **at least 85.43 %**
+ * of pixels sit below WCAG relative luminance 0.02 in EVERY step (the worst is step 5;
+ * the best is 93.24 %), and the median pixel is exactly `u_deep`; see
  * scripts/check-shader.html, which computes that histogram from real framebuffer reads.
+ *
+ * The worst step, not the pooled figure. Pooling the same run gives a friendlier 89.17 %,
+ * and that is the number this comment used to quote — but a pooled average is exactly
+ * what hides a single bright frame, which is the only thing the darkness constraint is
+ * about. check-shader.html reports per step for that reason and docs/VERIFICATION.md §3
+ * certifies the minimum; this now says the same thing they do.
  *
  * The ribbons come from warping: a low-frequency noise displaces the coordinate the
  * ribbon function reads, which turns straight bands into swirls. Raising the warp

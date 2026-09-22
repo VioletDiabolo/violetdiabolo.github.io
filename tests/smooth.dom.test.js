@@ -68,9 +68,28 @@ describe('createSmoothScroll', () => {
     document.body.innerHTML = '<a href="https://example.com">Out</a>';
     createSmoothScroll({ reduced: false, LenisCtor: Stub });
     const event = new window.MouseEvent('click', { bubbles: true, cancelable: true });
+
+    // Leaving the default action in place is the POINT of this test -- and in jsdom the
+    // default action for an off-origin href is a real navigation, which jsdom does not
+    // implement and reports by printing a stack to stderr on every `npm test`. Harmless,
+    // but it is six lines of noise a genuine error can hide behind in CI.
+    //
+    // So: read the application's decision, then neutralise the default action. This
+    // listener is on `window`, which comes after `document` in the bubble path, so
+    // createSmoothScroll's own document-level handler has already run and finished by the
+    // time it fires -- `defaultPrevented` here is exactly what the app left behind. The
+    // preventDefault() afterwards is addressed at jsdom, not at the code under test, and
+    // happens strictly after the only thing being measured.
+    let preventedByTheApp = null;
+    window.addEventListener('click', (e) => {
+      preventedByTheApp = e.defaultPrevented;
+      e.preventDefault();
+    }, { once: true });
+
     document.querySelector('a').dispatchEvent(event);
+
     expect(calls.scrollTo).toHaveLength(0);
-    expect(event.defaultPrevented).toBe(false);
+    expect(preventedByTheApp, 'the app swallowed a click meant for the browser').toBe(false);
   });
 
   it('ignores an anchor pointing at nothing', () => {

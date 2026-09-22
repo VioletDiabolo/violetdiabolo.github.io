@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { stubGL } from './helpers/webgl-stub.js';
+import { TARGET_FPS } from '../src/render/budget.js';
 
 // jsdom implements no IntersectionObserver, and initReveal() (src/ui/reveal.js) is
 // mounted unconditionally in boot() -- before the WebGL branch, per main.js's own
@@ -8,11 +9,54 @@ import { stubGL } from './helpers/webgl-stub.js';
 // whenever prefersReducedMotion is false. Supplies a missing jsdom global and nothing
 // more: it does not touch, wrap or weaken main.js or initReveal, which is what these
 // tests measure.
+//
+// IT REPORTS AN INTERSECTION, which the earlier version of this stub did not. `observe()`
+// was a no-op, so createLifecycle's `visible` never became true, `active()` never became
+// true, start() never armed a frame, and onFrame -- the one place where Lenis's step, the
+// frame cap and the gradient's draw are composed (main.js) -- never ran once in this
+// file. The honest `expect(gl.calls.draws).toBe(0)` that recorded this was a limitation
+// being written down, not a property being checked: invert the cap's `elapsed > 0`, drop
+// the cap call, or hand render() the wrong argument, and nothing here noticed.
+//
+// Delivery is synchronous inside observe(), which a real IntersectionObserver never is.
+// That is deliberate and safe for what this file measures: every consumer (createLifecycle
+// and initReveal alike) assigns its `observer` const before calling observe(), so nothing
+// here depends on the async gap. It buys determinism -- no test has to wait for an
+// entry -- in exchange for not exercising the async ordering, which tests/lifecycle.test.js
+// covers through its own injected observer.
 if (typeof globalThis.IntersectionObserver === 'undefined') {
   globalThis.IntersectionObserver = class IntersectionObserverStub {
-    observe() {}
+    constructor(callback) { this.callback = callback; }
+    observe(element) { this.callback([{ target: element, isIntersecting: true }], this); }
     unobserve() {}
     disconnect() {}
+  };
+}
+
+/**
+ * A requestAnimationFrame the test drives by hand.
+ *
+ * Installed for EVERY test in this file, not just the ones that step it. With the
+ * observer above now reporting an intersection, createLifecycle really does arm a frame
+ * during boot, and left on jsdom's own rAF that loop would run free on a timer --
+ * producing draws at unpredictable moments in tests that are measuring something else.
+ * Here nothing advances until a test says so, and `pending()` is how a test asks whether
+ * the loop is armed at all.
+ */
+function stubRaf() {
+  const queue = new Map();
+  let nextId = 0;
+  return {
+    raf: (cb) => { const id = ++nextId; queue.set(id, cb); return id; },
+    caf: (id) => { queue.delete(id); },
+    pending: () => queue.size,
+    /** Runs every callback queued right now, with `now` as the timestamp, once. */
+    step(now) {
+      const due = [...queue.values()];
+      queue.clear();
+      for (const cb of due) cb(now);
+      return due.length;
+    },
   };
 }
 
@@ -45,6 +89,9 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 
 const SECTION_IDS = ['hero', 'about', 'events', 'media', 'board', 'contact'];
 
+/** The current test's hand-driven rAF. Reassigned by the file-level beforeEach. */
+let frames;
+
 // Shared by every describe in this file: resets modules so each test's vi.doMock takes
 // effect on a fresh import, and rebuilds the body to match index.html's own two
 // top-level nodes -- the gradient canvas (Task 3) and #content -- so main.js's
@@ -66,6 +113,12 @@ beforeEach(() => {
   // genuinely the condition most tests in this file run under -- the "with a working GL
   // context" describe block below overrides this per-test where it needs a real stub.
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  // createLifecycle captures `raf`/`caf` from these globals as default parameters, at
+  // call time, so this has to be in place before main.js is imported -- which it is:
+  // every test in this file imports inside its own body, after this runs.
+  frames = stubRaf();
+  globalThis.requestAnimationFrame = frames.raf;
+  globalThis.cancelAnimationFrame = frames.caf;
 });
 
 describe('boot', () => {
@@ -191,12 +244,16 @@ describe('the gradient mount, with a working GL context', () => {
     // lifecycle; nothing here previously asserted it actually lands there.
     expect(window.__vd?.smooth).toBeDefined();
     // The initial fit() reached the GL layer (confirms the mount really ran against
-    // this stub, not a short-circuited path). No draw call is expected here: jsdom's
-    // IntersectionObserver stub never reports an intersection, so createLifecycle's
-    // `active()` stays false and start() never actually arms requestAnimationFrame --
-    // onFrame (and therefore gradient.render) never fires in this harness. That's a
-    // harness limitation, not something this test claims otherwise.
+    // this stub, not a short-circuited path).
     expect(gl.calls.viewports).toBeGreaterThan(0);
+    // The loop is ARMED but has not been stepped: the observer reported an intersection
+    // and `document.hidden` is false, so createLifecycle's active() is true and start()
+    // queued a frame on the hand-driven rAF above. Nothing has run it, so no draw has
+    // happened yet. This is now a statement about a harness the test controls, not the
+    // "the loop can never start here" limitation it used to record -- the block below
+    // steps that queue and watches what onFrame does.
+    expect(window.__vd.lifecycle.isRunning(), 'the loop was never armed').toBe(true);
+    expect(frames.pending(), 'no frame was queued').toBe(1);
     expect(gl.calls.draws).toBe(0);
   });
 
@@ -240,5 +297,139 @@ describe('the gradient mount, with a working GL context', () => {
     // (drawArrays) actually ran again after the resize, rather than the resize leaving
     // the last real render stranded before a since-cleared buffer.
     expect(gl.calls.draws).toBeGreaterThan(drawsAfterBoot);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The animated onFrame composition.
+ *
+ * main.js's onFrame is three things meeting in four lines: Lenis is stepped every frame,
+ * `createFrameCap` accumulates the delta and reports how much to draw with, and the
+ * gradient is rendered only when that report is non-zero. Each piece had tests --
+ * budget.test.js for the cap's arithmetic, smooth.dom.test.js for Lenis, gradient.dom.
+ * test.js for render() -- and the COMPOSITION had none. VERIFICATION.md §3's frame-budget
+ * figure is the shader's drawArrays in a bare canvas, and §4's proof that the loop runs
+ * counts `frameCount()`, which increments whether or not onFrame draws anything.
+ *
+ * So the whole of the coupling was unguarded: invert `if (elapsed > 0)`, delete the
+ * `cap(delta)` call, or hand `render()` the raw delta instead of the accumulated elapsed,
+ * and every test on this branch stayed green. These four do not.
+ *
+ * ON THE CADENCES BELOW. They are derived from TARGET_FPS rather than hardcoded -- the
+ * task's constraints forbid retuning it, and a test pinning 30 by hand would be a second
+ * place to remember if it ever changed -- but they are deliberately kept AWAY from the
+ * cap's exact interval. Spacing frames by exactly 1000/TARGET_FPS ms puts the comparison
+ * `accumulated < interval` on a floating-point knife edge: `(33.333333333333336)/1000`
+ * lands either side of `1/30` depending on how the timestamps accumulated, and the first
+ * draft of this block asserted 11 draws and measured 6 for precisely that reason. SLOW
+ * and FAST below are a comfortable third of an interval and a comfortable interval and a
+ * fifth, so every expectation here is decided by the cap's logic and never by the last
+ * bit of a double.
+ * ------------------------------------------------------------------------- */
+
+describe('the animated onFrame composition', () => {
+  let gl;
+
+  /** Comfortably under one cap interval: three of these still owe the cap a draw. */
+  const SLOW_MS = 1000 / TARGET_FPS / 3.333;
+  /** Comfortably over one cap interval: every frame at this spacing releases a draw. */
+  const FAST_MS = (1000 / TARGET_FPS) * 1.2;
+
+  async function boot() {
+    gl = stubGL();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => gl);
+    vi.doMock('../src/fallback/detect.js', () => ({
+      supportsWebGL: () => true,
+      prefersReducedMotion: () => false,
+    }));
+    await import('../src/main.js');
+    // The real loop, armed by the real createLifecycle against the real canvas.
+    expect(window.__vd.lifecycle.isRunning(), 'the loop never armed; the rest is vacuous').toBe(true);
+    return gl;
+  }
+
+  /**
+   * Steps the loop `count` times, `spacingMs` apart, and reports what happened. `at` is
+   * the timestamp of the first of them, so a test can continue a cadence it started.
+   */
+  function run(count, spacingMs, at = 1000) {
+    const drawsBefore = gl.calls.draws;
+    const framesBefore = window.__vd.lifecycle.frameCount();
+    for (let i = 0; i < count; i++) {
+      expect(frames.pending(), `loop stopped scheduling after frame ${i}`).toBe(1);
+      frames.step(at + i * spacingMs);
+    }
+    return {
+      draws: gl.calls.draws - drawsBefore,
+      frames: window.__vd.lifecycle.frameCount() - framesBefore,
+      time: gl.calls.uniforms.u_time,
+      next: at + count * spacingMs,
+    };
+  }
+
+  it('draws when the loop runs -- onFrame really does reach gradient.render', async () => {
+    await boot();
+    // Twelve frames, each spaced by more than a full cap interval. The first carries
+    // delta 0 (createLifecycle starts a resumed loop at zero, deliberately) so it cannot
+    // draw; each of the other eleven releases exactly one draw.
+    const r = run(12, FAST_MS);
+    expect(r.frames, 'onFrame did not run at all').toBe(12);
+    expect(r.draws, 'the loop ran but never reached gradient.render').toBe(11);
+  });
+
+  it('lets the cap gate the draw: frames that do not add up to an interval draw nothing', async () => {
+    await boot();
+    // Four frames a third of an interval apart. onFrame runs four times; the accumulated
+    // time is three thirds of... just under one interval (the first frame's delta is 0),
+    // so the cap returns 0 every time and nothing may be drawn. Delete the `cap(delta)`
+    // call and render every frame instead, and this is 4 draws rather than 0.
+    const r = run(4, SLOW_MS);
+    expect(r.frames, 'onFrame did not run at all').toBe(4);
+    expect(r.draws, 'drew on a frame the cap had already refused').toBe(0);
+  });
+
+  it('releases exactly one draw once the accumulated time crosses the interval', async () => {
+    await boot();
+    // The other half of the claim above: the cap DELAYS the draw, it does not cancel it.
+    // Without this, "0 draws" would pass just as well against a cap that never released
+    // anything at all.
+    const held = run(4, SLOW_MS);
+    expect(held.draws, 'the cadence was not actually sub-interval').toBe(0);
+    const crossing = run(1, SLOW_MS, held.next);
+    expect(crossing.draws, 'the cap never released the time it had accumulated').toBe(1);
+  });
+
+  it('hands render() the ACCUMULATED elapsed, not the single frame delta', async () => {
+    await boot();
+    // gradient.render(delta) does `time += delta` and writes u_time, so the uniform is a
+    // running total of what onFrame passed it. Five frames a third of an interval apart
+    // produce exactly one draw, and the time it advanced by must be the four deltas the
+    // cap held onto -- not the one delta of the frame that happened to trip it, which is
+    // four times smaller and what `gradient.render(delta)` would have written.
+    const r = run(5, SLOW_MS);
+    expect(r.draws).toBe(1);
+    expect(r.time, 'render() got the frame delta rather than the accumulated elapsed')
+      .toBeCloseTo((4 * SLOW_MS) / 1000, 9);
+    expect(r.time, 'render() got a single frame delta').not.toBeCloseTo(SLOW_MS / 1000, 9);
+  });
+
+  it('steps Lenis on EVERY frame, ahead of the cap, not only on the frames that draw', async () => {
+    await boot();
+    // The third limb of the composition, and the only one that is a deliberate asymmetry:
+    // main.js's own comment says the cap throttles the gradient's draw ALONE, because
+    // stepping Lenis at 30 Hz would make the inertia stutter. That is a claim about
+    // ordering and frequency, and until this test it was a claim made only in a comment --
+    // deleting `smooth.raf(performance.now())` outright left all four tests above green.
+    //
+    // Spying after boot works because main.js closes over the same object window.__vd
+    // exposes and looks `raf` up on it at call time, so this observes the real call site
+    // rather than a copy of it.
+    const stepped = vi.spyOn(window.__vd.smooth, 'raf');
+    const r = run(6, SLOW_MS);
+    expect(r.frames).toBe(6);
+    // Sub-interval cadence: at most one of these six frames drew anything...
+    expect(r.draws).toBeLessThanOrEqual(1);
+    // ...and Lenis was still stepped on all six.
+    expect(stepped, 'Lenis was stepped at the capped rate, or not at all').toHaveBeenCalledTimes(6);
   });
 });

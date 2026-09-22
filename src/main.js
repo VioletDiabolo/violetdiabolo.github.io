@@ -67,7 +67,13 @@ function boot() {
       // Lenis is driven every frame, ahead of the cap below: the cap throttles only the
       // gradient's draw call, and stepping Lenis at that same reduced rate would make the
       // inertia stutter.
-      if (smooth) smooth.raf(performance.now());
+      //
+      // Unconditional, and provably safe to be: createSmoothScroll returns null for
+      // exactly one input, `reduced: true` (src/scroll/smooth.js), and the call above
+      // passes the literal `false` because this branch already returned for a
+      // reduced-motion visitor. An `if (smooth)` here read as a real fallback and was
+      // not one.
+      smooth.raf(performance.now());
       const elapsed = cap(delta);
       if (elapsed > 0) gradient.render(elapsed);
     },

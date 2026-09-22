@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 202 tests, all passing** |
+| Unit suite | `npx vitest run` → **17 files, 211 tests, all passing**, and with no stderr noise (was 202; the review fixes added 9) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -50,16 +50,16 @@ it matters:
 | Claim | Status |
 |---|---|
 | Three.js absent from `package.json` and from the built bundle | **Verified** — the only "three" in the bundle is the English word, in two GLSL comments |
-| Bundle shrank from 600 kB | **Verified; baseline rebuilt from the merge base** — 600,476 B → **38,522 B** raw, −93.6 % |
+| Bundle shrank from 600 kB | **Verified; baseline rebuilt from the merge base** — 600,476 B → **38,565 B** raw, −93.6 % |
 | `contrast.js` never ships | **Verified** — no `worstCase` / `TIME_STEPS` / `0.03928` / `12.92` in `dist/` |
 | Nothing uses `position: sticky` | **Verified** — 0 in source, 0 in built CSS, 0 computed across 145 live elements |
 | The about panel scrolls immediately; no heading pins | **Verified** — residual **0 px** from pure scroll at 10 sampled offsets |
 | Shader compiles and links | **Verified** — vertex, fragment and link OK, empty driver logs |
-| Frame cost inside the 4 ms budget | **Verified, with a zero-render control** — **0.01253 ms/frame**, control **0.0000** |
+| Frame cost inside the 4 ms budget | **Verified for the SHADER, with a zero-render control** — **0.01253 ms/frame**, control **0.0000**. The `backdrop-filter` layers over it are a separate cost: measured at §3.1, unresolved below this host's vsync ceiling |
 | Most of the frame stays near-black | **Verified** — **85.43 %** of the *worst* frame under L 0.02 |
 | The render loop stops when the document hides | **Verified, and proved to have been running first** |
 | Reduced motion renders one frame and installs nothing | **Verified against a labelled JS-level stand-in** |
-| No-WebGL fallback renders the whole page | **Verified** — `data-stage="unsupported"`, 7/7 sections, static gradient painted |
+| No-WebGL fallback renders the whole page | **Verified against a labelled `getContext` patch** — `data-stage="unsupported"`, 7/7 sections, static gradient painted |
 | 26 text blocks clear WCAG over the moving gradient | **Verified at 375 / 768 / 1440** — **26/26**, tightest margin **1.166×** |
 | `scrollWidth === clientWidth` | **Verified at 320 / 375 / 768 / 1440**, and at **320 / 375 / 280 with a 32 px root** |
 | Nav pills never overflow; the bar never covers a heading | **Verified** — 0 pills outside the viewport at any width |
@@ -68,7 +68,7 @@ it matters:
 | Page is 6–8 screens | **Qualified** — 7.37 at 1440×900; **8.31 / 8.64 / 9.05** at 375×812 / 320×812 / 768×1024 |
 | Lenis costs ~5.4 kB gzipped | **Corrected** — re-measured at **5,050 B ≈ 4.93 kB** |
 | Real reduced-motion, real tab visibility, real WebGL-less browser, real scroll input | **Not verified** — §10 |
-| `README.md` describes the shipped site | **False** — it still documents the deleted 3D system, including a `position: sticky` stage. See F4. |
+| `README.md` describes the shipped site | **Rewritten, and re-checked against the tree** — 73 automated assertions over paths, per-file test counts, byte sizes, palette values and the panel/surface map. See F4. |
 
 ---
 
@@ -78,9 +78,14 @@ it matters:
 
 | | raw | gzip |
 |---|---|---|
-| `dist/assets/index-DTqm9uPc.js` | **38,522 B** | 13,464 B |
+| `dist/assets/index-CsTE_hkR.js` | **38,565 B** | 13,485 B |
 | `dist/assets/index-9lyFq0Rz.css` | 13,174 B | 3,627 B |
-| `dist/index.html` | 1,605 B | 875 B |
+| `dist/index.html` | 1,605 B | 876 B |
+
+Re-measured after the review fixes. The JS was **38,522 B** (`index-DTqm9uPc.js`) when the nine
+steps below were run; the guard added to `src/ui/reveal.js` and the conditional removed from
+`src/main.js` move it by **+43 B**, and the hash with it. The CSS is byte-identical and keeps its
+hash: none of the fixes touched a stylesheet.
 
 **The 600 kB baseline was rebuilt, not quoted.** Commit `19e4131` — the merge base with `main`,
 where `package.json` still listed `"three": "^0.186.0"` — was checked out into a throwaway worktree
@@ -88,11 +93,11 @@ and built with the same Vite.
 
 | | before | after | change |
 |---|---|---|---|
-| JS raw | 600,476 B | 38,522 B | **−561,954 B (−93.6 %)** |
-| JS gzip | 156,758 B | 13,464 B | −143,294 B (−91.4 %) |
+| JS raw | 600,476 B | 38,565 B | **−561,911 B (−93.6 %)** |
+| JS gzip | 156,758 B | 13,485 B | −143,273 B (−91.4 %) |
 | CSS raw | 14,275 B | 13,174 B | −1,101 B |
 | `index.html` raw | 4,656 B | 1,605 B | −3,051 B |
-| **total shipped, raw** | **619,407 B** | **53,301 B** | **−566,106 B (−91.4 %)** |
+| **total shipped, raw** | **619,407 B** | **53,344 B** | **−566,063 B (−91.4 %)** |
 
 The string `three` occurs exactly twice in the shipped JS, both times as the English word inside
 GLSL comments carried over from `src/gradient/shader.js`. No `THREE`, no `WebGLRenderer`, no
@@ -177,6 +182,67 @@ overhead would not.
 | 2880 × 1800 | 240 | 4.709 ms | 0.01962 |
 
 Previously published: 0.0122 ms/frame. **Re-measured at 0.01253** — same order, slightly up.
+
+### 3.1 What that figure does NOT include: the `backdrop-filter` over the canvas
+
+The 0.01253 ms above is the **shader's `drawArrays` into a bare canvas**, measured by the bench
+page. It was a true figure when it was taken and it is still a true figure about the shader — but it
+was taken before the panels existed, and the panels put two full-viewport
+`backdrop-filter: blur(22px) saturate(1.15)` layers (`src/styles/sections.css`) directly over that
+canvas. The canvas repaints every frame, so the blur behind those panels **cannot be cached between
+frames**. Reading "0.31 % of budget" as "the background costs nothing" is therefore a step further
+than the measurement goes, and nothing in this record previously said so.
+
+**The geometry, measured live** (`getBoundingClientRect` on every element whose computed
+`backdrop-filter` is not `none`; exactly two match, `#about` and `#events`):
+
+| viewport | filtered panels | each | total blurred area | **max on screen at once** |
+|---|---|---|---|---|
+| 1024 × 768 | `#about`, `#events` | 1024 × 768 each | **2.00 viewports** | **0.996 viewports**, at `scrollY` 840 |
+| 375 × 812 | `#about`, `#events` | 375 × 756, 375 × 568 | **1.63 viewports** | **0.932 viewports**, at `scrollY` 600 |
+
+Two corrections to the shape of the concern fall out of that. The **2×** figure is a document total,
+not a simultaneous one: the 81 px `--panel-gap` means the two panels can never both be fully on
+screen, so the compositor is never asked for more than **one** viewport of blurred backdrop at any
+scroll position. And at phone width it is less again — the narrow breakpoint drops
+`min-height: 100dvh` to `min-height: 0`, so the panels are 756 px and 568 px tall against an 812 px
+viewport.
+
+**The cost, as far as this host can resolve it.** `document.hidden` was redefined to `false` and
+`visibilitychange` dispatched (the §4 technique), so the real `createLifecycle` loop ran against the
+real shader; the viewport was parked on `#about` with 92 % of the screen blurred; rAF intervals were
+sampled for 3 s per condition, A/B/A/B, toggling only `backdrop-filter: none` on
+`[data-surface='glass']`:
+
+| condition | frames / 3 s | fps | median | p95 | frames > 20 ms |
+|---|---|---|---|---|---|
+| `blur(22px) saturate(1.15)` | 179 | 59.67 | 16.7 ms | 18.0 ms | **0** |
+| `backdrop-filter: none` | 179 | 59.67 | 16.7 ms | 18.7 ms | **0** |
+| `blur(22px) saturate(1.15)` (repeat) | 179 | 59.67 | 16.7 ms | 18.6 ms | **0** |
+| `backdrop-filter: none` (repeat) | 179 | 59.67 | 16.7 ms | 18.6 ms | **0** |
+
+**Indistinguishable — and that is a ceiling, not a cost.** The display is vsync-locked at 60 Hz and
+both conditions finish inside 16.7 ms with room to spare, so this says the shipped configuration has
+headroom on this machine; it cannot say how much.
+
+**So the headroom was measured instead**, by stacking additional full-viewport
+`blur(22px) saturate(1.15)` layers over the same live canvas until frames actually dropped:
+
+| extra full-viewport blur layers | 0 | 1 | 2 | 4 | 8 | 16 | 32 | **64** |
+|---|---|---|---|---|---|---|---|---|
+| fps | 59.5 | 59.5 | 59.5 | 59.5 | 59.5 | 59.5 | 59.5 | **15.5** |
+| median frame | 16.7 ms | 16.7 | 16.7 | 16.7 | 16.7 | 16.7 | 16.7 | **66.6 ms** |
+| frames > 20 ms (of ~119) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **31** |
+
+**33× the shipped on-screen blurred area still holds a locked 60 fps with zero late frames**; the
+first dropped frame is somewhere between 33× and 65×. Two honest caveats on that number: stacked
+filters each sample the composite beneath them, so the load does not scale like one larger area, and
+the shape of the 32 → 64 result is a cliff rather than a ramp, which looks more like a render-surface
+limit than the linear part of the cost curve. It is a headroom figure, not a cost curve.
+
+**What is still not established: a mid-range phone.** Every figure above is Chromium on an Apple M4,
+which is the machine the rest of this document was measured on and is not the machine the concern is
+about. See §10.11.
 
 ### Darkness
 
@@ -348,6 +414,22 @@ band's minimum and its maximum, and taking the maximum is strictly conservative 
 dark surface. It is *not* conservative for the near-black-on-light pills, which is exactly why those
 are bounded at `deep` as well.
 
+**That argument covers `blur(22px)`. It does not cover `saturate(1.15)`**, which is the other half of
+the same filter and is not an averaging operation — it pushes a channel away from the mean and can
+land a pixel *above* the band maximum this probe takes as its ceiling. `src/styles/sections.css`
+(the comment above `[data-surface='glass']`) works it out: saturating the arithmetic ceiling pixel
+`rgb(128,36,255)` gives approximately `rgb(137,31,255)`, **L 0.135 against the 0.1307** every glass
+composite in `base.css` is derived from. So "a guarantee over every frame" is, strictly, very
+slightly stronger than the arithmetic behind it, and this record did not say so until now.
+
+The impact is immaterial and the reason is structural, not a tolerance: **the three tightest-margin
+blocks in the table below are `bare`** — hero h1, hero tagline, footer line, at 1.17× — and bare text
+has no panel over it, so no filter runs between it and the canvas at all. Every block that *is*
+behind the filter sits at 1.58× or better. Folding the saturated ceiling in would mean re-deriving
+every glass composite from a filtered ground rather than the plain one `PALETTE` emits — a second,
+parallel arithmetic to keep in sync — to move numbers that already clear with margin. Recorded
+rather than re-derived, and §10.6 says the same.
+
 ### The table, 1440 × 900, tightest margin first
 
 | block | px | wt | needs | measured | **bound** | at | margin | surface |
@@ -395,6 +477,12 @@ are bounded at `deep` as well.
 Previously published: "26/26 pass, tightest margin 1.17×, lowest 5.29:1". **All three reproduce** —
 1.1660× rounds to 1.17×, and 5.29:1 is the lowest *measured* figure; the lowest **bound**, the
 number the design is certified against, is **5.25:1**.
+
+**Re-run after the review fixes**, at all three viewports, against the same probe: **26 / 26 resolved
+and 26 / 26 pass on the bound at every width**, tightest margin **1.17×** (hero tagline, 5.25:1
+against a 4.5 requirement), lowest measured **5.29 / 5.31 / 5.33** at 1440 / 375 / 768. Every row of
+the 1440 table above reproduces value-for-value. None of the fixes touched a stylesheet, a palette
+stop or `contrast.js`'s arithmetic, and the figures say so.
 
 ---
 
@@ -478,15 +566,27 @@ Previously published: 7.37 and 8.31. **Both reproduce exactly.** See F2.
 ## 9. Findings
 
 **No correctness defect was found** in the shader, the lifecycle, the fallback, the nav or the
-contrast arithmetic. Nothing in the *shipped code* blocks a merge. **F4 is documentation, and it is
-the one thing here worth fixing first.**
+contrast arithmetic — the nine steps above all reproduce. **One was found afterwards, outside them,
+and it was the serious one: F5, the reveal gate, which could hand a visitor an entirely blank page.**
+F1 and F4 are both now fixed as well. Everything in this section is resolved; nothing here blocks a
+merge.
 
-**F1 — `three@0.186.0` is still installed and still in `package-lock.json`.** Not a dependency of
-this project: `npm ls three` shows `violet-diabolo → animejs@4.5.0 → three@0.186.0`, marked
-`"optional": true, "peer": true` in the lockfile. animejs declares a `three` adapter as an optional
-peer and npm installs optional peers by default. Nothing imports it and nothing ships it, so this
-costs visitors nothing — it will only surprise someone who greps `node_modules` to check the branch
-did what it says. No action needed unless the team wants `--omit=optional` pinned.
+**F1 (fixed) — `three@0.186.0` was still installed, via a dependency nothing imported.** `npm ls
+three` showed `violet-diabolo → animejs@4.5.0 → three@0.186.0`, marked `"optional": true,
+"peer": true` in the lockfile: animejs declares a `three` adapter as an optional peer and npm
+installs optional peers by default. The root cause was `animejs` itself — `grep -rn animejs src/`
+returned **zero** hits while `package.json` still declared `"animejs": "^4.5.0"`, because both
+modules that ever imported it (`src/scroll/choreography.js`, `src/scroll/entrance.js`) were deleted
+at `15901a9`.
+
+**Dropped, and `three` went with it.** After removing the dependency and reinstalling:
+`npm ls animejs` → empty, `npm ls three` → empty, `node_modules/animejs` and `node_modules/three`
+both absent, **0 references to either in `package-lock.json`** (31 lines deleted). The guard that
+was supposed to police this — `tests/lifecycle.test.js`'s "engine independence" — had been excepting
+those two deleted files, so its `continue` was unreachable and its exception set an inert constant;
+it is now two positive claims with no exception set: nothing under `src/` imports animejs, and
+`package.json` declares neither animejs nor three. A source grep alone would never have caught the
+original, since no file imported animejs either and the package was still installed.
 
 **F2 — 6–8 screens holds at desktop widths only.** 7.37 at 1440×900 is inside the range; 8.31 at
 375×812, 8.64 at 320×812 and 9.05 at 768×1024 are outside it. The 8.31 figure was already published
@@ -512,12 +612,13 @@ The reachable causes are a `NaN`/`Infinity` component, or an RGB/RGBA-length mis
 `b` to `undefined`. The docstring now says that, and records the negative case as an explicit
 non-cause — harmless here because the only producer is `gl.readPixels` with `UNSIGNED_BYTE`, which
 cannot emit one. **The arithmetic is untouched:** the bundle keeps its identical content hash
-(`index-DTqm9uPc.js`, 38,522 B) across the edit, and the suite is 202/202 both before and after.
+(`index-DTqm9uPc.js`, 38,522 B — the bundle as it stood at that commit; see §1 for the current
+figure) across the edit, and the suite is 202/202 both before and after.
 
-**F4 — `README.md` still documents the deleted 3D system, and contradicts this branch.** Not
-measured as part of the nine steps; found while checking which files reference this record. It is
-the one finding here I would fix before merge, because it is the first file a reader opens and
-almost every load-bearing sentence in it is now false.
+**F4 (fixed) — `README.md` documented the deleted 3D system end to end.** Not measured as part of the
+nine steps; found while checking which files reference this record. It was not a stale section but
+the whole document: the first file a reader opens, with almost every load-bearing sentence false.
+The table below is what it claimed at `0853652`.
 
 | `README.md` | says | actual |
 |---|---|---|
@@ -530,8 +631,65 @@ almost every load-bearing sentence in it is now false.
 | line 69 | "`#stage` is `position: sticky`" | `#stage` is gone, and **§2 above measures zero `position: sticky` anywhere** — the README asserts the exact thing this branch removed |
 | lines 73, 77, 79, 81, 164 | the 40dvh object band, `LatheGeometry` profiles, the `ROOMS` table, `cupTop` fractions, the sticky-pin IntersectionObserver argument | all describe deleted code |
 
-Also stale by implication: lines 160–170 summarise the *previous* `VERIFICATION.md`, which this
-commit replaced.
+Beyond that table: line 44 stated that "anime.js is imported by exactly two modules,
+`src/scroll/choreography.js` and `src/scroll/entrance.js`" — both deleted, and nothing imported
+anime.js at all (see F1). Lines 88–104 ("How the 3D works", "Changing the choreography") and
+110–118 ("Fallback paths", describing an `index.html` fallback SVG this branch deleted and a
+`tests/materials.dom.test.js` that no longer exists) described only deleted code, and the per-file
+test table at 142–158 named eight deleted files. Lines 160–170 summarised the *previous*
+`VERIFICATION.md`, which this document replaced.
+
+**Rewritten from the tree.** Every path, count and figure in the new README was checked
+programmatically rather than by reading: **73 assertions** covering that each of the 25 files it
+names exists, that `src/` contains nothing it omits, that each of the 17 per-file test counts
+matches `vitest --reporter=json`, that the bundle byte size and the −93.6 % figure match `dist/`,
+that the three palette stops match `palette.js`, that `TARGET_FPS`/`RENDER_SCALE`/`--panel-gap`/
+`.site-nav { position: fixed }` match their sources, that the six `data-panel`/`data-surface` pairs
+match `sections.js`, and that `contrast.js` is absent from the bundle and from `main.js`'s imports.
+All 73 pass.
+
+**One argument was kept on purpose.** The old "Known limitations #2" reasoned that the
+`IntersectionObserver` pause can never fire, because the observed element is pinned to the viewport
+for the whole document height. The element it was about (`#stage`, `position: sticky`) is gone —
+but `main.js` now observes `#gradient`, which is `position: fixed; inset: 0`, so the conclusion is
+unchanged and the reasoning is carried into the rewrite with its new subject. `src/render/
+lifecycle.js`'s own docstring now says the same thing, which it did not before.
+
+**F5 (fixed) — the reveal gate could hand a visitor a blank page, and its docstring said it could
+not.** `src/ui/reveal.js` added `.reveal-pending` — `opacity: 0`, base.css — **synchronously, in JS**,
+to every direct child of every section, and the only thing that ever removed it again was an
+`IntersectionObserver` callback. Its docstring claimed the rule's placement inside a
+`prefers-reduced-motion: no-preference` block meant "a browser with no JS at all — or an observer
+that never fires — leaves content fully visible". The first half was true. The second was not: the
+class is added by the JS, so an observer that cannot run leaves it on forever.
+
+This branch raised the stakes rather than lowering them: `src/ui/sections.js` makes `.room` the
+single reveal unit per section and every panel is `min-height: 100dvh`, so one unrevealed element is
+a full viewport of blank page.
+
+**Measured, by booting the shipped modules in a same-origin `srcdoc` iframe with
+`window.IntersectionObserver` deleted:**
+
+| | before the guard | after |
+|---|---|---|
+| `.room` elements at `opacity: 0` | **6 of 6** | **0 of 6** |
+| class on each | `room reveal-pending` | `room` |
+| `transform` | `matrix(1,0,0,1,0,12)` | `none` |
+| footer line | `reveal-pending`, `opacity: 0` | `footer-line`, `opacity: 1` |
+| elements carrying `reveal-pending` | 7 | **0** |
+| text under `#content` | 2,495 chars, none of it visible | 2,495 chars, visible on `rgb(8,6,13)` |
+
+The fix guards on the constructor's existence before the class is added, and only for the real
+factory — an injected observer still runs, which is what the five pre-existing tests depend on.
+Three new tests in `tests/reveal.dom.test.js` cover it, falsified three ways: removing the guard,
+widening it to ignore the injected factory, and moving it to *after* the class is added all fail it.
+
+The docstring no longer claims what it cannot deliver. An observer that exists but never *delivers*
+still leaves the page hidden; in a real browser a visitor cannot reach that state, because
+IntersectionObserver delivery is a step of "update the rendering" — a browser that never delivers an
+entry never painted the frame the content would have appeared in. It is reachable in automation,
+which is why the distinction is now written down instead of assumed. See §10.12 for what this run
+did *not* establish about that path.
 
 ---
 
@@ -557,7 +715,11 @@ commit replaced.
 6. **`backdrop-filter`'s actual blurred composite.** The contrast probe ignores it by design, taking
    the band maximum instead — strictly conservative for light text on a dark surface, and separately
    bounded at `deep` for the near-black-on-light pills. The blurred pixels themselves were never
-   sampled.
+   sampled. **That reasoning covers `blur(22px)` only**: `saturate(1.15)` on the same filter is not
+   an averaging operation and can push a channel past the band maximum — `src/styles/sections.css`
+   records the resulting ceiling as **L 0.135 against the certified 0.1307**. Immaterial in practice
+   (the three tightest-margin blocks are bare, with no filter between them and the canvas), but it
+   means the word "guarantee" in §7 is very slightly stronger than the arithmetic under it. See §7.
 7. **Real mobile devices.** 320 / 375 / 768 were viewport emulation. No real touch input, no real
    device pixel pipeline, no real mobile GPU.
 8. **Cross-browser and cross-GPU.** Chromium on ANGLE / Metal / Apple M4 only. No Safari, no Firefox,
@@ -568,3 +730,21 @@ commit replaced.
 10. **Font loading and glyph rendering.** The Google Fonts stylesheet is requested; glyph rendering,
     the swap and fallback metrics were not inspected. The contrast figures are computed from
     `getComputedStyle` colours and sizes, which do not depend on which face actually rendered.
+11. **`backdrop-filter`'s per-frame compositing cost on anything but this GPU.** §3.1 measures the
+    geometry exactly and shows the shipped configuration has at least 33× headroom on Chromium /
+    ANGLE / Metal / Apple M4 — but both conditions are pinned at the 60 Hz vsync ceiling there, so
+    the *cost* itself is bounded above rather than resolved, and the mid-range phone the concern is
+    actually about was not measured. The frame-budget figure in §3 is the shader alone and should
+    not be read as the background's total per-frame cost.
+12. **The reveal's degradation in a browser that has no `IntersectionObserver` at all.** The guard
+    added to `src/ui/reveal.js` was verified by booting the shipped modules in a same-origin
+    `srcdoc` iframe with `window.IntersectionObserver` **deleted**: all six `.room` elements go from
+    `opacity: 0` (every one of them hidden, with nothing left that could reveal them) to
+    `opacity: 1`, and `#content` carries 2,430+ characters on the `--stage` ground. That is a
+    deleted-global stand-in, not a real browser without the API. **One thing it exposes is not
+    fixed:** `createLifecycle` still constructs an `IntersectionObserver` unguarded, so the same
+    condition throws a `ReferenceError` after the content has mounted and the animated gradient
+    never starts. Content, nav and contrast are unaffected — `body` is `background-color:
+    var(--stage)`, which is `deep`, the *best* ground in the contrast table rather than the
+    worst — but the page is flat rather than animated, and the error is real. Left deliberately:
+    it is a behaviour change outside the reviewed scope, on the last commit before merge.
