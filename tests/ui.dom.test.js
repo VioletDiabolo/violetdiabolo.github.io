@@ -3,13 +3,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderSections, renderMediaPage } from '../src/ui/sections.js';
+import { renderSections, renderMediaPage, marqueeItem } from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
 import { mountMedia } from '../src/ui/media.js';
 import { mountGallery } from '../src/ui/gallery.js';
 import { mountForms } from '../src/ui/forms.js';
 import {
-  BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS, PRACTICE_PHOTOS,
+  BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS, PRACTICE_PHOTOS, PERFORMED_FOR,
 } from '../src/content/index.js';
 
 beforeEach(() => { document.body.innerHTML = '<main id="content"></main>'; });
@@ -274,6 +274,55 @@ describe('section photographs', () => {
       expect(img).not.toBeNull();
       expect(img.alt.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('the performed-for marquee', () => {
+  const render = () => { const root = document.createElement('main'); renderSections(root); return root; };
+
+  it('runs the list twice, and hides the copy from assistive tech', () => {
+    // The loop is two identical tracks translated by -50%; the duplicate is what makes
+    // the reset seamless and `aria-hidden` is what stops a screen reader hearing the
+    // club's whole performance history twice.
+    const lists = render().querySelectorAll('.marquee-list');
+    expect(lists).toHaveLength(2);
+    expect(lists[0].hasAttribute('aria-hidden')).toBe(false);
+    expect(lists[1].getAttribute('aria-hidden')).toBe('true');
+    expect(lists[0].querySelectorAll('li')).toHaveLength(PERFORMED_FOR.length);
+  });
+
+  it('renders a name as text and a logo as a picture that still carries the name', () => {
+    const root = render();
+    for (const org of PERFORMED_FOR) {
+      const li = [...root.querySelectorAll('.marquee-list:not([aria-hidden]) li')]
+        .find((x) => x.dataset.logo === org.logo || x.textContent === org.name);
+      expect(li, `${org.name} is not in the strip`).toBeDefined();
+      if (org.logo) {
+        const img = li.querySelector('img');
+        expect(img, `${org.name} has a logo configured but renders no image`).not.toBeNull();
+        // The strip must read as a list of ORGANISATIONS however it looks on screen.
+        expect(img.alt).toBe(org.name);
+      } else {
+        expect(li.textContent).toBe(org.name);
+        expect(li.querySelector('img')).toBeNull();
+      }
+    }
+  });
+
+  it('builds a logo chip that still carries the organisation name', () => {
+    // Called directly, because every entry is name-only today and the logo branch is
+    // therefore unreachable through renderSections. Without this the marquee would ship
+    // a path nothing had ever run, to be discovered on the day the first mark arrives.
+    const li = marqueeItem({ name: 'Chinatown Beautification Day', logo: 'logo' });
+    const img = li.querySelector('img');
+    expect(img, 'a configured logo rendered no image').not.toBeNull();
+    expect(img.alt).toBe('Chinatown Beautification Day');
+    expect(li.dataset.logo).toBe('logo');
+    expect(li.textContent.trim()).toBe('');
+    // And the other branch, from the same entry point, so this test sees both.
+    const plain = marqueeItem({ name: 'NYU Welcome', logo: null });
+    expect(plain.querySelector('img')).toBeNull();
+    expect(plain.textContent).toBe('NYU Welcome');
   });
 });
 

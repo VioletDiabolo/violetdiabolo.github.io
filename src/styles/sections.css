@@ -534,7 +534,14 @@ body { overflow-x: hidden; }
 .marquee-track {
   display: flex;
   width: max-content;
-  animation: marquee-slide 42s linear infinite;
+  /*
+   * 65s, not the 42s this ran at with seven names. The duration is a fixed time for a
+   * fixed DISTANCE -- half the track -- so the speed is set by how long the list is, and
+   * going from 7 organisations to 18 took the track from 4,739px to 7,306px. At 42s that
+   * is 87px/s against the 56px/s the strip was tuned at; 65s puts it back. Add names and
+   * this needs raising again, or the strip quietly speeds up.
+   */
+  animation: marquee-slide 65s linear infinite;
 }
 
 .marquee:hover .marquee-track,
@@ -547,6 +554,20 @@ body { overflow-x: hidden; }
   margin: 0;
   padding: 0 clamp(0.875rem, 2vw, 1.625rem);
   list-style: none;
+}
+
+/* A logo chip, for whenever PERFORMED_FOR starts carrying marks. Capped by HEIGHT, not
+   width: logos arrive at every aspect ratio, and a shared height is the only thing that
+   makes a row of them look like one row. */
+.marquee-list li[data-logo] img {
+  display: block;
+  width: auto;
+  height: 1.75rem;
+  /* These arrive as full-colour marks on a page that is near-black. Until someone says
+     otherwise they are knocked back to the page's own ink so the strip reads as one
+     thing; delete these two lines to show them in their own colours. */
+  filter: grayscale(1) brightness(1.9);
+  opacity: 0.75;
 }
 
 .marquee-list li {
