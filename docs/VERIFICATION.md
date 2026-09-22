@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 211 tests, all passing**, and with no stderr noise (was 202; the review fixes added 9) |
+| Unit suite | `npx vitest run` → **17 files, 216 tests, all passing**, and with no stderr noise (was 202; the review fixes added 14) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:

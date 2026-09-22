@@ -11,7 +11,7 @@ npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (runs `npm run assets` first)
 npm run preview      # Serve the built dist/ locally
-npm test             # 211 tests across 17 test files
+npm test             # 216 tests across 17 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -42,7 +42,7 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | `scripts/check-shader.html` | Dev-time shader bench: compile, frame cost with a zero-render control, luminance histogram. |
 | `scripts/check-contrast.html` | Dev-time contrast probe over the real page. Needs `npm run dev` — it imports `contrast.js`, which the build excludes. |
 | `scripts/bench-verdict.mjs` | The pass/fail decision the shader bench calls, as a module so the suite can falsify it. |
-| `tests/` | 211 tests across 17 files — see **Testing**. |
+| `tests/` | 216 tests across 17 files — see **Testing**. |
 | `public/images/` | Generated derivatives (`npm run assets`). Masters live in `assets-src/`. |
 | `docs/VERIFICATION.md` | What was measured in a real browser, on a named GPU, and what could not be. |
 
@@ -154,16 +154,16 @@ Widths cap at 2000 px, not 2400. Measured on the 4032×3024 master: at 2400 the 
 npm test
 ```
 
-**211 tests across 17 files**, all passing, with no stderr noise.
+**216 tests across 17 files**, all passing, with no stderr noise.
 
 | file | tests | covers |
 |---|---|---|
 | `visual-language.test.js` | 57 | the deleted design elements' absence, the four panel patterns, glass and accent discipline, the focus ring on both grounds, the luminance ceiling, the shader's two fixed defects, the bench and probe wiring, the nav pill row and height, 200 % text zoom |
 | `ui.dom.test.js` | 17 | DOM structure for every panel, media and form facades, the footer, and the content boundary |
-| `lifecycle.test.js` | 16 | pause/resume on visibility and intersection, delta clamping, teardown; the no-animation-engine and no-`animejs`-dependency guards |
+| `lifecycle.test.js` | 17 | pause/resume on visibility and intersection, delta clamping, teardown; the no-animation-engine and no-`animejs`-dependency guards |
 | `contrast.test.js` | 15 | `relativeLuminance`, `contrastRatio`, `worstCase` (including its non-finite guard), `TIME_STEPS` |
 | `smooth.dom.test.js` | 14 | Lenis construction, anchor interception, modifier-click opt-out, teardown, and installing nothing under reduced motion |
-| `main.dom.test.js` | 13 | boot ordering, both fallback paths, the gradient mount, and the animated `onFrame` composition |
+| `main.dom.test.js` | 17 | boot ordering, both fallback paths, the gradient mount, and the animated `onFrame` composition |
 | `gradient.dom.test.js` | 12 | shader compile/link, uniform plumbing, failure cleanup, resize |
 | `nav.dom.test.js` | 12 | the links, the CTA, the markup, and `--nav-offset`'s `ResizeObserver` |
 | `content.test.js` | 11 | apostrophe preservation, board structure, media list, contact details |
