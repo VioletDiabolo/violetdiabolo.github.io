@@ -55,25 +55,42 @@ export const SECTION_HEADINGS = {
 /**
  * Organisations the club has performed for, for the marquee under the About panel.
  *
- * PROVENANCE, because a claim on a club's own site should be traceable: every entry
- * below is backed either by a video in MEDIA (the club's own recording of that
- * performance) or by a confirmed booking email. "NYU Welcome" is the latter — Isabelle
- * Ormsby's 25 Aug 2026 email confirming Violet Diabolo in the running order for the Club
- * Showcase at Kimmel E&L on 14 Sept.
+ * PROVENANCE. Every entry was read out of violetdiabolo@gmail.com and is backed by one of
+ * three things: the club confirming and then sending set music or logistics, the host
+ * sending day-of details or a thank-you, or a video of the performance in MEDIA below.
+ * Invitations the club DECLINED are not here — NYU VSA's 2026 Minh Gala ("We'll miss you
+ * guys at the gala") and an NYU I-Hub Lunar New Year slot ("There's always next year!")
+ * both looked like performances from the subject line alone, which is why subject lines
+ * were not good enough.
  *
- * INCOMPLETE, and deliberately not padded. The club's own inbox (violetdiabolo@gmail.com)
- * was not reachable when this was written, so this is what could be evidenced from the
- * media list plus one forwarded email. Add to it from the booking confirmations rather
- * than from memory.
+ * `logo` is the base name of a mark in the asset pipeline, or null for a name-only chip.
+ * All null today: these are student clubs, public schools and neighbourhood non-profits,
+ * and their marks are theirs to give rather than ours to take off an Instagram page. The
+ * marquee renders whichever it is given (src/ui/sections.js), so adding one later is a
+ * file in assets-src, a line in scripts/build-assets.mjs and a base name here.
  */
 export const PERFORMED_FOR = Object.freeze([
-  'NYU Welcome',
-  'VSA Holiday Night Market',
-  'USADA National Diabolo Competition',
-  'OGS Lunar New Year Celebration',
-  'TAP Lunar New Year Banquet',
-  'Asian Heritage Month Fall Fest',
-  'Chinatown Beautification Day',
+  // --- NYU ---------------------------------------------------------------
+  { name: 'NYU Welcome', logo: null },              // Club Showcase, Kimmel E&L, Sept 2026
+  { name: 'NYU Asian Heritage Month', logo: null }, // Fall Fest, 2019 and since
+  { name: 'NYU VSA', logo: null },                  // Minh 2022; Holiday Night Market 2024
+  { name: 'NYU CSS', logo: null },                  // LNY Gala 2024; DynamiCSS 2024
+  { name: 'NYU KSA', logo: null },                  // Koreating, March 2026
+  { name: 'NYU HKSA', logo: null },                 // Sensations, April 2025
+  { name: 'NYU ACU', logo: null },                  // ACU Idol, 2022
+  { name: 'NYU Kappa Phi Lambda', logo: null },     // Kappa Kafe, April 2023
+  { name: 'NYU OGS', logo: null },                  // Lunar New Year Celebration 2024
+  { name: 'Tisch Talent Guild', logo: null },       // Holiday Cabaret, 2022
+
+  // --- Beyond NYU --------------------------------------------------------
+  { name: 'Columbia Wushu', logo: null },                    // Showcase, Feb 2026
+  { name: 'Brooklyn Conservatory of Music', logo: null },    // LNY Feb 2026; Open Stages May 2026
+  { name: 'NYC Mid-Autumn Festival', logo: null },           // Moonlite, Oct 2025
+  { name: 'Chinatown Beautification Day', logo: null },      // 2023 and 2024
+  { name: 'PS 124 Yung Wing School', logo: null },           // Lunar New Year
+  { name: 'PS 184M Shuang Wen', logo: null },                // Spring Bash, June 2026
+  { name: 'TAP New York', logo: null },                      // Lunar New Year Banquet 2024
+  { name: 'USADA Nationals', logo: null },                   // National Diabolo Competition 2024
 ]);
 
 export const MEDIA = [

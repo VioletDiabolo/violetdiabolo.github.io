@@ -11,7 +11,7 @@ npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (runs `npm run assets` first)
 npm run preview      # Serve the built dist/ locally
-npm test             # 239 tests across 17 test files
+npm test             # 244 tests across 17 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -42,7 +42,7 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | `scripts/check-shader.html` | Dev-time shader bench: compile, frame cost with a zero-render control, luminance histogram. |
 | `scripts/check-contrast.html` | Dev-time contrast probe over the real page. Needs `npm run dev` — it imports `contrast.js`, which the build excludes. |
 | `scripts/bench-verdict.mjs` | The pass/fail decision the shader bench calls, as a module so the suite can falsify it. |
-| `tests/` | 239 tests across 17 files — see **Testing**. |
+| `tests/` | 244 tests across 17 files — see **Testing**. |
 | `public/images/` | Generated derivatives (`npm run assets`). Masters live in `assets-src/`. |
 | `docs/VERIFICATION.md` | What was measured in a real browser, on a named GPU, and what could not be. |
 
@@ -158,19 +158,19 @@ Widths cap at 2000 px, not 2400. Measured on the 4032×3024 master: at 2400 the 
 npm test
 ```
 
-**239 tests across 17 files**, all passing, with no stderr noise.
+**244 tests across 17 files**, all passing, with no stderr noise.
 
 | file | tests | covers |
 |---|---|---|
 | `visual-language.test.js` | 57 | the deleted design elements' absence, the four panel patterns, glass and accent discipline, the focus ring on both grounds, the luminance ceiling, the shader's two fixed defects, the bench and probe wiring, the nav pill row and height, 200 % text zoom |
-| `ui.dom.test.js` | 27 | DOM structure for every panel, the hero and events photographs, media and form facades, board photographs and their stand-in tiles, the practice gallery and its reserved cells, the footer, and the content boundary |
+| `ui.dom.test.js` | 30 | DOM structure for every panel, the hero and events photographs, media and form facades, board photographs and their stand-in tiles, the practice gallery and its reserved cells, the footer, and the content boundary |
 | `lifecycle.test.js` | 17 | pause/resume on visibility and intersection, delta clamping, teardown; the no-animation-engine and no-`animejs`-dependency guards |
 | `contrast.test.js` | 15 | `relativeLuminance`, `contrastRatio`, `worstCase` (including its non-finite guard), `TIME_STEPS` |
 | `smooth.dom.test.js` | 14 | Lenis construction, anchor interception, modifier-click opt-out, teardown, and installing nothing under reduced motion |
 | `main.dom.test.js` | 17 | boot ordering, both fallback paths, the gradient mount, and the animated `onFrame` composition |
 | `gradient.dom.test.js` | 15 | shader compile/link, uniform plumbing, scroll acceleration (rate, direction, cap, decay, monotonicity), failure cleanup, resize |
 | `nav.dom.test.js` | 12 | the links, the CTA, the markup, and `--nav-offset`'s `ResizeObserver` |
-| `content.test.js` | 14 | apostrophe preservation, board structure, the practice timetable, media list, photograph alt text, contact details |
+| `content.test.js` | 16 | apostrophe preservation, board structure, the practice timetable, media list, photograph alt text, contact details |
 | `budget.test.js` | 9 | the frame cap's accumulation and `renderSize`'s clamp |
 | `reveal.dom.test.js` | 9 | the reveal's pending/visible classes, one-shot unobserve, reduced motion, and the no-`IntersectionObserver` guard |
 | `assets.test.js` | 9 | the image pipeline's derivatives, EXIF orientation, each derivative's width against its own srcset descriptor, and the 400 KB budget |

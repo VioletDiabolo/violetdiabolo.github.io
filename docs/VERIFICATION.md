@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 239 tests, all passing**, and with no stderr noise (was 216 at merge; §11–§14 added 23) |
+| Unit suite | `npx vitest run` → **17 files, 244 tests, all passing**, and with no stderr noise (was 216 at merge; §11–§16 added 28) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -1181,3 +1181,93 @@ end of its panel, or bring the standalone strip back — each fails.
 Everything in §10 and §14.7 stands, including the email sweep, which still needs
 `violetdiabolo@gmail.com` signed in. One new item: the nav mark has not been seen at 200%
 text zoom in a real browser — the `1.75rem` height is reasoned from the rule, not measured.
+
+
+---
+
+## 16. The performance history, out of the mailbox
+
+`violetdiabolo@gmail.com` was signed in for this pass, so §14.7's open item is closed.
+
+### 16.1 Method
+
+876 conversations, read back to 2021. The two labels that looked purpose-built — "NYU
+Performance + Inquiries" and "Outside Performance + Inquiries" — hold **two threads
+between them** and were a dead end.
+
+What worked was a sender sweep: search, then extract every result row's subject and the
+counterparty's ADDRESS, which names the organisation without opening anything
+(`columbiawushu@gmail.com`, `nyukpl.cultural@gmail.com`, `miranda.knutson@bkcm.org`).
+That produced ~30 candidates. Gmail is a single-page app, so each candidate was then
+opened by setting `location.hash` and scraping the thread in place.
+
+### 16.2 Subject lines are not evidence
+
+Two threads read as bookings and were refusals:
+
+| thread | what the thread actually said |
+|---|---|
+| VIOLET DIABOLO X VSA COLLAB MINH GALA (2026) | *"We'll miss you guys at the gala."* |
+| Lunar New Year Event Performance (NYU I-Hub) | *"All good! There's always next year!"* |
+
+Both would have been credits on the club's own website if the list had been built from
+subject lines, which is how the first cut of it was going to be built. A test now pins
+their absence — the risk here is not a wrong pixel, it is the site claiming a booking the
+club turned down.
+
+### 16.3 What was confirmed, and by what
+
+Eighteen organisations. The strongest evidence in each thread:
+
+| organisation | evidence |
+|---|---|
+| NYU Welcome | running order + call time + confirmation form, Kimmel E&L, Sept 2026 |
+| Columbia Wushu | "Day-Of Information"; club sent set music and lighting notes |
+| NYU KSA (Koreating) | "the rehearsal time works for us" + performance audio, March 2026 |
+| Brooklyn Conservatory of Music | *"Thank you so much for being a part of BKCM's Lunar New Year celebration"* + a PIX11 news segment; separately, Open Stages in May |
+| NYC Mid-Autumn Festival (Moonlite) | performer advancing info; **paid** ("All Zelle payments have been made") |
+| NYU HKSA | "Looking forward to the event, and here's our music", Sensations, April 2025 |
+| Chinatown Beautification Day | 2023 "the closing performance works best"; 2024 slot 1:55–2:55 with workshop |
+| NYU CSS | "We're excited to perform!" (LNY Gala 2024); set list sent (DynamiCSS 2024) |
+| NYU Kappa Phi Lambda | subject "Confirmed performance: Kappa Kafe" + rehearsal chase, April 2023 |
+| NYU Asian Heritage Month | *"Can't wait to have you and your team at Fall Fest!"* |
+| PS 124 Yung Wing School | headcount confirmed for the Lunar New Year event |
+| PS 184M Shuang Wen | "Looking forward to the event"; **paid**, cheque details sent |
+| NYU (Sharmila Prasad) | **paid**; *"The students really enjoyed the performance and we will definitely work with your group again"* |
+| Tisch Talent Guild | Holiday Cabaret, 2022 |
+| NYU VSA | Minh 2022; Holiday Night Market 2024 (video in MEDIA) |
+| NYU ACU | ACU Idol backing track, 2022 |
+| NYU OGS | Lunar New Year Celebration 2024 (video in MEDIA) |
+| TAP New York / USADA Nationals | Lunar New Year Banquet and the 2024 national competition (videos in MEDIA) |
+
+### 16.4 Logos: the marquee takes them, and has none
+
+The client asked for logos. The strip renders a mark when an entry has one and its name
+when it does not, and `marqueeItem()` is exported **solely** so the logo branch can be
+tested — every entry is name-only today, so that path is unreachable from
+`renderSections` and would otherwise have shipped having never run once.
+
+No marks are included. These are student clubs, two public schools and several
+neighbourhood non-profits; their logos are theirs to give rather than ours to lift off an
+Instagram page, and a wall of borrowed marks reads as sponsorship rather than as a list of
+places the club has played. Adding one is a file in `assets-src`, a line in
+`scripts/build-assets.mjs` and a base name in `PERFORMED_FOR`.
+
+### 16.5 A constant that moved with the content
+
+The marquee's duration is a fixed time for a fixed DISTANCE — half the track — so its
+SPEED is set by how long the list is. Going from 7 names to 18 took the track from 4,739px
+to 7,306px and the strip from 56px/s to 87px/s without a line of CSS changing. Raised to
+65s. Adding names needs it raised again, which the rule now says out loud.
+
+### 16.6 Still not verified
+
+1. **Not exhaustive.** 876 threads were searched, not read. The sweep was
+   relevance-ranked keyword searches plus every candidate thread opened; a performance
+   discussed in a thread whose subject and body never use a performance word would have
+   been missed.
+2. **Some credits rest on one message.** Tisch Talent Guild and NYU ACU are inferred from
+   the club sending performance material (a sample video, a backing track) rather than
+   from a host confirming afterwards.
+3. **Dates are not published.** The table above carries them; the marquee shows names
+   only, so nothing on the page can go stale as years pass.

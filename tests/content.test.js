@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, SECTION_HEADINGS, PHOTOS,
-  PRACTICE_PHOTOS,
+  PRACTICE_PHOTOS, PERFORMED_FOR,
 } from '../src/content/index.js';
 
 describe('content', () => {
@@ -109,6 +109,32 @@ describe('content', () => {
         expect(member.image, `${member.name} has a falsy non-null image`).toBeNull();
       }
     }
+  });
+
+  it('names an organisation for every performance credit, and no half-entries', () => {
+    expect(PERFORMED_FOR.length).toBeGreaterThan(10);
+    for (const org of PERFORMED_FOR) {
+      expect(typeof org.name).toBe('string');
+      expect(org.name.trim().length, 'an entry with no name').toBeGreaterThan(0);
+      // null or a bare derivative base name — never a path, a filename or ''. An empty
+      // string is falsy, so it would render as a name-only chip while LOOKING like a
+      // logo was configured, which is the shape of a bug nobody reports.
+      expect(org.logo === null || (typeof org.logo === 'string' && !/[/.]/.test(org.logo) && org.logo !== ''),
+        `${org.name} has a logo value that is neither null nor a base name`).toBe(true);
+    }
+    // Duplicates would show twice in a strip whose whole job is a scannable list.
+    const names = PERFORMED_FOR.map((o) => o.name);
+    expect(new Set(names).size, 'a duplicated organisation').toBe(names.length);
+  });
+
+  it('claims nobody the mailbox showed turning the club down', () => {
+    // Both of these read as performances from the subject line and were declines in the
+    // thread — NYU VSA's 2026 Minh Gala ("We'll miss you guys at the gala") and an NYU
+    // I-Hub Lunar New Year slot ("There's always next year!"). Pinned because the danger
+    // here is not a wrong pixel, it is the club's site claiming a booking it turned down.
+    const names = PERFORMED_FOR.map((o) => o.name);
+    expect(names).not.toContain('NYU I-Hub');
+    expect(names).not.toContain('Minh Gala');
   });
 
   it('describes every practice photograph without naming anyone', () => {

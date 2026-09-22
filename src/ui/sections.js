@@ -113,6 +113,29 @@ export function renderMediaPage(root) {
 }
 
 /**
+ * One chip in the marquee: a mark if the organisation has given us one, its name if not.
+ *
+ * Exported for the tests, and that is the whole reason it is a named function. Every
+ * entry in PERFORMED_FOR is name-only today, so the logo branch is unreachable from
+ * renderSections — code that ships untested until the first logo lands, which is exactly
+ * when nobody is looking. A test can call this directly with a synthetic entry.
+ */
+export function marqueeItem(org) {
+  const li = document.createElement('li');
+  if (org.logo) {
+    // The name becomes the mark's alt text: the strip has to read as a list of
+    // organisations to a screen reader whichever form it takes on screen.
+    li.dataset.logo = org.logo;
+    li.append(buildPicture({
+      base: org.logo, widths: [80, 160], alt: org.name, sizes: '80px', loading: 'lazy',
+    }));
+  } else {
+    li.textContent = org.name;
+  }
+  return li;
+}
+
+/**
  * The names the club has performed under, running as a marquee.
  *
  * The list is duplicated into a second track and the pair is translated by exactly -50%,
@@ -136,11 +159,7 @@ function marquee() {
     const ul = document.createElement('ul');
     ul.className = 'marquee-list';
     if (hidden) ul.setAttribute('aria-hidden', 'true');
-    for (const name of PERFORMED_FOR) {
-      const li = document.createElement('li');
-      li.textContent = name;
-      ul.append(li);
-    }
+    for (const org of PERFORMED_FOR) ul.append(marqueeItem(org));
     return ul;
   };
 
