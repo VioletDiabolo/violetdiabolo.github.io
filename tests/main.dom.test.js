@@ -89,7 +89,9 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   };
 }
 
-const SECTION_IDS = ['hero', 'about', 'events', 'media', 'board', 'contact'];
+// Five, not six: media moved to media.html. boot() picks its renderer off
+// document.body.dataset.page, and these specs run against the default (home).
+const SECTION_IDS = ['hero', 'about', 'events', 'board', 'contact'];
 
 /** The current test's hand-driven rAF. Reassigned by the file-level beforeEach. */
 let frames;
@@ -522,7 +524,8 @@ describe('boot without IntersectionObserver', () => {
     await withoutIntersectionObserver(async () => {
       await import('../src/main.js');
       const rooms = document.querySelectorAll('.room');
-      expect(rooms.length, 'renderSections did not build the expected six rooms').toBe(6);
+      expect(rooms.length, 'renderSections did not build the expected five rooms')
+        .toBe(SECTION_IDS.length);
       for (const room of rooms) expect(room.classList.contains(PENDING_CLASS)).toBe(false);
     });
   });

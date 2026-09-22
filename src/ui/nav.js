@@ -1,12 +1,35 @@
 import { SITE } from '../content/index.js';
 
-/** Where the pills go, ordered as the page is. */
+/**
+ * Where the pills go, ordered as the page is.
+ *
+ * `page: 'media'` marks the one link that leaves the home page rather than jumping within
+ * it. Everything else is a section id.
+ */
 export const NAV_LINKS = Object.freeze([
   { label: 'About', target: 'about' },
   { label: 'Events', target: 'events' },
-  { label: 'Media', target: 'media' },
+  { label: 'Media', target: 'media', page: 'media' },
   { label: 'Board', target: 'board' },
 ]);
+
+/** The two pages, and the file each one lives at. */
+export const PAGES = Object.freeze({ home: './index.html', media: './media.html' });
+
+/**
+ * An href for `link`, as seen FROM `from`.
+ *
+ * A bare '#about' only means anything on the home page. From the media page the same pill
+ * has to be './index.html#about' — a real navigation, which is also why Lenis leaves it
+ * alone: its click handler only intercepts hrefs starting with '#' (src/scroll/smooth.js).
+ * Getting this wrong is silent: the pill still looks like a pill and simply does nothing.
+ */
+export function hrefFor(link, from = 'home') {
+  const onOwnPage = (link.page ?? 'home') === from;
+  if (onOwnPage) return `#${link.target}`;
+  if (link.page) return PAGES[link.page];
+  return `${PAGES.home}#${link.target}`;
+}
 
 /** The one filled control. A club page's job is to get people to turn up. */
 export const CTA = Object.freeze({ label: 'Join us', target: 'contact' });
@@ -59,14 +82,14 @@ export function observeNavHeight(nav, root = document.documentElement) {
   return () => { observer.disconnect(); stop(); };
 }
 
-export function buildNav() {
+export function buildNav({ page = 'home' } = {}) {
   const nav = document.createElement('nav');
   nav.className = 'site-nav';
   nav.setAttribute('aria-label', 'Sections');
 
   const wordmark = document.createElement('a');
   wordmark.className = 'site-nav-mark';
-  wordmark.href = '#hero';
+  wordmark.href = page === 'home' ? '#hero' : PAGES.home;
   wordmark.textContent = SITE.name;
   nav.append(wordmark);
 
@@ -74,8 +97,10 @@ export function buildNav() {
   pills.className = 'site-nav-links';
   for (const link of NAV_LINKS) {
     const a = document.createElement('a');
-    a.href = `#${link.target}`;
+    a.href = hrefFor(link, page);
     a.textContent = link.label;
+    // The pill for the page you are on says so, to a screen reader and to the stylesheet.
+    if ((link.page ?? 'home') === page) a.setAttribute('aria-current', 'page');
     pills.append(a);
   }
   nav.append(pills);
@@ -83,7 +108,7 @@ export function buildNav() {
   const cta = document.createElement('a');
   cta.className = 'site-nav-cta';
   cta.dataset.cta = 'true';
-  cta.href = `#${CTA.target}`;
+  cta.href = page === 'home' ? `#${CTA.target}` : `${PAGES.home}#${CTA.target}`;
   cta.textContent = CTA.label;
   nav.append(cta);
 

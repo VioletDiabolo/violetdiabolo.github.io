@@ -1,5 +1,5 @@
 import { buildNav } from './ui/nav.js';
-import { renderSections } from './ui/sections.js';
+import { renderSections, renderMediaPage } from './ui/sections.js';
 import { initReveal } from './ui/reveal.js';
 import { supportsWebGL, prefersReducedMotion } from './fallback/detect.js';
 import { createGradient } from './gradient/gradient.js';
@@ -11,8 +11,14 @@ export const APP_NAME = 'violet-diabolo';
 
 function boot() {
   const content = document.getElementById('content');
-  renderSections(content);
-  document.body.prepend(buildNav());
+  // One boot, two pages. index.html and media.html differ by this attribute alone —
+  // everything below (the graphics branch, the reduced-motion return, the
+  // no-IntersectionObserver guard) is the same sequence for both, because a second copy
+  // of a load-bearing ordering is a second thing to get wrong.
+  const page = document.body.dataset.page === 'media' ? 'media' : 'home';
+  if (page === 'media') renderMediaPage(content);
+  else renderSections(content);
+  document.body.prepend(buildNav({ page }));
   // Mounted before any graphics branch: content must never wait on WebGL.
   initReveal();
 

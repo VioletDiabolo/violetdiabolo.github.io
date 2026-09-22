@@ -3,15 +3,20 @@ export const SITE = {
   tagline: 'PREMIER DIABOLO TEAM AT NYU',
 };
 
+/**
+ * Cut roughly in half at the client's note that it ran too long — 100 words to 54. Every
+ * fact survives: the founding, the award, the art form, the Hell's Kitchen credit and the
+ * range of the work. What went was the restatement (three clauses all saying "we perform
+ * a lot, in a lot of places") and the third-person voice, which read like a grant
+ * application beside the rest of the page.
+ */
 export const ABOUT = {
   heading: 'ABOUT US',
   body:
     'Founded in the Spring of 2019, Violet Diabolo is NYU’s award-winning Chinese Yo-Yo team. ' +
-    'Adopting this traditional recreational pastime and blending it with energetic contemporary music, ' +
-    'Violet Diabolo aims to promote AAPI culture through showcasing their unique performing art. ' +
-    'The club has been invited to perform on Gordon Ramsey’s Hell’s Kitchen and has dazzled major ' +
-    'crowds at hundreds of other teaching engagements and performances at major galas, festivals, ' +
-    'non-profit events, schools, and fundraisers throughout the tri-state area.',
+    'We take a traditional pastime, set it to contemporary music, and use it to promote AAPI ' +
+    'culture through performance. The club has appeared on Gordon Ramsey’s Hell’s Kitchen and at ' +
+    'hundreds of galas, festivals, schools and fundraisers across the tri-state area.',
 };
 
 export const EVENTS = {
@@ -25,11 +30,39 @@ export const EVENTS = {
 // Headings for the sections that don't otherwise carry a `heading` field (MEDIA is an
 // array, BOARD is a semester map, CONTACT is just an email/linktree pair) - kept here so
 // ui/sections.js never hardcodes club-facing copy, matching ABOUT.heading/EVENTS.heading.
+/** One line under the MEDIA title on its own page, where a bare heading floats. */
+export const MEDIA_INTRO =
+  'Performances, competitions and a Friday on the lawn — the club’s own record of itself.';
+
 export const SECTION_HEADINGS = {
   media: 'MEDIA',
   board: 'BOARD',
   contact: 'CONTACT US',
 };
+
+/**
+ * Organisations the club has performed for, for the marquee under the About panel.
+ *
+ * PROVENANCE, because a claim on a club's own site should be traceable: every entry
+ * below is backed either by a video in MEDIA (the club's own recording of that
+ * performance) or by a confirmed booking email. "NYU Welcome" is the latter — Isabelle
+ * Ormsby's 25 Aug 2026 email confirming Violet Diabolo in the running order for the Club
+ * Showcase at Kimmel E&L on 14 Sept.
+ *
+ * INCOMPLETE, and deliberately not padded. The club's own inbox (violetdiabolo@gmail.com)
+ * was not reachable when this was written, so this is what could be evidenced from the
+ * media list plus one forwarded email. Add to it from the booking confirmations rather
+ * than from memory.
+ */
+export const PERFORMED_FOR = Object.freeze([
+  'NYU Welcome',
+  'VSA Holiday Night Market',
+  'USADA National Diabolo Competition',
+  'OGS Lunar New Year Celebration',
+  'TAP Lunar New Year Banquet',
+  'Asian Heritage Month Fall Fest',
+  'Chinatown Beautification Day',
+]);
 
 export const MEDIA = [
   { name: 'VSA Holiday Night Market - 2024', youtubeId: 'OF6nfdBX9OQ' },
@@ -148,11 +181,18 @@ export const FORMS = [
   },
 ];
 
+/**
+ * `icon` names a mark in src/ui/icons.js. It was carried here from the previous site and
+ * nothing read it for the whole of this rebuild — the socials rendered as text labels —
+ * which made it exactly the kind of inert data this project keeps finding. It is live now.
+ *
+ * GitHub is gone at the client's request. The label stays on every entry: it is the
+ * accessible name, since an icon on its own says nothing to a screen reader.
+ */
 export const SOCIALS = [
   { label: 'Instagram', href: 'https://instagram.com/violet_diabolo', icon: 'instagram' },
   { label: 'YouTube', href: 'https://www.youtube.com/@violetdiabolo2213', icon: 'youtube' },
   { label: 'NYU Engage', href: 'https://engage.nyu.edu/organization/violet-diabolo-all-university', icon: 'engage' },
-  { label: 'GitHub', href: 'https://github.com/VioletDiabolo/violetdiabolo.github.io', icon: 'github' },
 ];
 
 /**

@@ -160,22 +160,33 @@
    *      a column W wide can hold that word at W / --wordmark-em, so the hero h1 is
    *      capped at that size and the club's name never has to break mid-word.
    *
-   *      Measured at Inter 200 with the hero's -0.045em tracking, not guessed:
-   *      "DIABOLO" is 4.004em and "VIOLET" is 3.179em, so DIABOLO is what binds. (The
-   *      comment beside --type-hero in sections.css says VIOLET is the wider of the
-   *      two; that was measured at a different weight and is wrong for the hero.) 4.15
-   *      carries about 3.6% of margin for a font-file update, and the system fallback
-   *      is narrower still at 3.599em, so it has more margin rather than less.
+   *      Measured at the hero's LIVE weight and tracking, not guessed -- and re-measured
+   *      when the weight changed, because the two are coupled and nothing else would
+   *      have caught it. At Inter 400 / -0.045em, "DIABOLO" is 4.086em and "VIOLET" is
+   *      3.265em, so DIABOLO is what binds. (The comment beside --type-hero in
+   *      sections.css says VIOLET is the wider of the two; that was measured at a
+   *      different weight and is wrong for the hero.)
+   *
+   *      4.25 carries about 4% of margin. It was 4.15 while the hero was weight 200,
+   *      where DIABOLO measured 4.004em; going to 400 widened the word to 4.086 and cut
+   *      that margin to 1.6% without changing a single line of the cap's own code. The
+   *      system fallback is narrower still at 4.101em with no webfont, so it has margin
+   *      rather than less.
    *
    *      This is viewport-derived through the container, never rem-derived, which is
    *      what makes it hold at 200% text zoom -- the exact case where a rem floor under
    *      a vw preferred value wins and overflows the column. ---- */
-  --wordmark-em: 4.15;
+  --wordmark-em: 4.25;
 
   /* Two radii, because they mean different things: a card is a cut rectangle, a control
      is a pressable pill. One radius on everything is how a page stops having hierarchy. */
   --radius:      6px;
   --radius-pill: 999px;
+
+  /* The bar's own ground. --stage at 0.82 rather than an opaque fill: the gradient still
+     moves behind it, just far enough down that nothing in the bar has to compete. */
+  --bar:      rgba(8, 6, 13, 0.82);
+  --bar-edge: rgba(245, 242, 250, 0.10);
 
   --gutter: clamp(1.25rem, 5vw, 4.5rem);
 
@@ -213,6 +224,24 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+
+/*
+ * Off the screen, still in the accessibility tree. Used for a social link's text label
+ * once an icon has taken its place visually (src/ui/sections.js) — `display: none` or
+ * `visibility: hidden` would take the link's accessible NAME with it and leave a screen
+ * reader announcing the bare URL.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 html { -webkit-text-size-adjust: 100%; }
 
@@ -352,13 +381,23 @@ h1, h2, h3 {
   overflow-wrap: anywhere;
 }
 
-/* The display voice: Inter, run large and thin. Weight comes DOWN as size goes up --
-   200 is only legible because the hero is set at 9rem; the section titles, a step
-   smaller, need 300 to hold the same visual weight of line. */
+/*
+ * The display voice: Inter.
+ *
+ * 700, not the 300 this ran at. The client's note was that every heading on the page
+ * carried the same weight and nothing stood above anything else -- which was true: h2 at
+ * 300 and body at 400 meant the SECTION TITLES were lighter than the prose under them.
+ * There are three weights on the page now and they step in the order you read them:
+ * section titles 700, the hero wordmark 400 (its own rule in sections.css -- 700 at 115px
+ * is a slab, not a wordmark), card headings 500.
+ *
+ * The tracking goes with it. -0.03em was drawn for a hairline; at 700 the letters are
+ * thicker and the same negative tracking closes the counters, so it eases to -0.02em.
+ */
 h1, h2 {
   font-family: var(--font-display);
-  font-weight: 300;
-  letter-spacing: -0.03em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 /* Card headings (board, media, forms) stay on the body face: they are read at a glance
@@ -458,6 +497,21 @@ a:hover {
   gap: clamp(0.35rem, 1.2vw, 0.9rem);
   min-height: var(--nav-h);
   padding: 0.5rem var(--gutter);
+
+  /*
+   * An actual bar, at the client's request: "its not accessible when u just make it like
+   * a floating idk". It was a row of chips over bare page, so whatever the page was
+   * scrolling past ran between and behind them -- a paragraph's descenders crossing the
+   * pill row, which their screenshot caught mid-scroll.
+   *
+   * --bar is --stage at 0.82, so the ground under the chips is the page's own near-black
+   * however bright the ribbon passing beneath it. The blur is what stops the gradient
+   * reading as a moving pattern THROUGH the bar; the hairline is what gives it an edge
+   * where it meets the panel below, which a translucent fill alone does not.
+   */
+  background: var(--bar);
+  backdrop-filter: blur(18px) saturate(1.1);
+  border-bottom: 1px solid var(--bar-edge);
 }
 
 /*
@@ -551,10 +605,15 @@ a:hover {
   border-radius: var(--radius-pill);
   padding: 0.45rem 0.9rem;
   font-size: var(--type-micro);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
+  /* Caps, with tracking opened to match: set solid, caps at 12.5px close up and read as
+     one block. The labels stay mixed-case in content (src/ui/nav.js) -- this is how they
+     are SET, not what they say, and a screen reader still hears "About". */
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -564,6 +623,13 @@ a:hover {
 }
 
 .site-nav-links a:hover {
+  background: var(--chip-hover);
+  color: var(--ink);
+}
+
+/* The page you are on. Marked in the markup too (aria-current), so this is the visible
+   half of a state a screen reader already hears rather than the only signal. */
+.site-nav-links a[aria-current='page'] {
   background: var(--chip-hover);
   color: var(--ink);
 }

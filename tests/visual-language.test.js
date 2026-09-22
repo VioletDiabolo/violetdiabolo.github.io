@@ -139,10 +139,15 @@ describe('glass', () => {
     // The blanket ban existed because backdrop-filter was being used to rescue text
     // laid over the 3D object. That object is gone; glass panels are a deliberate
     // surface. The ban is narrowed, not lifted: still nothing blurred behind plain text.
+    // .site-nav joins the allowlist: it is CHROME, not a plate slid under running text.
+    // The bar blurs what scrolls past underneath it so the gradient does not read as a
+    // moving pattern through the pill row. The rule this guards is unchanged -- nothing
+    // may blur behind body copy -- and the list stays two entries long.
+    const ALLOWED = /\[data-surface=['"]?glass|^\.site-nav$/;
     for (const rule of leafRules(allCss())) {
       if (!/backdrop-filter/.test(rule.body)) continue;
-      expect(rule.selector, `${rule.selector} blurs without being glass`)
-        .toMatch(/\[data-surface=['"]?glass/);
+      expect(rule.selector.trim(), `${rule.selector} blurs without being glass or the bar`)
+        .toMatch(ALLOWED);
     }
   });
 
@@ -683,32 +688,36 @@ describe('the shader bench', () => {
   });
 
   it('stays out of the build', () => {
-    // Vite's only entry is index.html; nothing may pull scripts/ into dist/.
+    // Nothing may pull scripts/ into dist/.
     expect(read('../index.html')).not.toMatch(/check-shader/);
     expect(read('../index.html')).not.toMatch(/check-contrast/);
 
-    // The claim is "no second rollup entry", so that is what is banned -- an
-    // `input` key inside a rollupOptions block, in either spelling. The version this
-    // replaces banned the bare substring `input` ANYWHERE in the file, which would have
-    // failed on the word "input" in a comment, on `assetsInlineLimit` if it were ever
-    // spelled differently, and on any future option whose name contains it.
+    // THE BAN ON A SECOND ENTRY IS GONE, and what it stood for is asserted directly.
     //
-    // A second fix pass found THIS version too narrow rather than too wide. `[^}]*`
-    // cannot cross a closing brace, so it only ever looked inside the FIRST nested block
-    // of `rollupOptions`: `rollupOptions: { output: { manualChunks: undefined },
-    // input: 'x.html' }` -- output before input, an entirely ordinary way to write a
-    // Vite config -- walked straight past it the moment `output` (or any other nested
-    // option) sat between the opening brace and `input`. `[\s\S]*?` has no such wall: it
-    // scans lazily for the first `input:` anywhere after `rollupOptions:`, so a nested
-    // block in between no longer hides it. The comment strip above is what still keeps
-    // this from firing on the word appearing in prose -- that guarantee did not change.
+    // It banned any `rollupOptions.input` at all, on the reasoning that Vite's only entry
+    // was index.html so a second one could only be scripts/ reaching dist/. media.html
+    // made the premise false — there are two legitimate entries now — while the thing
+    // worth protecting did not change. So this checks the entries THEMSELVES: every one
+    // must be a root-level .html file, none may live under scripts/, and none may pull a
+    // probe in. A proxy that has outlived its premise is worse than no guard, because it
+    // fails on correct work and says nothing about the real risk.
     const config = read('../vite.config.js')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/.*$/gm, '');
-    expect(config, 'vite.config.js declares a second rollup entry; scripts/ can reach dist/')
-      .not.toMatch(/rollupOptions\s*:[\s\S]*?\binput\b\s*:/);
-    expect(config, 'vite.config.js sets rollupOptions.input; scripts/ can reach dist/')
-      .not.toMatch(/rollupOptions\s*\.\s*input/);
+    const block = /rollupOptions\s*:\s*\{[\s\S]*?input\s*:\s*(\{[\s\S]*?\}|\[[\s\S]*?\]|'[^']*'|"[^"]*")/.exec(config);
+    const entries = block ? [...block[1].matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]) : ['index.html'];
+
+    expect(entries.length, 'no build entry resolved at all — this guard is reading nothing')
+      .toBeGreaterThan(0);
+    for (const entry of entries) {
+      expect(entry, `${entry} is a build entry outside the project root`).toMatch(/^[\w-]+\.html$/);
+      expect(entry, `${entry} would pull scripts/ into dist/`).not.toMatch(/^scripts\//);
+      // And the entry itself must not reference a probe, which is how scripts/ would
+      // actually arrive in dist/ — by being imported, not by being listed.
+      const html = read(`../${entry}`);
+      expect(html, `${entry} references check-shader`).not.toMatch(/check-shader/);
+      expect(html, `${entry} references check-contrast`).not.toMatch(/check-contrast/);
+    }
   });
 });
 
@@ -1073,7 +1082,13 @@ describe('the horizontal overflow at 200% text zoom', () => {
     // going to fit regardless -- exactly the shape of every other fix in this group.
     const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
     for (const [name, px] of [['board-list', 240], ['media-list', 230]]) {
-      const rule = css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`));
+      // `(?:^|\})\s*` anchors this to the rule whose selector IS `.media-list`, not to
+      // any rule whose selector merely ENDS in it. Unanchored, the media page's
+      // `[data-panel='page'] .media-list` override matched first -- it sits earlier in
+      // the file -- and the guard read a rule that deliberately has no floor at all,
+      // reporting a defect in correct work. Same lesson the --type-title guard learned:
+      // a regex that finds the first plausible match finds the wrong one eventually.
+      const rule = new RegExp(`(?:^|\\})\\s*\\.${name}\\s*\\{([^}]*)\\}`).exec(css);
       expect(rule, `.${name} has no base rule any more`).not.toBeNull();
       expect(rule[1], `.${name}'s column floor can push its grid past the viewport again`)
         .toMatch(new RegExp(`minmax\\(\\s*min\\(\\s*${px}px\\s*,\\s*100%\\s*\\)`));

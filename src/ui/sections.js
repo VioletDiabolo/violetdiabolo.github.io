@@ -1,9 +1,11 @@
 import {
-  SITE, ABOUT, EVENTS, CONTACT, SOCIALS, SECTION_HEADINGS, PHOTOS,
+  SITE, ABOUT, EVENTS, CONTACT, SOCIALS, SECTION_HEADINGS, PHOTOS, MEDIA_INTRO,
 } from '../content/index.js';
 import { mountBoard } from './board.js';
 import { mountMedia } from './media.js';
 import { mountGallery } from './gallery.js';
+import { buildIcon } from './icons.js';
+import { PERFORMED_FOR } from '../content/index.js';
 import { mountForms } from './forms.js';
 import { buildPicture } from './picture.js';
 
@@ -54,7 +56,7 @@ function section(id, headingText, panel, surface, level = 'h2') {
     head.append(heading);
   }
 
-  return { el, head, body };
+  return { el, room: inner, head, body };
 }
 
 function paragraph(text) {
@@ -70,6 +72,70 @@ function figure(photo, sizes, loading) {
   return fig;
 }
 
+/**
+ * The media page's own body. Same nav, same gradient, same panel vocabulary — the videos
+ * and the practice gallery simply have a page to themselves instead of a panel at the
+ * bottom of the home page, at the client's request.
+ *
+ * Not a second entry point: index.html and media.html both load src/main.js and differ
+ * only by `data-page` on <body>. The boot sequence in main.js is load-bearing (content
+ * before any graphics branch, the reduced-motion return, the no-IntersectionObserver
+ * guard) and a second copy of it is a second thing to get wrong.
+ */
+export function renderMediaPage(root) {
+  const media = section('media', SECTION_HEADINGS.media, 'page', 'solid');
+  media.head.append(paragraph(MEDIA_INTRO));
+  mountMedia(media.body);
+  mountGallery(media.body);
+
+  const footer = document.createElement('footer');
+  footer.dataset.section = 'footer';
+  footer.className = 'section-footer';
+  const footerLine = document.createElement('p');
+  footerLine.className = 'footer-line';
+  footerLine.textContent = `${SITE.name} ${new Date().getFullYear()}`;
+  footer.append(footerLine);
+
+  root.replaceChildren(media.el, footer);
+}
+
+/**
+ * The names the club has performed under, running as a marquee.
+ *
+ * The list is duplicated into a second track and the pair is translated by exactly -50%,
+ * so the moment the first track leaves the frame the second is where it started and the
+ * loop has no seam. That is why `aria-hidden` is on the copy and not on both: a screen
+ * reader should hear the list once, and a keyboard user should never tab into a duplicate.
+ *
+ * It is a <ul>, so what is announced is a list of seven organisations rather than one
+ * run-on line, and it stops on `prefers-reduced-motion` (src/styles/sections.css) — a
+ * loop that cannot be paused is the accessibility complaint this pattern usually earns.
+ */
+function marquee() {
+  const strip = document.createElement('div');
+  strip.className = 'marquee';
+  strip.dataset.marquee = 'performed-for';
+
+  const track = document.createElement('div');
+  track.className = 'marquee-track';
+
+  const list = (hidden) => {
+    const ul = document.createElement('ul');
+    ul.className = 'marquee-list';
+    if (hidden) ul.setAttribute('aria-hidden', 'true');
+    for (const name of PERFORMED_FOR) {
+      const li = document.createElement('li');
+      li.textContent = name;
+      ul.append(li);
+    }
+    return ul;
+  };
+
+  track.append(list(false), list(true));
+  strip.append(track);
+  return strip;
+}
+
 export function renderSections(root) {
   const hero = section('hero', SITE.name, 'hero', undefined, 'h1');
   hero.head.append(paragraph(SITE.tagline));
@@ -81,17 +147,17 @@ export function renderSections(root) {
   const about = section('about', ABOUT.heading, 'story', 'glass');
   about.head.append(paragraph(ABOUT.body));
   about.body.append(figure(PHOTOS.group, '(max-width: 900px) 92vw, 46vw', 'lazy'));
+  about.room.append(marquee());
 
+  // The copy and both form buttons go in the HEAD, which is the left column; the body
+  // holds nothing but the photograph. Before this the head was the heading alone and
+  // everything else sat in the right column, leaving the bottom-left quadrant of a
+  // full-screen panel empty — the "unnecessary white space on the left side" the client
+  // photographed.
   const events = section('events', EVENTS.heading, 'feature', 'glass');
-  events.body.append(paragraph(EVENTS.body));
-  events.body.append(figure(PHOTOS.events, '(max-width: 767px) 92vw, 46vw', 'lazy'));
-  mountForms(events.body);
-
-  const media = section('media', SECTION_HEADINGS.media, 'grid', 'solid');
-  mountMedia(media.body);
-  // Photographs after the videos, in the same panel: both are the club's own record of
-  // itself, and a seventh nav entry for six pictures is a heavier thing than the pictures.
-  mountGallery(media.body);
+  events.head.append(paragraph(EVENTS.body));
+  mountForms(events.head);
+  events.body.append(figure(PHOTOS.events, '(max-width: 767px) 92vw, 34vw', 'lazy'));
 
   const board = section('board', SECTION_HEADINGS.board, 'grid', 'solid');
   mountBoard(board.body);
@@ -120,9 +186,19 @@ export function renderSections(root) {
   for (const s of SOCIALS) {
     const a = document.createElement('a');
     a.href = s.href;
-    a.textContent = s.label;
     a.rel = 'noreferrer';
     a.target = '_blank';
+    const mark = buildIcon(s.icon);
+    if (mark) a.append(mark);
+    // The label is always in the DOM, never replaced by the mark: it is the link's
+    // accessible name. `.visually-hidden` takes it off the screen without taking it out
+    // of the accessibility tree, and it comes back as visible text if the icon is ever
+    // missing (buildIcon returns null), so a link can never end up with no name at all.
+    const label = document.createElement('span');
+    label.className = mark ? 'visually-hidden' : '';
+    label.textContent = s.label;
+    a.append(label);
+    if (mark) a.title = s.label;
     socials.append(a);
   }
   // Socials belong with the sign-off in the text column, not out among the pictures:
@@ -144,5 +220,5 @@ export function renderSections(root) {
   footerLine.textContent = `${SITE.name} ${new Date().getFullYear()}`;
   footer.append(footerLine);
 
-  root.replaceChildren(hero.el, about.el, events.el, media.el, board.el, contact.el, footer);
+  root.replaceChildren(hero.el, about.el, events.el, board.el, contact.el, footer);
 }
