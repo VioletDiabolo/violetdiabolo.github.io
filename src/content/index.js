@@ -10,6 +10,18 @@ export const SITE = {
  * a lot, in a lot of places") and the third-person voice, which read like a grant
  * application beside the rest of the page.
  */
+/**
+ * The club's mark, for the nav bar.
+ *
+ * `alt: ''` on purpose. It sits inside the wordmark link, which already carries the text
+ * "VIOLET DIABOLO" — giving the image a name as well would have a screen reader announce
+ * the club twice for one link. Decorative here is the accurate description, not a
+ * shortcut.
+ */
+export const LOGO = Object.freeze({
+  base: 'logo', widths: [64, 128], width: 128, height: 149, alt: '',
+});
+
 export const ABOUT = {
   heading: 'ABOUT US',
   body:

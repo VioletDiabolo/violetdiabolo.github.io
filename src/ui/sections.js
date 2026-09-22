@@ -73,6 +73,26 @@ function figure(photo, sizes, loading) {
 }
 
 /**
+ * The club name and the year, as the last line INSIDE the last panel.
+ *
+ * There is no standalone <footer> any more. It was a full-bleed strip after the contact
+ * panel with one line in it, and between the panel's own bottom gap and the strip's
+ * padding the page ended on a screenful of gradient -- "remove the whitespace from the
+ * bottom entirely, treat Contact us as a footer". So the sign-off moved inside, the last
+ * panel loses its trailing gap (sections.css), and the page now ends on the plate.
+ *
+ * Appended to `.room` rather than to head or body: it spans both of a grid panel's
+ * columns, which neither of those can do from inside one of them.
+ */
+function signoff() {
+  const line = document.createElement('p');
+  line.className = 'footer-line';
+  // Computed at render time, never hardcoded.
+  line.textContent = `${SITE.name} ${new Date().getFullYear()}`;
+  return line;
+}
+
+/**
  * The media page's own body. Same nav, same gradient, same panel vocabulary — the videos
  * and the practice gallery simply have a page to themselves instead of a panel at the
  * bottom of the home page, at the client's request.
@@ -87,16 +107,9 @@ export function renderMediaPage(root) {
   media.head.append(paragraph(MEDIA_INTRO));
   mountMedia(media.body);
   mountGallery(media.body);
+  media.room.append(signoff());
 
-  const footer = document.createElement('footer');
-  footer.dataset.section = 'footer';
-  footer.className = 'section-footer';
-  const footerLine = document.createElement('p');
-  footerLine.className = 'footer-line';
-  footerLine.textContent = `${SITE.name} ${new Date().getFullYear()}`;
-  footer.append(footerLine);
-
-  root.replaceChildren(media.el, footer);
+  root.replaceChildren(media.el);
 }
 
 /**
@@ -207,18 +220,7 @@ export function renderSections(root) {
   contact.head.append(socials);
   contact.body.append(figure(PHOTOS.wide, '(max-width: 900px) 92vw, 46vw'));
 
-  // No 3D object plays behind this line any more (this branch strips it) -- sections.css's
-  // .section-footer comment still walks through why it used to be left-aligned rather
-  // than centred there; the other reason it gives (matching the rest of the page, which
-  // is left-aligned throughout) is the one still live. Year is computed at render time,
-  // never hardcoded.
-  const footer = document.createElement('footer');
-  footer.dataset.section = 'footer';
-  footer.className = 'section-footer';
-  const footerLine = document.createElement('p');
-  footerLine.className = 'footer-line';
-  footerLine.textContent = `${SITE.name} ${new Date().getFullYear()}`;
-  footer.append(footerLine);
+  contact.room.append(signoff());
 
-  root.replaceChildren(hero.el, about.el, events.el, board.el, contact.el, footer);
+  root.replaceChildren(hero.el, about.el, events.el, board.el, contact.el);
 }

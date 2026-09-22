@@ -185,8 +185,11 @@
 
   /* The bar's own ground. --stage at 0.82 rather than an opaque fill: the gradient still
      moves behind it, just far enough down that nothing in the bar has to compete. */
-  --bar:      rgba(8, 6, 13, 0.82);
-  --bar-edge: rgba(245, 242, 250, 0.10);
+  --bar: rgba(8, 6, 13, 0.82);
+  /* The one hairline on the page: under the nav bar, and over the sign-off line inside
+     the last panel. Named for what it IS rather than where it first appeared -- it was
+     --bar-edge until the footer wanted the same rule. */
+  --hairline: rgba(245, 242, 250, 0.10);
 
   --gutter: clamp(1.25rem, 5vw, 4.5rem);
 
@@ -511,7 +514,7 @@ a:hover {
    */
   background: var(--bar);
   backdrop-filter: blur(18px) saturate(1.1);
-  border-bottom: 1px solid var(--bar-edge);
+  border-bottom: 1px solid var(--hairline);
 }
 
 /*
@@ -531,6 +534,9 @@ a:hover {
 }
 
 .site-nav-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   margin-right: auto;
   /* 0 1 auto: hugs its text like every other chip, and can give a little back if a line
      ever runs short. Not `1 1 auto` -- tried, and grow made the wordmark a 920px chip at
@@ -622,6 +628,18 @@ a:hover {
   color: var(--ink);
 }
 
+/* 1.75rem, sized off the TEXT rather than a fixed px: at 200% zoom the label beside it
+   doubles, and a mark that did not would look like a stray dot. The picture carries its
+   own intrinsic ratio (src/ui/picture.js), so `height: auto` needs no aspect-ratio here. */
+.site-nav-mark img {
+  display: block;
+  width: auto;
+  height: 1.75rem;
+  flex: 0 0 auto;
+}
+
+.site-nav-name { min-width: 0; }
+
 .site-nav-links a:hover {
   background: var(--chip-hover);
   color: var(--ink);
@@ -663,8 +681,18 @@ a:hover {
     padding-inline: clamp(0.75rem, 4vw, 1.25rem);
   }
 
-  .site-nav-mark {
+  /*
+   * The NAME goes, the mark stays. This used to hide the whole chip, on the reasoning
+   * that the hero's h1 says the club's name sixty pixels below it -- still true of the
+   * name, and the reason it is the half that goes. The logo is ~28px against the 140px
+   * the full chip took, so the pill row keeps the width that rationale was protecting.
+   */
+  .site-nav-name {
     display: none;
+  }
+
+  .site-nav-mark {
+    padding-inline: 0.5rem;
   }
 
   .site-nav-cta {
