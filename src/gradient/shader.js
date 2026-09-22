@@ -23,8 +23,17 @@ void main() { gl_Position = vec4(a_position, 0.0, 1.0); }
  * ribbon function reads, which turns straight bands into swirls. Raising the warp
  * amplitudes makes it more turbulent; adding bands makes it busier.
  *
- * `u_velocity` is added to the time term rather than multiplied into it, so a fast
- * scroll pushes the animation forward instead of changing its speed permanently.
+ * There is no velocity uniform. Scroll acceleration lives entirely in how fast
+ * `u_time` is advanced (src/gradient/gradient.js) rather than in a second term added to
+ * it here. The version this replaces did the latter -- `t = u_time + u_velocity`, with
+ * u_velocity clamped to +/-4 -- and it could not work: the clamp is four seconds of
+ * motion, real scroll velocities saturate it instantly, so the picture jumped forward,
+ * froze at the offset for the length of the scroll, and snapped back at the end.
+ *
+ * The coefficients below (0.055, 0.031) are therefore RATIOS, not speeds. They set how
+ * the two warp octaves move relative to each other; the pace they share is
+ * RESTING_RATE in gradient.js. Changing one here changes the character of the motion,
+ * changing RESTING_RATE changes its speed.
  *
  * TWO DEFECTS THIS REPLACES, both in the constants as first written:
  *
@@ -46,7 +55,6 @@ precision highp float;
 
 uniform vec2 u_resolution;
 uniform float u_time;
-uniform float u_velocity;
 uniform vec3 u_deep;
 uniform vec3 u_mid;
 uniform vec3 u_bright;
@@ -99,7 +107,7 @@ void main() {
   vec2 p = gl_FragCoord.xy / u_resolution - 0.5;
   p.x *= u_resolution.x / u_resolution.y;
 
-  float t = u_time + u_velocity;
+  float t = u_time;
 
   // 0.95 rad, and the ribbons run along (sin a, cos a) -- about 36 degrees above
   // horizontal, bottom-left to top-right. mat2 fills columns, so this literal is R(a).

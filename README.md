@@ -11,7 +11,7 @@ npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (runs `npm run assets` first)
 npm run preview      # Serve the built dist/ locally
-npm test             # 216 tests across 17 test files
+npm test             # 232 tests across 17 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -31,10 +31,10 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | Path | Purpose |
 |---|---|
 | `src/content/index.js` | Club identity, board members, events, videos, forms, socials, photos. No markup. Mutations here flow everywhere. |
-| `src/ui/` | DOM rendering: the fixed nav (`nav.js`), the six panels (`sections.js`), board cards (`board.js`), video facades (`media.js`), form facades (`forms.js`), responsive `<picture>` (`picture.js`), scroll reveal (`reveal.js`). No WebGL. |
+| `src/ui/` | DOM rendering: the fixed nav (`nav.js`), the six panels (`sections.js`), board cards (`board.js`), video facades (`media.js`), form facades (`forms.js`), responsive `<picture>` (`picture.js`), the practice gallery (`gallery.js`), scroll reveal (`reveal.js`). No WebGL. |
 | `src/gradient/` | `palette.js` (three stops), `shader.js` (the GLSL), `gradient.js` (the WebGL state), `contrast.js` (contrast arithmetic — **test and probe only, never bundled**). |
 | `src/render/` | `lifecycle.js` (when the loop may run), `budget.js` (`TARGET_FPS`, `RENDER_SCALE`, the frame cap). |
-| `src/scroll/smooth.js` | Lenis inertia scrolling, and the source of the gradient's velocity uniform. |
+| `src/scroll/smooth.js` | Lenis inertia scrolling, and the source of the gradient's scroll boost. |
 | `src/fallback/detect.js` | Feature detection: `supportsWebGL()`, `prefersReducedMotion()`. |
 | `src/styles/` | `base.css` (tokens, reset, typography, nav, focus, scroll reveal), `sections.css` (the four panel patterns and the two surfaces). Two files, no third. |
 | `src/main.js` | `boot()`: render content, mount the nav, mount the reveal, then branch on WebGL and reduced motion. |
@@ -42,7 +42,7 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | `scripts/check-shader.html` | Dev-time shader bench: compile, frame cost with a zero-render control, luminance histogram. |
 | `scripts/check-contrast.html` | Dev-time contrast probe over the real page. Needs `npm run dev` — it imports `contrast.js`, which the build excludes. |
 | `scripts/bench-verdict.mjs` | The pass/fail decision the shader bench calls, as a module so the suite can falsify it. |
-| `tests/` | 216 tests across 17 files — see **Testing**. |
+| `tests/` | 232 tests across 17 files — see **Testing**. |
 | `public/images/` | Generated derivatives (`npm run assets`). Masters live in `assets-src/`. |
 | `docs/VERIFICATION.md` | What was measured in a real browser, on a named GPU, and what could not be. |
 
@@ -102,7 +102,11 @@ Three stops, dark to light (`src/gradient/palette.js`):
 
 Measured over twelve time steps at 1440×900, **at least 85.43 % of pixels sit below relative luminance 0.02 in every step** (worst step 5; best 93.24 %), and the median pixel is exactly `deep`. That is the per-step minimum, not the pooled 89.17 % — pooling is exactly what would hide a single bright frame.
 
-`u_velocity` is *added* to the time term rather than multiplied into it, so a fast scroll pushes the animation forward instead of changing its speed permanently. Lenis supplies it (`src/scroll/smooth.js`), clamped to `MAX_VELOCITY`.
+**Scrolling accelerates the drift; it does not offset it.** `gradient.js` advances `u_time` at `RESTING_RATE` (3 units/second) multiplied by `1 + boost`, where `boost` is Lenis's reported speed mapped onto `MAX_BOOST` — smoothed toward its target, and decayed away once Lenis stops reporting. The multiplier is never below 1, so the clock only ever moves forward and faster.
+
+There is no velocity uniform. The version this replaces had one, added to the time term (`t = u_time + u_velocity`, clamped to ±4), and it could not work: real scroll velocities are 2–273 px/frame, so the clamp saturated instantly. The picture jumped four seconds forward, froze there for the length of the scroll, and snapped *backwards* on release. Measured as pixel path length over one second: rest 30.9, gentle scroll 35.7, brisk 71.5, fling 85.3.
+
+The shader's warp coefficients (0.055, 0.031) are the **ratio** between its two octaves, not speeds — `RESTING_RATE` is the pace they share.
 
 ### What it is allowed to cost
 
@@ -154,25 +158,25 @@ Widths cap at 2000 px, not 2400. Measured on the 4032×3024 master: at 2400 the 
 npm test
 ```
 
-**216 tests across 17 files**, all passing, with no stderr noise.
+**232 tests across 17 files**, all passing, with no stderr noise.
 
 | file | tests | covers |
 |---|---|---|
 | `visual-language.test.js` | 57 | the deleted design elements' absence, the four panel patterns, glass and accent discipline, the focus ring on both grounds, the luminance ceiling, the shader's two fixed defects, the bench and probe wiring, the nav pill row and height, 200 % text zoom |
-| `ui.dom.test.js` | 17 | DOM structure for every panel, media and form facades, the footer, and the content boundary |
+| `ui.dom.test.js` | 21 | DOM structure for every panel, media and form facades, the practice gallery and its reserved cells, the footer, and the content boundary |
 | `lifecycle.test.js` | 17 | pause/resume on visibility and intersection, delta clamping, teardown; the no-animation-engine and no-`animejs`-dependency guards |
 | `contrast.test.js` | 15 | `relativeLuminance`, `contrastRatio`, `worstCase` (including its non-finite guard), `TIME_STEPS` |
 | `smooth.dom.test.js` | 14 | Lenis construction, anchor interception, modifier-click opt-out, teardown, and installing nothing under reduced motion |
 | `main.dom.test.js` | 17 | boot ordering, both fallback paths, the gradient mount, and the animated `onFrame` composition |
-| `gradient.dom.test.js` | 12 | shader compile/link, uniform plumbing, failure cleanup, resize |
+| `gradient.dom.test.js` | 15 | shader compile/link, uniform plumbing, scroll acceleration (rate, direction, cap, decay, monotonicity), failure cleanup, resize |
 | `nav.dom.test.js` | 12 | the links, the CTA, the markup, and `--nav-offset`'s `ResizeObserver` |
-| `content.test.js` | 11 | apostrophe preservation, board structure, media list, contact details |
+| `content.test.js` | 14 | apostrophe preservation, board structure, the practice timetable and its hero teaser, media list, photograph alt text, contact details |
 | `budget.test.js` | 9 | the frame cap's accumulation and `renderSize`'s clamp |
 | `reveal.dom.test.js` | 9 | the reveal's pending/visible classes, one-shot unobserve, reduced motion, and the no-`IntersectionObserver` guard |
-| `assets.test.js` | 7 | the image pipeline's derivatives and the 400 KB budget |
+| `assets.test.js` | 8 | the image pipeline's derivatives, EXIF orientation, and the 400 KB budget |
 | `palette.test.js` | 5 | three stops, ordering, range, and that it is violet rather than blue |
 | `panels.dom.test.js` | 5 | `data-panel` / `data-surface` stamping |
-| `sections-layout.dom.test.js` | 4 | the grid panel's title size, that nothing resolves to sticky, and that the scan proving it is not blind |
+| `sections-layout.dom.test.js` | 9 | the grid panel's title size, the hero wordmark's size cap, that nothing resolves to sticky, that the scan proving it is not blind, and that the contrast probe's block list covers every element that paints text |
 | `detect.dom.test.js` | 4 | WebGL and reduced-motion detection |
 | `smoke.test.js` | 1 | module load |
 
@@ -180,7 +184,7 @@ npm test
 
 From **§10 of [`docs/VERIFICATION.md`](docs/VERIFICATION.md)**, which lists eleven. The ones worth knowing before you change anything:
 
-1. **Live scroll input is not verified end to end.** The verification host delivers no `requestAnimationFrame` of its own, so Lenis was stepped by hand with real timestamps and anchor activation was synthesized. Wheel and touch inertia, and the velocity uniform under real input, rest on `tests/smooth.dom.test.js` and `tests/gradient.dom.test.js` alone. The sustained frame rate and the 30 fps cap in a live visible tab are likewise unmeasured — the *frame cost* is a real GPU timer query; the *achieved* rate is not.
+1. **Live scroll input is not verified end to end.** The verification host delivers no `requestAnimationFrame` of its own, so Lenis was stepped by hand with real timestamps and anchor activation was synthesized. Wheel and touch inertia, and the scroll boost under real input, rest on `tests/smooth.dom.test.js` and `tests/gradient.dom.test.js` alone. The sustained frame rate and the 30 fps cap in a live visible tab are likewise unmeasured — the *frame cost* is a real GPU timer query; the *achieved* rate is not.
 
 2. **The `IntersectionObserver` pause is unreachable by design, not merely unverified.** `createLifecycle` gates the loop on intersection **and** visibility, but `main.js` observes `#gradient`, which is `position: fixed; inset: 0` — it covers the viewport at every scroll position and can never stop intersecting. The observer reports `isIntersecting: true` at first delivery and never flips. **`document.hidden` is the only gate that fires live**; the observer half is defensive depth, exercised only through an injected observer in tests. (The previous version of this page made the identical argument about a `position: sticky` stage. The stage is gone, the stickiness is gone, and the conclusion survived both.)
 

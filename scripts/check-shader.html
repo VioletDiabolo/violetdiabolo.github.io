@@ -90,6 +90,7 @@
 <script type="module">
 import { VERTEX_SHADER, FRAGMENT_SHADER } from '../src/gradient/shader.js';
 import { PALETTE } from '../src/gradient/palette.js';
+import { RESTING_RATE } from '../src/gradient/gradient.js';
 // The pass/fail decision lives in a module so the unit suite can RUN it rather than
 // grep for it -- see the header of bench-verdict.mjs.
 import { costVerdict, FRAME_BUDGET_MS } from './bench-verdict.mjs';
@@ -164,7 +165,7 @@ function bind(gl, program) {
   gl.uniform3f(u('u_deep'), ...PALETTE.deep);
   gl.uniform3f(u('u_mid'), ...PALETTE.mid);
   gl.uniform3f(u('u_bright'), ...PALETTE.bright);
-  return { uTime: u('u_time'), uVelocity: u('u_velocity'), uResolution: u('u_resolution') };
+  return { uTime: u('u_time'), uResolution: u('u_resolution') };
 }
 
 /* ---------------------------------------------------------------------------
@@ -176,9 +177,16 @@ function bind(gl, program) {
 const channel = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
 const luminance = (r, g, b) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 
-/** Matches TIME_STEPS in src/gradient/contrast.js; four seconds apart covers a cycle. */
+/**
+ * Matches TIME_STEPS in src/gradient/contrast.js. The step is in SHADER TIME UNITS,
+ * not seconds: gradient.js advances u_time at RESTING_RATE units per second, so these
+ * 12 steps of 4 units span 48 units -- about 16 wall-clock seconds at rest, and less
+ * under a scroll boost, but the same 48 units of u_time either way. The unit is what
+ * the shader sees and therefore what the darkness figures below are certified against;
+ * the wall-clock equivalent moves whenever RESTING_RATE does.
+ */
 const TIME_STEPS = intParam('steps', 12, 1, 64);
-const STEP_SECONDS = 4;
+const STEP_UNITS = 4;
 
 /**
  * The luminance histogram, with the "most of the frame is near-black" constraint
@@ -200,9 +208,8 @@ function histogram(gl, loc, width, height) {
   const perStep = [];
   gl.viewport(0, 0, width, height);
   gl.uniform2f(loc.uResolution, width, height);
-  gl.uniform1f(loc.uVelocity, 0);
   for (let step = 0; step < TIME_STEPS; step++) {
-    gl.uniform1f(loc.uTime, step * STEP_SECONDS);
+    gl.uniform1f(loc.uTime, step * STEP_UNITS);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     let stepUnder01 = 0;
@@ -223,7 +230,7 @@ function histogram(gl, loc, width, height) {
     }
     perStep.push({
       step,
-      time: step * STEP_SECONDS,
+      time: step * STEP_UNITS,
       max: stepMax,
       under0_01: stepUnder01 / stepCount,
       under0_02: stepUnder02 / stepCount,
@@ -347,7 +354,6 @@ async function frameCost(gl, loc, timer, width, height) {
   const body = (draw) => () => {
     for (let i = 0; i < DRAWS; i++) {
       gl.uniform1f(loc.uTime, i * 0.033);
-      gl.uniform1f(loc.uVelocity, 0);
       if (draw) gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
   };
@@ -505,7 +511,6 @@ async function main() {
       const ploc = bind(pgl, pbuilt.program);
       pgl.viewport(0, 0, preview.width, preview.height);
       pgl.uniform2f(ploc.uResolution, preview.width, preview.height);
-      pgl.uniform1f(ploc.uVelocity, 0);
       let t = 0;
       const step = (dt) => {
         t += dt;
@@ -513,7 +518,9 @@ async function main() {
         pgl.drawArrays(pgl.TRIANGLES, 0, 6);
       };
       step(0);
-      setInterval(() => step(1 / 30), 33);
+      // RESTING_RATE, so the preview drifts at the speed the page actually ships at
+      // rather than at the 1 unit/second this hardcoded before the rate was named.
+      setInterval(() => step(RESTING_RATE / 30), 33);
       window.__shaderBench.step = step;
     }
   }

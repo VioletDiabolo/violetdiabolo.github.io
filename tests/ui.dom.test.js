@@ -6,8 +6,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { renderSections } from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
 import { mountMedia } from '../src/ui/media.js';
+import { mountGallery } from '../src/ui/gallery.js';
 import { mountForms } from '../src/ui/forms.js';
-import { BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS } from '../src/content/index.js';
+import {
+  BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS, PRACTICE_PHOTOS,
+} from '../src/content/index.js';
 
 beforeEach(() => { document.body.innerHTML = '<main id="content"></main>'; });
 
@@ -50,7 +53,11 @@ describe('board', () => {
   it('renders one card per member of the selected semester', () => {
     const el = document.getElementById('content');
     mountBoard(el);
-    expect(el.querySelectorAll('[data-member]')).toHaveLength(BOARD['Fall 2025'].length);
+    // The newest semester, read from BOARD rather than named: this was pinned to
+    // 'Fall 2025' and broke the moment a newer board was added, which is the one thing
+    // a roster is guaranteed to do.
+    const newest = BOARD[Object.keys(BOARD)[0]];
+    expect(el.querySelectorAll('[data-member]')).toHaveLength(newest.length);
   });
 
   it('swaps the roster when the semester changes', () => {
@@ -65,10 +72,41 @@ describe('board', () => {
   it('renders the open slot without an img element', () => {
     const el = document.getElementById('content');
     mountBoard(el);
+    // Selected explicitly: the newest board is fully staffed and has no open slot, so
+    // this has to go to a semester that does rather than assume the default does.
+    const semester = Object.keys(BOARD).find((s) => BOARD[s].some((m) => m.placeholder));
+    expect(semester, 'no semester has an open slot to render').toBeDefined();
+    const select = el.querySelector('select');
+    select.value = semester;
+    select.dispatchEvent(new Event('change'));
+
     const cards = [...el.querySelectorAll('[data-member]')];
     const openSlot = cards.find((c) => c.dataset.placeholder === 'true');
     expect(openSlot).toBeDefined();
     expect(openSlot.querySelector('img')).toBeNull();
+  });
+
+  it('renders a seated member whose photograph has not arrived, without an img', () => {
+    // A distinct case from the open slot above, and new with the Fall 2026 board: a real
+    // person holding a real role whose photo is not in public/images yet. The card must
+    // still render -- name, role and bio -- rather than being skipped or given a broken
+    // <img>, and it must NOT be marked as a placeholder seat.
+    const el = document.getElementById('content');
+    mountBoard(el);
+    const semester = Object.keys(BOARD)
+      .find((s) => BOARD[s].some((m) => !m.image && !m.placeholder));
+    expect(semester, 'no roster has a seated member without a photograph').toBeDefined();
+    const select = el.querySelector('select');
+    select.value = semester;
+    select.dispatchEvent(new Event('change'));
+
+    const member = BOARD[semester].find((m) => !m.image && !m.placeholder);
+    const card = el.querySelector(`[data-member="${member.name}"]`);
+    expect(card).not.toBeNull();
+    expect(card.querySelector('img')).toBeNull();
+    expect(card.dataset.placeholder).toBeUndefined();
+    expect(card.textContent).toContain(member.position);
+    expect(card.textContent).toContain(member.description);
   });
 });
 
@@ -156,6 +194,45 @@ describe('section photographs', () => {
       expect(img).not.toBeNull();
       expect(img.alt.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('practice gallery', () => {
+  it('renders one cell per photograph, each with an AVIF and a WebP source', () => {
+    const el = document.getElementById('content');
+    mountGallery(el);
+    const cells = el.querySelectorAll('[data-photo]');
+    expect(cells).toHaveLength(PRACTICE_PHOTOS.photos.length);
+    for (const cell of cells) {
+      const types = [...cell.querySelectorAll('source')].map((x) => x.type);
+      expect(types).toEqual(['image/avif', 'image/webp']);
+    }
+  });
+
+  it('reserves each cell before the bytes land', () => {
+    // The defect this exists for is documented at the top of sections.css: buildPicture
+    // sets no intrinsic size by default, so with `height: auto` a cell computes to ZERO
+    // height until its picture loads and everything below it jumps. Measured there at
+    // 256px of shift on the contact panel. The about and contact photographs are fixed
+    // by a per-section aspect-ratio in CSS; these six cannot be, because they are two
+    // different shapes, so the size rides on the img's own attributes instead.
+    const el = document.getElementById('content');
+    mountGallery(el);
+    for (const cell of el.querySelectorAll('[data-photo]')) {
+      const img = cell.querySelector('img');
+      const declared = PRACTICE_PHOTOS.photos.find((p) => p.base === cell.dataset.photo);
+      expect(img.getAttribute('width'), `${cell.dataset.photo} has no width attribute`)
+        .toBe(String(declared.width));
+      expect(img.getAttribute('height')).toBe(String(declared.height));
+    }
+  });
+
+  it('carries both portrait and landscape cells, which is why no ratio is shared', () => {
+    // The non-vacuity control for the rule above. If every photograph were the same
+    // shape, a single CSS aspect-ratio would be the simpler answer and the attribute
+    // plumbing would be dead weight -- this fails the moment that becomes true.
+    const shapes = new Set(PRACTICE_PHOTOS.photos.map((p) => (p.width > p.height ? 'wide' : 'tall')));
+    expect([...shapes].sort()).toEqual(['tall', 'wide']);
   });
 });
 

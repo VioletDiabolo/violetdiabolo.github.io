@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 216 tests, all passing**, and with no stderr noise (was 202; the review fixes added 14) |
+| Unit suite | `npx vitest run` → **17 files, 232 tests, all passing**, and with no stderr noise (was 216 at merge; §11's pass added 16) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -709,7 +709,7 @@ constructed when `IntersectionObserver` is absent.
    path and its layout are verified; no actual WebGL-less browser was used.
 4. **Real scroll input.** This host delivers no `requestAnimationFrame`, so Lenis was stepped by hand
    with `setTimeout` and real timestamps, and anchor activation was synthesized. **Wheel and touch
-   inertia, and the velocity uniform under real input, are not verified here** — they are covered
+   inertia, and the scroll boost under real input, are not verified here** — they are covered
    only by `tests/smooth.dom.test.js` and `tests/gradient.dom.test.js`.
 5. **Sustained frame rate under a running loop.** The *frame cost* is a real GPU timer-query
    measurement. The *achieved* frame rate and the 30 fps cap in a live visible tab are not measured,
@@ -739,3 +739,158 @@ constructed when `IntersectionObserver` is absent.
     the *cost* itself is bounded above rather than resolved, and the mid-range phone the concern is
     actually about was not measured. The frame-budget figure in §3 is the shader alone and should
     not be read as the background's total per-frame cost.
+
+
+---
+
+## 11. Follow-up pass — scroll acceleration and the wordmark
+
+Same host, same GPU, same method. Two defects the client reported from a screenshot, plus a content
+change. Re-measured after each.
+
+### 11.1 The gradient "sticks to a certain shape"
+
+Two causes behind one symptom, and both are numbers rather than opinions.
+
+**Resting pace.** `u_time` advanced at 1 unit/second against warp coefficients of 0.055 and 0.031,
+so the noise field crossed one feature (~1.25 units of input) every **23 seconds**. `RESTING_RATE`
+is now 3, which is ~7.7 seconds — a visible drift instead of a still image.
+
+**Scroll acceleration could not work at all.** The shader read `t = u_time + u_velocity`, an OFFSET,
+with `u_velocity` clamped to ±4. Lenis's reported velocity was measured live by hooking
+`setVelocity` and pumping `lenis.raf()` by hand over a 2500 px `scrollTo`: **peak 273 px/frame,
+median 8.5**. Every one of those saturates a ±4 clamp instantly, so the picture jumped ~4 seconds
+forward, held there for the length of the scroll, and ran *backwards* on release. The uniform is
+deleted rather than zeroed; scroll now multiplies the rate.
+
+Verified by **pixel path length** — the per-frame change summed over one second of 30 frames, read
+back through a 2D canvas. Endpoint difference was tried first and is useless here: it saturates once
+the field decorrelates, and reported the post-scroll second (24.1) as *larger* than the scrolling
+second (22.2). Path length is monotonic in speed:
+
+| condition | `setVelocity` | path length / second | vs rest |
+|---|---|---|---|
+| resting | — | 30.88 | 1.00× |
+| gentle scroll | 10 | 35.74 | 1.16× |
+| brisk scroll | 60 | 71.48 | 2.31× |
+| fling | 400 | 85.33 | 2.76× |
+
+Below the theoretical 4× ceiling because the boost ramps from 0 across the measured second
+(`BOOST_TAU` 0.35 s); a sustained scroll approaches it.
+
+**The shader's appearance is unchanged**, which §3's figures re-confirm exactly: worst step
+**85.428 %** under L 0.02 (step 5), best 93.238 %, pooled 89.175 %, median exactly `deep`, brightest
+pixel `rgb(127, 36, 254)`, `--ink` at 5.288:1 against it. Frame cost re-measured at
+**0.0155 ms/frame** at 1440×900 with a zero-cost control (`EXT_disjoint_timer_query_webgl2`,
+240 draws) — the control is what makes that a measurement rather than a number.
+
+Both probes lose the uniform with it. Their `STEP_SECONDS` constants were shader time units, not
+seconds, and are renamed `STEP_UNITS` at the **same values**, so every figure above still refers to
+the same sampled `u_time`.
+
+### 11.2 The wordmark broke mid-word
+
+The client's screenshot showed "VIOLET" / "DIABOL" / "O". Reproduced at 1024×768: the hero head is
+**350.2 px**, `--type-hero` resolved to **98.3 px**, and "DIABOLO" paints **393.1 px** of ink.
+`overflow-wrap: anywhere` (base.css, added for a different heading) did the only thing left to it.
+
+Word widths measured in the live face rather than assumed: **DIABOLO 4.004 em**, VIOLET 3.179 em at
+Inter 200 with the hero's −0.045 em tracking — so the comment beside `--type-hero` claiming VIOLET
+is the wider of the two is wrong for this weight. The system fallback is narrower still (3.599 em),
+so it has more margin, not less.
+
+Fixed by capping the hero at `min(var(--type-hero), calc(100cqi / var(--wordmark-em)))` against a
+query container on `.room-head`. Container units because the column is `min(38%, 30rem)` of a box
+that already has the gutters removed — no viewport formula reproduces that number.
+
+Verified with a `Range` walked character by character over the h1's text node, grouping by line-box
+top — **ink, not boxes**, the same method that caught "EVENTS" escaping its column. A line break is
+counted as mid-word when the character before it is not whitespace.
+
+| viewport | root | font-size | head width | lines | clearance |
+|---|---|---|---|---|---|
+| 1440×900 | 16 px | 115.66 | 480.0 | VIOLET / DIABOLO | 17.5 px |
+| 1440×900 | 32 px | 118.67 | 492.5 | VIOLET / DIABOLO | 17.9 px |
+| 1024×768 | 16 px | 84.39 | 350.2 | VIOLET / DIABOLO | 12.8 px |
+| 1024×768 | 32 px | 84.39 | 350.2 | VIOLET / DIABOLO | 12.8 px |
+| 767×900 | 16 px | 72.00 | 690.3 | VIOLET DIABOLO | 156.8 px |
+| 767×900 | 32 px | 115.05 | 687.0 | VIOLET / DIABOLO | 226.9 px |
+| 375×812 | 16 px | 56.25 | 335.0 | VIOLET / DIABOLO | 110.1 px |
+| 375×812 | 32 px | 71.08 | 295.0 | VIOLET / DIABOLO | 10.8 px |
+| 280×812 | 16 px | 46.40 | 240.0 | VIOLET / DIABOLO | 54.4 px |
+| 280×812 | 32 px | 48.19 | 200.0 | VIOLET / DIABOLO | **7.3 px** |
+
+No mid-word break and `scrollWidth === clientWidth` in all ten. This also closes the
+280 px / 200 % zoom four-line break ("VIOL" / "ET" / "DIAB" / "OLO") that base.css carried as an
+accepted client-visible cost — both terms of the `min()` are viewport-derived, so the rem floor can
+only ever win by being the smaller.
+
+**Containment control.** `container-type: inline-size` applies size containment, so the claim that it
+changes nothing was measured both ways rather than reasoned: the head is **240.0 px** with and
+without it at 280×812.
+
+### 11.3 Contrast, re-run after the content change
+
+26 of 26 text blocks pass worst-case contrast across 12 time steps at 1440×900, none missing.
+Tightest margin **1.17×** (hero tagline and footer line, 5.25:1 against a 4.5 requirement). The
+probe's own overflow sweep passes at 375 and 280 with zero offenders.
+
+### 11.4 Still not verified
+
+Everything in §10 stands. Two specific to this pass:
+
+1. **The acceleration has not been felt on a real wheel.** Lenis was driven programmatically, as in
+   §10.4. The path-length figures come from `gradient.render()` called by hand at a fixed 30 frames
+   per second — the *mapping* from velocity to rate is measured, the feel of it under a real
+   trackpad is not.
+2. **The container query was not exercised in a browser without `cqi` support.** `min()` with an
+   unsupported unit is invalid at parse time and the whole declaration is dropped, so each hero
+   rule carries a bare `font-size` ahead of the capped one: such a browser gets the uncapped size
+   this shipped with before the fix, not the UA's default h1. That fallback was reasoned from the
+   cascade, not tested against a browser that actually lacks `cqi` — none was available. What was
+   measured is that adding it changes nothing where `cqi` IS supported: 84.39 px and two lines at
+   1024×768, identical to the table above.
+
+
+### 11.5 The practice gallery
+
+Six photographs from the client's Drive folder, chosen from all 100 by building a contact
+sheet out of Drive's own thumbnail endpoint — no originals were downloaded to look at
+them. Fifteen were then pulled at full size and six kept.
+
+**The pipeline was rotating nothing.** Nine of those fifteen are PORTRAITS stored as
+4608x3456 landscape with EXIF `orientation=8`; `scripts/build-assets.mjs` never called
+`sharp.rotate()`, so they built lying on their side. The four masters that predate this
+are orientation 1 or none, checked rather than assumed, so the call changes nothing for
+them.
+
+The six masters were rewritten upright at 2000px on the long edge before being committed:
+**46.2 MB → 3.4 MB**, against a repository whose `.git` is 24 MB, and 2000 is this
+document's own derivative ceiling so nothing downstream can want more. That rewrite makes
+an orientation assertion about the shipped derivatives vacuous, so the guard runs
+`prepare()` against a synthesised 40x20 master with `orientation=8` and requires a 20x40
+result — it fails when `.rotate()` is removed.
+
+**A claim that was withdrawn rather than explained.** That test first asserted the rotate
+had to happen BEFORE the resize. A mutation moving `.rotate()` after `.resize()` passed
+it: sharp applies a no-argument rotate during input decode, so the order does not matter.
+The assertion and the comment claiming it both went.
+
+**Contrast, re-run: 27 of 27 blocks pass**, the new "AT PRACTICE" heading at 7.51:1
+against a 4.5 requirement, no missing selectors, overflow clean at 375 and 280.
+
+That 27th block exists because of a gap this pass found in the probe itself: nothing
+checked that its BLOCKS list covered the page. A heading was added, the probe reported a
+clean "26 of 26", and it had never looked at it. Two guards now close it from both sides —
+every element with a direct text node must be matched by some BLOCKS selector, and every
+BLOCKS selector must match something the page renders. Falsified in both directions.
+
+Cells are sized from the `<img>`'s own `width`/`height` attributes rather than a CSS
+`aspect-ratio`, because four of the six are 3:4 and two are 4:3 — one shared ratio would
+crop the group photograph's outer two people off. Verified in the browser at 1440: three
+columns, portraits 251x334 and landscapes 251x188, correct AVIF derivative served for
+each, `scrollWidth == clientWidth`.
+
+Alt text describes the action and never a name. These are identifiable students and
+nothing in the brief says which face belongs to which of the six board members; a test
+asserts no alt string contains any name from BOARD.

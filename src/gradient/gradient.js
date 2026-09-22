@@ -1,8 +1,46 @@
 import { PALETTE } from './palette.js';
 import { VERTEX_SHADER, FRAGMENT_SHADER } from './shader.js';
 
-/** Above this the ribbons move fast enough to read as flicker rather than motion. */
-const MAX_VELOCITY = 4;
+/**
+ * How fast the ribbons drift with nobody touching the page, in shader time units per
+ * second. The shader's own warp coefficients (0.055 and 0.031, src/gradient/shader.js)
+ * set the RATIO between its two octaves; this sets the overall pace, so raising it
+ * speeds both up together and leaves their counter-drift intact.
+ *
+ * 3, not the 1 this started at. At 1 the warp field advanced 0.055 units per second
+ * against a noise feature roughly 1.25 units across -- one traversal every 23 seconds,
+ * which is slow enough that the picture reads as a still image rather than a slow one.
+ * That is the "it sticks to a certain shape" the client reported. At 3 a ribbon makes a
+ * visible swing in about 3 seconds.
+ */
+export const RESTING_RATE = 3;
+
+/**
+ * Scrolling ACCELERATES the drift: the boost is a multiplier on the rate above, never
+ * an offset added to the clock.
+ *
+ * This is the second half of the same client report, and the distinction is the whole
+ * bug. The shader used to read `t = u_time + u_velocity` with u_velocity clamped to
+ * +/-4 -- so any real scroll (Lenis reports 2 to 273 px/frame; a 2500px anchor jump
+ * peaks at 273) pinned that term at the clamp instantly. The picture JUMPED four
+ * seconds forward, held there for the whole scroll, and snapped back on release: a
+ * step function wearing an acceleration's name. Multiplying the rate instead means
+ * time only ever moves forward, and faster.
+ *
+ * MAX_BOOST is 3, so the fastest scroll runs at 4x RESTING_RATE. Above that the ribbons
+ * cross the frame quickly enough to read as flicker rather than motion, which is the
+ * accessibility limit the old clamp was reaching for and the one thing worth keeping
+ * from it.
+ */
+export const MAX_BOOST = 3;
+
+/** Lenis velocity, in px/frame, at which the boost saturates. Measured: an unhurried
+ *  wheel scroll sits near 10, a brisk one near 60, a nav-anchor jump peaks near 273. */
+export const SCROLL_REFERENCE = 60;
+
+/** Seconds for the boost to cover ~63% of the distance to its target, in both
+ *  directions -- the ramp when a scroll starts and the fade when it stops. */
+const BOOST_TAU = 0.35;
 
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
@@ -73,7 +111,6 @@ export function createGradient({ canvas, palette = PALETTE }) {
   const u = (name) => gl.getUniformLocation(program, name);
   const uTime = u('u_time');
   const uResolution = u('u_resolution');
-  const uVelocity = u('u_velocity');
 
   gl.uniform3f(u('u_deep'), ...palette.deep);
   gl.uniform3f(u('u_mid'), ...palette.mid);
@@ -81,7 +118,11 @@ export function createGradient({ canvas, palette = PALETTE }) {
 
   // This module owns time. Nothing else writes it, and no setter is exposed.
   let time = 0;
-  let velocity = 0;
+  // The smoothed boost, and the value it is chasing. setVelocity only ever writes the
+  // target; render owns both the chase and the decay, so there is still exactly one
+  // place where the clock's rate is decided.
+  let boost = 0;
+  let boostTarget = 0;
   let width = canvas.width;
   let height = canvas.height;
 
@@ -90,14 +131,27 @@ export function createGradient({ canvas, palette = PALETTE }) {
     // this module's lifetime — true only because each instance owns its canvas
     // exclusively; a second instance sharing one canvas would need to re-bind.
     render(delta = 0) {
-      time += delta;
+      // One exponential, applied twice. `boost` chases `boostTarget` so a flick ramps
+      // instead of snapping; `boostTarget` decays toward 0 because scroll events stop
+      // arriving the moment the scroll does, and a target left at its last reported
+      // value would hold the gradient at speed forever. Lenis fires on every frame it
+      // is scrolling, which re-raises the target faster than this drains it.
+      const k = 1 - Math.exp(-delta / BOOST_TAU);
+      boost += (boostTarget - boost) * k;
+      boostTarget -= boostTarget * k;
+
+      // boost is never negative, so the multiplier is never below 1: scrolling can only
+      // ever speed the drift up. It cannot slow, stop or reverse it.
+      time += delta * RESTING_RATE * (1 + boost);
       gl.uniform1f(uTime, time);
-      gl.uniform1f(uVelocity, velocity);
       gl.uniform2f(uResolution, width, height);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     },
+    /** Scroll speed, signed, as Lenis reports it. Direction is discarded deliberately —
+     *  scrolling up accelerates the drift exactly as scrolling down does. */
     setVelocity(v) {
-      velocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, v || 0));
+      const speed = Math.abs(Number(v)) || 0;
+      boostTarget = MAX_BOOST * Math.min(1, speed / SCROLL_REFERENCE);
     },
     resize(w, h) {
       width = w;

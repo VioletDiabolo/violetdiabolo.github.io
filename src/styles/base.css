@@ -156,6 +156,22 @@
   --text-col:  min(38%, 30rem);
   --measure:   62ch;
 
+  /* ---- The hero wordmark's widest word, in em of the face it is set in. A DIVISOR:
+   *      a column W wide can hold that word at W / --wordmark-em, so the hero h1 is
+   *      capped at that size and the club's name never has to break mid-word.
+   *
+   *      Measured at Inter 200 with the hero's -0.045em tracking, not guessed:
+   *      "DIABOLO" is 4.004em and "VIOLET" is 3.179em, so DIABOLO is what binds. (The
+   *      comment beside --type-hero in sections.css says VIOLET is the wider of the
+   *      two; that was measured at a different weight and is wrong for the hero.) 4.15
+   *      carries about 3.6% of margin for a font-file update, and the system fallback
+   *      is narrower still at 3.599em, so it has more margin rather than less.
+   *
+   *      This is viewport-derived through the container, never rem-derived, which is
+   *      what makes it hold at 200% text zoom -- the exact case where a rem floor under
+   *      a vw preferred value wins and overflows the column. ---- */
+  --wordmark-em: 4.15;
+
   /* Two radii, because they mean different things: a card is a cut rectangle, a control
      is a pressable pill. One radius on everything is how a page stops having hierarchy. */
   --radius:      6px;
@@ -319,16 +335,19 @@ h1, h2, h3 {
    * was run. Every heading already clears its own line at every width this file has
    * verified, so this changes nothing there.
    *
-   * CLIENT-VISIBLE COST, noted rather than hidden: at 280x812 with a 32px root font, this
-   * rule breaks the club's own wordmark mid-word. Measured (a Range walked character by
-   * character over the hero h1's text node): "VIOLET DIABOLO" renders as four lines --
-   * "VIOL" / "ET " / "DIAB" / "OLO" -- not two lines split only at the space between the
-   * words. That is correct behaviour for `overflow-wrap: anywhere` on a single word wider
-   * than its column, and it is strictly better than the alternative it replaces (the same
-   * word silently painting past the viewport, clipped by `body { overflow-x: hidden }`),
-   * but it is a visible change to the club's own name at extreme zoom, not a free one,
-   * and worth a human decision if a less aggressive fallback is ever wanted at this
-   * specific size.
+   * THE COST THIS USED TO CARRY, and where it went: this rule broke the club's own
+   * wordmark mid-word -- "VIOL" / "ET " / "DIAB" / "OLO" at 280x812 with a 32px root,
+   * and "VIOLET" / "DIABOL" / "O" at 1024x768 at a normal root, which is what the client
+   * reported seeing. That was correct behaviour for `overflow-wrap: anywhere` on a word
+   * wider than its column, and better than the silent overflow it replaced, but it was
+   * still the club's name coming apart.
+   *
+   * It is fixed at the cause rather than by exempting the hero here: the hero h1 is now
+   * capped at a font-size its widest word FITS (--wordmark-em above, applied through a
+   * container query in sections.css), so `anywhere` has nothing left to break. This
+   * declaration stays exactly as it was, and still covers every other heading -- the
+   * feature panel's "EVENTS" among them -- where an unbreakable word can still outgrow
+   * its column and where breaking is the right answer.
    */
   overflow-wrap: anywhere;
 }

@@ -261,3 +261,131 @@ describe('nothing sticks to the viewport', () => {
       `"${position?.selector}" (${position?.rule.sheet})`).toBe('fixed');
   });
 });
+
+/*
+ * The hero wordmark, and why this is a source guard rather than a layout assertion:
+ * jsdom has no layout engine, so nothing here can measure where the ink lands. The
+ * measurements that justify these rules were taken in a real browser and are recorded
+ * with their numbers in the CSS comments; what this file can do is make sure the
+ * MECHANISM those measurements were taken against is still present and still complete.
+ *
+ * The defect being guarded: at 1024x768 the hero head is 350px and --type-hero resolved
+ * to 98.3px, where "DIABOLO" paints 393px. base.css's `overflow-wrap: anywhere` broke it
+ * -- the client's screenshot showed "VIOLET" / "DIABOL" / "O". The fix caps the hero's
+ * font-size at the size its widest word fits, measured against the container.
+ */
+describe('the hero wordmark size cap', () => {
+  const BASE_CSS = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/styles/base.css');
+  const strip = (file) => readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('caps EVERY hero h1 font-size against the container, not just the first one', () => {
+    // matchAll, for the reason the --type-title guard above learned the hard way: a
+    // stylesheet grows by ADDING a rule, and a guard that inspects only the first
+    // declaration it finds is blind to exactly that.
+    const decls = [...strip(SECTIONS_CSS).matchAll(
+      /\[data-panel=['"]hero['"]\]\s+h1\s*\{([^{}]*)\}/g,
+    )].map((m) => m[1]).filter((body) => /font-size\s*:/.test(body));
+
+    expect(decls.length, 'no rule sets the hero h1 font-size any more -- update this guard')
+      .toBeGreaterThanOrEqual(2); // the base rule and the narrow-screen override
+
+    for (const body of decls) {
+      // The LAST font-size in the rule, not the first: each rule carries a bare
+      // declaration ahead of the capped one as a no-`cqi` fallback, and the cascade
+      // gives the win to the last one a browser understood. Matching the first would
+      // read the fallback and pass on a rule whose cap had been deleted.
+      const all = [...body.matchAll(/font-size\s*:([^;]*);/g)];
+      const fontSize = all[all.length - 1][1];
+      expect(fontSize, `hero h1 font-size "${fontSize.trim()}" is not capped against the ` +
+        'container -- a bare clamp() lets the wordmark outgrow its column and break mid-word')
+        .toMatch(/cqi/);
+      expect(fontSize, `hero h1 font-size "${fontSize.trim()}" does not take a min() -- ` +
+        'a cap that is not the smaller of the two terms is not a cap').toMatch(/min\s*\(/);
+    }
+  });
+
+  it('establishes the query container the cap measures against', () => {
+    // Without this the cqi term above resolves against the small-viewport fallback and
+    // the cap silently stops tracking the column it is supposed to track.
+    const rule = strip(SECTIONS_CSS).match(
+      /\[data-panel=['"]hero['"]\]\s+\.room-head\s*\{([^{}]*)\}/,
+    );
+    expect(rule, 'no [data-panel="hero"] .room-head rule found at all').not.toBeNull();
+    expect(rule[1]).toMatch(/container-type\s*:\s*inline-size/);
+  });
+
+  it('keeps --wordmark-em at or above the width the word actually needs', () => {
+    // 4.004em is "DIABOLO" measured in a real browser at Inter 200 with the hero's
+    // -0.045em tracking; "VIOLET" is 3.179em, so DIABOLO binds. A divisor below the
+    // measurement is a cap that does not fit its own word -- which is the original bug
+    // wearing the fix's clothes.
+    const value = strip(BASE_CSS).match(/--wordmark-em\s*:\s*([0-9.]+)\s*;/);
+    expect(value, '--wordmark-em is gone; the hero cap has no divisor').not.toBeNull();
+    expect(Number(value[1])).toBeGreaterThanOrEqual(4.004);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The contrast probe's COVERAGE, as opposed to its correctness.
+ *
+ * Everything in `describe('the contrast probe')` above asks whether the probe computes
+ * the right answer. None of it asks whether it computes that answer about all the text
+ * on the page -- and a block the contract does not list is simply not measured, silently,
+ * with the report still saying "N of N pass".
+ *
+ * This was written after adding a heading ("AT PRACTICE") to the media panel and getting
+ * a clean 26-of-26 run that had never looked at it.
+ * ------------------------------------------------------------------------- */
+
+const PROBE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../scripts/check-contrast.html');
+
+describe("the contrast probe's block list", () => {
+  /** The [label, selector] pairs out of check-contrast.html's BLOCKS array. */
+  const blocks = () => {
+    const src = readFileSync(PROBE, 'utf8');
+    const body = /const BLOCKS = \[([\s\S]*?)\n\];/.exec(src);
+    expect(body, 'BLOCKS is gone or no longer a flat array literal').not.toBeNull();
+    const pairs = [...body[1].matchAll(/\[\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*\]/g)]
+      .map((m) => [m[1], m[2].replace(/\\'/g, "'")]);
+    expect(pairs.length, 'parsed no blocks out of BLOCKS').toBeGreaterThan(20);
+    return pairs;
+  };
+
+  it('covers every element on the page that paints text', () => {
+    const selectors = blocks().map(([, sel]) => sel);
+
+    const root = document.createElement('main');
+    renderSections(root);
+    document.body.replaceChildren(buildNav(), root);
+
+    // Elements holding a direct, non-whitespace text node: the leaves that actually
+    // paint. A container whose text comes from a child is covered by that child.
+    const painters = [...document.querySelectorAll('body *')].filter((el) =>
+      [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 0));
+
+    const uncovered = painters
+      .filter((el) => !selectors.some((sel) => el.matches(sel) || el.closest(sel)))
+      .map((el) => {
+        const cls = String(el.className || '').trim().split(/\s+/).filter(Boolean).join('.');
+        return `${el.tagName.toLowerCase()}${cls ? `.${cls}` : ''} — "${el.textContent.trim().slice(0, 40)}"`;
+      });
+
+    expect([...new Set(uncovered)], 'these paint text that scripts/check-contrast.html ' +
+      'never measures — add a [label, selector] pair to its BLOCKS array, or the next ' +
+      '"N of N blocks pass" will be true and incomplete at the same time').toEqual([]);
+  });
+
+  it('lists no selector that matches nothing on the page', () => {
+    // The other direction, and the reason the probe reports a `missing` array at all: a
+    // selector kept after its element was renamed measures nothing while still counting
+    // toward the denominator.
+    const root = document.createElement('main');
+    renderSections(root);
+    document.body.replaceChildren(buildNav(), root);
+
+    const dead = blocks()
+      .filter(([, sel]) => document.querySelector(sel) === null)
+      .map(([label, sel]) => `${label} (${sel})`);
+    expect(dead, 'these BLOCKS selectors match nothing the page renders').toEqual([]);
+  });
+});
