@@ -519,6 +519,9 @@ body { overflow-x: hidden; }
 .marquee {
   grid-column: 1 / -1;
   margin-top: clamp(1.75rem, 4.5vh, 3rem);
+  /* Room around the marks once they grow. Without it a 52px logo sits hard against the
+     panel's own padding and the strip reads as cramped rather than as a band. */
+  padding-block: clamp(0.35rem, 1.4vh, 1rem);
   overflow: hidden;
   /* Both ends fade instead of being cut. Without this the loop reads as text hitting a
      wall; with it the strip reads as continuing past the panel, which is what it does. */
@@ -535,13 +538,16 @@ body { overflow-x: hidden; }
   display: flex;
   width: max-content;
   /*
-   * 65s, not the 42s this ran at with seven names. The duration is a fixed time for a
-   * fixed DISTANCE -- half the track -- so the speed is set by how long the list is, and
-   * going from 7 organisations to 18 took the track from 4,739px to 7,306px. At 42s that
-   * is 87px/s against the 56px/s the strip was tuned at; 65s puts it back. Add names and
-   * this needs raising again, or the strip quietly speeds up.
+   * The duration comes from the MEASURED track width (observeMarqueeSpeed in
+   * src/ui/sections.js), so the strip holds a constant speed instead of a constant time.
+   *
+   * It was a hand-tuned constant twice, and rotted both times: a fixed duration over a
+   * fixed distance means the SPEED is whatever the content length makes it. Seven names
+   * to eighteen took it from 56px/s to 87px/s; taller logos on desktop would have done it
+   * again. The 65s here is now only the fallback for the moment before the first
+   * measurement, and for a browser with no ResizeObserver.
    */
-  animation: marquee-slide 65s linear infinite;
+  animation: marquee-slide var(--marquee-duration, 65s) linear infinite;
 }
 
 .marquee:hover .marquee-track,
@@ -571,16 +577,26 @@ body { overflow-x: hidden; }
 .marquee-list li[data-logo] img {
   display: block;
   width: auto;
-  height: 1.75rem;
-  border-radius: 4px;
+  /*
+   * 28px on a phone, up to 52px on a desktop. At 28 the marks were present but not really
+   * legible -- a crest, a panda, a bao all resolve to a coloured square at that size, and
+   * the client asked for the strip to earn the space the logos need. The floor stays 28
+   * because a phone has no width to spare, and vw between them so it is one continuous
+   * ramp rather than a jump at a breakpoint.
+   */
+  height: clamp(1.75rem, 3.4vw, 3.25rem);
+  border-radius: 6px;
 }
 
 .marquee-list li {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: clamp(0.6rem, 1.1vw, 0.95rem);
   white-space: nowrap;
-  font-size: var(--type-micro);
+  /* On the LI, not on .marquee-name: the name inherits it, and the contrast probe reads
+     this element's computed font-size. Set it on the span instead and the probe measures
+     a size nothing paints at. */
+  font-size: clamp(0.78rem, 0.95vw, 0.95rem);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;

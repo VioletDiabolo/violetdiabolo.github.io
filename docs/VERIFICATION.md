@@ -28,7 +28,7 @@ npm run dev
 | Vendor | `Google Inc. (Apple)` — unmasked via `WEBGL_debug_renderer_info` |
 | Context | `WebGL 2.0 (OpenGL ES 3.0 Chromium)` / `WebGL GLSL ES 3.00` |
 | Live page | `vite preview`, port 4173 — the shipped bundle |
-| Unit suite | `npx vitest run` → **17 files, 246 tests, all passing**, and with no stderr noise (was 216 at merge; §11–§17 added 30) |
+| Unit suite | `npx vitest run` → **17 files, 251 tests, all passing**, and with no stderr noise (was 216 at merge; §11–§19 added 35) |
 
 Three properties of this host shaped how the live-page checks were run, and each is restated where
 it matters:
@@ -1395,3 +1395,61 @@ The chip is mark **plus** name, so each of these is still a full credit.
 
 23 of 23 blocks on index, marquee names at **5.62:1**, no missing selectors, no overflow at
 375 or 280. Fourteen marks load, none broken, every one rendering at exactly 28px tall.
+
+
+---
+
+## 19. A bigger strip, and a speed that stops rotting
+
+### 19.1 The marks earn their space
+
+`clamp(1.75rem, 3.4vw, 3.25rem)` — 28px on a phone, 52px on a desktop, one continuous
+ramp rather than a jump at a breakpoint. The 28px floor stays because a phone has no width
+to spare; the growth starts above ~824px, which is where "desktop" begins for this page.
+
+| viewport | mark | strip | name | track | duration | **speed** |
+|---|---|---|---|---|---|---|
+| 1440 | 49px | 71px | 13.7px | 12,114px | 91.77s | **66 px/s** |
+| 768 | 28px | 50px | 12.5px | 9,055px | 68.60s | **66 px/s** |
+| 375 | 28px | 51px | 12.5px | 8,864px | 67.15s | **66 px/s** |
+| 280 | 28px | 51px | 12.5px | 8,864px | 67.15s | **66 px/s** |
+
+No overflow at any of them.
+
+### 19.2 The duration is measured now, not tuned
+
+The constant in that last column is the point. The CSS animation travels a **fixed
+distance** — half the track — so a fixed DURATION means the speed is whatever the content
+length happens to make it. It rotted twice: 7 names to 18 took it from 56 to 87 px/s, and
+taller logos would have taken it to 93.
+
+`observeMarqueeSpeed` (src/ui/sections.js) watches the track with a ResizeObserver and
+writes `--marquee-duration` from the measured width, so `MARQUEE_SPEED` is what is held
+constant. Same shape as `observeNavHeight`: a disposer, a disconnect when the element
+leaves the document, nothing written while the width is 0, and the stylesheet's 65s left
+as the fallback for a browser with no ResizeObserver.
+
+### 19.3 "Measured and dropped", caught by falsification
+
+Four mutations were tried. Three failed as they should. The fourth — **making the
+stylesheet animate on a fixed `65s` again while the JS went on measuring and publishing** —
+passed the entire suite. Every JS-side test still held: the value was computed correctly,
+written correctly, and consumed by nothing.
+
+That is the same failure the nav observer's own tests were written to rule out, one
+property along, and it would have shipped a strip whose speed silently ignored every
+measurement. A source guard now requires `.marquee-track`'s `animation` to read
+`var(--marquee-duration`.
+
+### 19.4 A zero that was the pane, not a bug
+
+First live check: `--marquee-duration` unpublished, duration 65s, 93 px/s. The cause was
+**not** the new code — `--nav-offset` was also unpublished, and a freshly constructed
+ResizeObserver on a definitely-connected element fired **0 times in 400ms**. This pane
+reports `document.hidden === true` and throttles ResizeObserver delivery to zero, the same
+limitation §10 records for `requestAnimationFrame`.
+
+Forcing a paint published both immediately: `--nav-offset: 59.39px`, `--marquee-duration:
+91.77s`, 66 px/s. Worth recording because the first reading looked exactly like a broken
+observer, and the thing that distinguished them was checking whether the OLD observer was
+working either.

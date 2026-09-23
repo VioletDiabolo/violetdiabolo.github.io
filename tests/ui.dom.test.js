@@ -3,7 +3,9 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderSections, renderMediaPage, marqueeItem } from '../src/ui/sections.js';
+import {
+  renderSections, renderMediaPage, marqueeItem, observeMarqueeSpeed, MARQUEE_SPEED,
+} from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
 import { mountMedia } from '../src/ui/media.js';
 import { mountGallery } from '../src/ui/gallery.js';
@@ -431,5 +433,107 @@ describe('content boundary', () => {
         expect(source, `src/ui/${file} hardcodes club copy: "${literal}"`).not.toContain(literal);
       }
     }
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * The marquee's pace.
+ *
+ * Driven with a stub observer rather than grepping the stylesheet for a number, so
+ * "measured and published" stays distinguishable from "measured and dropped" — the same
+ * distinction observeNavHeight's tests were written for.
+ * ------------------------------------------------------------------------- */
+
+describe('observeMarqueeSpeed', () => {
+  /** A ResizeObserver stand-in; jsdom has none, which is also the no-support branch. */
+  function stubResizeObserver() {
+    const instances = [];
+    class Stub {
+      constructor(callback) { this.callback = callback; this.observed = []; this.disconnected = false; instances.push(this); }
+      observe(el) { this.observed.push(el); }
+      disconnect() { this.disconnected = true; }
+      fire() { this.callback([], this); }
+    }
+    const previous = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = Stub;
+    return { instances, restore: () => { globalThis.ResizeObserver = previous; } };
+  }
+
+  /** A strip whose track measures `width`, mounted so isConnected is true. */
+  const strip = (width) => {
+    const el = document.createElement('div');
+    el.className = 'marquee';
+    const track = document.createElement('div');
+    track.className = 'marquee-track';
+    track.getBoundingClientRect = () => ({ width, height: 0, top: 0, left: 0, right: width, bottom: 0, x: 0, y: 0 });
+    el.append(track);
+    document.body.append(el);
+    return el;
+  };
+
+  it('publishes the duration the measured width implies, at a constant speed', () => {
+    const { instances, restore } = stubResizeObserver();
+    try {
+      const el = strip(9240);
+      observeMarqueeSpeed(el);
+      const observer = instances.at(-1);
+      expect(observer.observed.map((n) => n.className)).toContain('marquee-track');
+      // Nothing until it fires: the value is a MEASUREMENT, not a guess at mount time.
+      expect(el.style.getPropertyValue('--marquee-duration')).toBe('');
+
+      observer.fire();
+      // Half the track, because that is the distance the keyframes travel (-50%).
+      expect(el.style.getPropertyValue('--marquee-duration'))
+        .toBe(`${(9240 / 2) / MARQUEE_SPEED}s`);
+    } finally { restore(); }
+  });
+
+  it('gives a longer list more time, so the speed does not change with the content', () => {
+    // The whole point. A fixed duration over a fixed distance means the SPEED is whatever
+    // the list length makes it, which is how this rotted twice.
+    const { instances, restore } = stubResizeObserver();
+    try {
+      const shortStrip = strip(4739);   // the seven-name track
+      observeMarqueeSpeed(shortStrip);
+      instances.at(-1).fire();
+      const longStrip = strip(9240);    // eighteen names with logos
+      observeMarqueeSpeed(longStrip);
+      instances.at(-1).fire();
+
+      const secs = (el) => parseFloat(el.style.getPropertyValue('--marquee-duration'));
+      expect(secs(longStrip)).toBeGreaterThan(secs(shortStrip));
+      // Same pixels per second out of both, which is the invariant.
+      expect((4739 / 2) / secs(shortStrip)).toBeCloseTo(MARQUEE_SPEED, 6);
+      expect((9240 / 2) / secs(longStrip)).toBeCloseTo(MARQUEE_SPEED, 6);
+    } finally { restore(); }
+  });
+
+  it('writes nothing without a ResizeObserver, leaving the CSS fallback', () => {
+    const previous = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = undefined;
+    try {
+      const el = strip(9240);
+      const stop = observeMarqueeSpeed(el);
+      expect(el.style.getPropertyValue('--marquee-duration')).toBe('');
+      expect(typeof stop).toBe('function');
+      stop();
+    } finally { globalThis.ResizeObserver = previous; }
+  });
+
+  it('disconnects and clears once the strip leaves the document', () => {
+    const { instances, restore } = stubResizeObserver();
+    try {
+      const el = strip(9240);
+      observeMarqueeSpeed(el);
+      const observer = instances.at(-1);
+      observer.fire();
+      expect(el.style.getPropertyValue('--marquee-duration')).not.toBe('');
+
+      el.querySelector('.marquee-track').remove();
+      observer.fire();
+      expect(observer.disconnected, 'kept observing a track that is gone').toBe(true);
+      expect(el.style.getPropertyValue('--marquee-duration'),
+        'left a stale duration behind rather than falling back to the stylesheet').toBe('');
+    } finally { restore(); }
   });
 });
