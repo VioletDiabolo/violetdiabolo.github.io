@@ -360,6 +360,24 @@ describe('the hero wordmark size cap', () => {
 
 const PROBE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../scripts/check-contrast.html');
 
+describe('the marquee duration', () => {
+  it('is read by the stylesheet from the property the observer writes', () => {
+    // The gap this closes: observeMarqueeSpeed measuring the track, publishing
+    // --marquee-duration, and the stylesheet animating on a hard-coded time anyway. Every
+    // test on the JS side still passes — the value is written, correctly, and consumed by
+    // nothing. "Measured and dropped", which is the exact failure the nav observer's own
+    // tests were written to rule out, one property along.
+    const css = readFileSync(SECTIONS_CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = /\.marquee-track\s*\{([^}]*)\}/.exec(css);
+    expect(rule, 'the marquee track has no rule any more').not.toBeNull();
+    const animation = /animation\s*:([^;]*);/.exec(rule[1]);
+    expect(animation, '.marquee-track no longer animates at all').not.toBeNull();
+    expect(animation[1], 'the strip animates on a fixed time, so the measured width is '
+      + 'published and then ignored — which is how its speed rotted twice already')
+      .toMatch(/var\(\s*--marquee-duration/);
+  });
+});
+
 describe("the contrast probe's block list", () => {
   /** The [label, selector, page] triples out of check-contrast.html's BLOCKS array. */
   const blocks = () => {

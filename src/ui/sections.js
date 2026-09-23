@@ -113,6 +113,51 @@ export function renderMediaPage(root) {
 }
 
 /**
+ * How fast the marquee travels, in CSS pixels per second.
+ *
+ * This is the number the strip was tuned to read at, and it is now the thing held
+ * constant rather than the duration. The CSS animation moves a FIXED DISTANCE (half the
+ * track), so a fixed duration means the speed is set by how long the list happens to be:
+ * going from 7 organisations to 18 took it from 56px/s to 87px/s with no rule changing,
+ * and making the logos taller on desktop would have done it again.
+ */
+export const MARQUEE_SPEED = 66;
+
+/**
+ * Keeps the strip at MARQUEE_SPEED by writing the duration its measured width implies.
+ *
+ * A ResizeObserver rather than a one-off measurement, and for the same reasons
+ * observeNavHeight uses one (src/ui/nav.js): the track's width changes on things `resize`
+ * never fires for — a webfont swapping in and re-measuring every name, the logos crossing
+ * a breakpoint, a name being added — and it needs no teardown bookkeeping in main.js.
+ *
+ * No feedback loop: --marquee-duration feeds `animation-duration` and nothing the track's
+ * width depends on, so writing it cannot resize the thing being observed.
+ *
+ * Writes nothing while the width is 0 (jsdom has no layout) and leaves the CSS fallback
+ * in place, which is also what a browser without ResizeObserver gets.
+ *
+ * @returns {() => void} a disposer.
+ */
+export function observeMarqueeSpeed(strip) {
+  const track = strip?.querySelector('.marquee-track');
+  const stop = () => strip?.style.removeProperty('--marquee-duration');
+  if (!track || typeof ResizeObserver !== 'function') return stop;
+  const observer = new ResizeObserver(() => {
+    if (!track.isConnected) {
+      observer.disconnect();
+      stop();
+      return;
+    }
+    const { width } = track.getBoundingClientRect();
+    // Half, because that is the distance the keyframes actually travel (-50%).
+    if (width > 0) strip.style.setProperty('--marquee-duration', `${(width / 2) / MARQUEE_SPEED}s`);
+  });
+  observer.observe(track);
+  return () => { observer.disconnect(); stop(); };
+}
+
+/**
  * One chip in the marquee: a mark if the organisation has given us one, its name if not.
  *
  * Exported for the tests, and that is the whole reason it is a named function. Every
@@ -172,6 +217,9 @@ function marquee() {
 
   track.append(list(false), list(true));
   strip.append(track);
+  // Measured here rather than in renderSections: the strip's pace is the strip's business,
+  // the same call nav.js makes about its own height.
+  observeMarqueeSpeed(strip);
   return strip;
 }
 
