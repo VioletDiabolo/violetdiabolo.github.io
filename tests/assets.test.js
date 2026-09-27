@@ -2,6 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync, existsSync } from 'node:fs';
 import { TARGETS, prepare } from '../scripts/build-assets.mjs';
 
+/** Every image base name content renders, with where it came from. */
+async function referencedByContent() {
+  const content = await import('../src/content/index.js');
+  const referenced = new Map();
+  const note = (base, where) => { if (base) referenced.set(base, where); };
+  for (const photo of Object.values(content.PHOTOS)) note(photo.base, 'PHOTOS');
+  for (const org of content.PERFORMED_FOR) note(org.logo, `PERFORMED_FOR (${org.name})`);
+  for (const member of Object.values(content.BOARD).flat()) note(member.image, `BOARD (${member.name})`);
+  note(content.LOGO.base, 'LOGO');
+  return referenced;
+}
+
 describe('image pipeline', () => {
   it('applies a master\'s EXIF orientation', async () => {
     // Nine of the fifteen photographs pulled from the client's Drive folder were
@@ -39,16 +51,8 @@ describe('image pipeline', () => {
     // have said so — a mutation pointing a marquee logo at 'logo-does-not-exist' passed
     // the whole suite, because every other guard checks the pipeline against ITSELF and
     // the DOM against content, and nobody checked content against the pipeline.
-    const content = await import('../src/content/index.js');
     const built = new Set(TARGETS.map((t) => t.name));
-
-    const referenced = new Map();
-    const note = (base, where) => { if (base) referenced.set(base, where); };
-    for (const photo of Object.values(content.PHOTOS)) note(photo.base, 'PHOTOS');
-    for (const photo of content.PRACTICE_PHOTOS.photos) note(photo.base, 'PRACTICE_PHOTOS');
-    for (const org of content.PERFORMED_FOR) note(org.logo, `PERFORMED_FOR (${org.name})`);
-    for (const member of Object.values(content.BOARD).flat()) note(member.image, `BOARD (${member.name})`);
-    note(content.LOGO.base, 'LOGO');
+    const referenced = await referencedByContent();
 
     expect(referenced.size, 'no content image names resolved — this guard is reading nothing')
       .toBeGreaterThan(15);
@@ -57,9 +61,21 @@ describe('image pipeline', () => {
     expect(missing, 'content references images the pipeline never builds').toEqual([]);
   });
 
-  it('declares every master that content references', () => {
-    const names = TARGETS.map((t) => t.name);
-    expect(names).toEqual(expect.arrayContaining(['group-usadc', 'usadc-wide', 'aaron', 'jon']));
+  it('builds nothing content does not ask for', async () => {
+    // The other direction. public/images ships to dist/ whole, so a target nothing
+    // renders is bytes every deploy carries for no page. Eight of them outlived their
+    // panels at once: the USADA group shot and the stage strip went with About and
+    // Contact, and the six gallery photographs with the Media page's pictures.
+    const referenced = await referencedByContent();
+    const unused = TARGETS.map((t) => t.name).filter((name) => !referenced.has(name));
+    expect(unused, 'the pipeline builds images no page renders').toEqual([]);
+  });
+
+  it('keeps no master the pipeline does not read', () => {
+    // assets-src is committed, and a master is megabytes of repository for every clone.
+    const read = new Set(TARGETS.map((t) => t.file));
+    const orphans = readdirSync('assets-src').filter((f) => !f.startsWith('.') && !read.has(f));
+    expect(orphans, 'masters that no target builds from').toEqual([]);
   });
 
   it('configures no width above 2000, the ceiling that fits the budget at full quality', () => {
@@ -123,6 +139,18 @@ describe('image pipeline', () => {
       }
       expect([...new Set(wrong)], 'these ship a width their srcset descriptor contradicts')
         .toEqual([]);
+    });
+
+    it('ships no derivative the pipeline does not build', () => {
+      // A retired target's files do not delete themselves: `npm run assets` writes, it
+      // never cleans. Every file here has to be one some target, at one of its widths,
+      // would write today.
+      const expected = new Set(TARGETS.flatMap((t) => [
+        ...t.widths.flatMap((w) => [`${t.name}-${w}.avif`, `${t.name}-${w}.webp`]),
+        ...t.jpgWidths.map((w) => `${t.name}-${w}.jpg`),
+      ]));
+      const stray = readdirSync(OUT).filter((f) => !f.startsWith('.') && !expected.has(f));
+      expect(stray, 'public/images holds files no target builds').toEqual([]);
     });
 
     it('emits every configured derivative', () => {

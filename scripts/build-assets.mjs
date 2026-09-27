@@ -8,18 +8,24 @@ const SRC = path.join(ROOT, 'assets-src');
 const OUT = path.join(ROOT, 'public', 'images');
 
 /**
- * Widths cap at 2000, not 2400. Measured on the 4032x3024 master: at 2400 the brief's
+ * Widths cap at 2000, not 2400. Measured on a 4032x3024 master: at 2400 the brief's
  * intended quality yields WebP 406 KB and JPEG 531 KB, both over the 400 KB budget, while
  * 2000 yields AVIF 240 / WebP 307 / JPEG 387. Capping the width preserves image quality;
  * dropping quality to fit 2400 would not.
  *
- * `jpgWidths` stops the last-resort JPEG at 1600 — it exists only for browsers supporting
- * neither AVIF nor WebP, which no longer meaningfully exist, and it is the least efficient
- * format at exactly the size where the budget is tightest.
+ * `jpgWidths` is the last-resort JPEG, for browsers supporting neither AVIF nor WebP. None
+ * of the targets below asks for one any more: the two that did -- the USADA group shot and
+ * the stage strip -- went with the About and Contact panels they illustrated, and nothing
+ * that renders neither format is going to reach this site.
+ *
+ * Every target has to be ASKED FOR by content, and tests/assets.test.js checks both
+ * directions: a base name content uses that nothing builds is a <picture> of 404s, and a
+ * target content never uses is dead weight in public/images -- which ships to dist/ whole.
+ * The practice gallery's six went on that rule when the client took the photographs off
+ * the Media page ("Remove images from media. Keep only the videos."); their masters are
+ * in git history, and the originals are in the club's Drive folder.
  */
 export const TARGETS = [
-  { name: 'group-usadc', file: 'group-usadc.png', widths: [900, 1600, 2000], jpgWidths: [900, 1600] },
-  { name: 'usadc-wide',  file: 'usadc-wide.png',  widths: [900, 1600, 2000], jpgWidths: [900, 1600] },
   { name: 'aaron',       file: 'aaron.jpg',       widths: [400, 800],        jpgWidths: [] },
   { name: 'jon',         file: 'jon.jpg',         widths: [400, 800],        jpgWidths: [] },
 
@@ -50,19 +56,6 @@ export const TARGETS = [
   { name: 'board-barry',  file: 'board-barry.jpg',  widths: [400, 800], jpgWidths: [] },
   { name: 'board-evan',   file: 'board-evan.jpg',   widths: [400, 800], jpgWidths: [] },
   { name: 'board-hannah', file: 'board-hannah.jpg', widths: [400, 800], jpgWidths: [] },
-
-  // The practice gallery. 1000 is the ceiling because a cell is at most ~30vw on a
-  // desktop grid -- roughly 430px at 1440 -- so 1000 already covers a 2x screen. No
-  // last-resort JPEG: these arrived in 2026 and nothing that renders neither AVIF nor
-  // WebP is going to reach them.
-  { name: 'practice-throw',    file: 'practice-throw.jpg',    widths: [500, 1000], jpgWidths: [] },
-  { name: 'practice-sylvette', file: 'practice-sylvette.jpg', widths: [500, 1000], jpgWidths: [] },
-  { name: 'practice-reach',    file: 'practice-reach.jpg',    widths: [500, 1000], jpgWidths: [] },
-  // practice-pair replaced practice-spin here: that master is now board-hannah, and one
-  // photograph doing both jobs put the same picture on the page twice.
-  { name: 'practice-pair',     file: 'practice-pair.jpg',     widths: [500, 1000], jpgWidths: [] },
-  { name: 'practice-back',     file: 'practice-back.jpg',     widths: [500, 1000], jpgWidths: [] },
-  { name: 'practice-team',     file: 'practice-team.jpg',     widths: [500, 1000], jpgWidths: [] },
 ];
 
 /**
@@ -79,9 +72,9 @@ export const TARGETS = [
  * It is here because it was missing, and it mattered: nine of the fifteen photographs
  * pulled from the client's Drive folder were portraits stored as 4608x3456 landscape with
  * orientation=8. Without this call they built rotated 90 degrees. The masters in the
- * repository are all upright with no orientation flag — the practice six were rewritten
- * that way on the way in, because a master that carries a flag every consumer has to
- * remember is a trap waiting for the next tool — so nothing here depends on it today.
+ * repository are all upright with no orientation flag — every Drive photograph was
+ * rewritten that way on the way in, because a master that carries a flag every consumer
+ * has to remember is a trap waiting for the next tool — so nothing here depends on it today.
  * It is for the next photograph someone drops in straight off a camera.
  */
 export function prepare(input, width) {

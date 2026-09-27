@@ -1,39 +1,40 @@
 import { SITE, LOGO } from '../content/index.js';
 import { buildPicture } from './picture.js';
 
+/** Every page on the site, and the file it lives at. */
+export const PAGES = Object.freeze({
+  home: './index.html',
+  about: './about.html',
+  media: './media.html',
+  join: './join.html',
+});
+
 /**
- * Where the pills go, ordered as the page is.
+ * The bar's buttons, in the order they sit. Two, where there were four.
  *
- * `page: 'media'` marks the one link that leaves the home page rather than jumping within
- * it. Everything else is a section id.
+ * Every one is a PAGE now, not a section anchor. At the client's request the bar keeps
+ * only About us, Media and Join us; Events and Board went. Board moved onto the About page
+ * with the club's story, and the practice times are on the home page directly under the
+ * first screen, where a button to scroll to them was a button to scroll half a screen.
  */
 export const NAV_LINKS = Object.freeze([
-  { label: 'About', target: 'about' },
-  { label: 'Events', target: 'events' },
-  { label: 'Media', target: 'media', page: 'media' },
-  { label: 'Board', target: 'board' },
+  { label: 'About us', page: 'about' },
+  { label: 'Media', page: 'media' },
 ]);
 
-/** The two pages, and the file each one lives at. */
-export const PAGES = Object.freeze({ home: './index.html', media: './media.html' });
+/** The one filled control. A club page's job is to get people to turn up. */
+export const CTA = Object.freeze({ label: 'Join us', page: 'join' });
 
 /**
- * An href for `link`, as seen FROM `from`.
+ * An href for a page link.
  *
- * A bare '#about' only means anything on the home page. From the media page the same pill
- * has to be './index.html#about' — a real navigation, which is also why Lenis leaves it
- * alone: its click handler only intercepts hrefs starting with '#' (src/scroll/smooth.js).
- * Getting this wrong is silent: the pill still looks like a pill and simply does nothing.
+ * Always the page's file, including from the page itself — a link to where you already
+ * are is what `aria-current` is for, and a '#' pointing nowhere would be a link that
+ * silently does nothing.
  */
-export function hrefFor(link, from = 'home') {
-  const onOwnPage = (link.page ?? 'home') === from;
-  if (onOwnPage) return `#${link.target}`;
-  if (link.page) return PAGES[link.page];
-  return `${PAGES.home}#${link.target}`;
+export function hrefFor(link) {
+  return PAGES[link.page];
 }
-
-/** The one filled control. A club page's job is to get people to turn up. */
-export const CTA = Object.freeze({ label: 'Join us', target: 'contact' });
 
 /**
  * Publish the bar's REAL height as --nav-offset, for everything that has to clear it.
@@ -86,10 +87,13 @@ export function observeNavHeight(nav, root = document.documentElement) {
 export function buildNav({ page = 'home' } = {}) {
   const nav = document.createElement('nav');
   nav.className = 'site-nav';
-  nav.setAttribute('aria-label', 'Sections');
+  // 'Site', not 'Sections' as it was: every button leads to a page now, not down this one.
+  nav.setAttribute('aria-label', 'Site');
 
   const wordmark = document.createElement('a');
   wordmark.className = 'site-nav-mark';
+  // '#hero' on the home page scrolls back to the top through Lenis; everywhere else the
+  // mark is the way home.
   wordmark.href = page === 'home' ? '#hero' : PAGES.home;
   // 'eager': the bar is the first thing painted and a lazy mark would pop in after it.
   wordmark.append(buildPicture({ ...LOGO, sizes: '32px', loading: 'eager' }));
@@ -103,10 +107,10 @@ export function buildNav({ page = 'home' } = {}) {
   pills.className = 'site-nav-links';
   for (const link of NAV_LINKS) {
     const a = document.createElement('a');
-    a.href = hrefFor(link, page);
+    a.href = hrefFor(link);
     a.textContent = link.label;
-    // The pill for the page you are on says so, to a screen reader and to the stylesheet.
-    if ((link.page ?? 'home') === page) a.setAttribute('aria-current', 'page');
+    // The button for the page you are on says so, to a screen reader and to the stylesheet.
+    if (link.page === page) a.setAttribute('aria-current', 'page');
     pills.append(a);
   }
   nav.append(pills);
@@ -114,8 +118,9 @@ export function buildNav({ page = 'home' } = {}) {
   const cta = document.createElement('a');
   cta.className = 'site-nav-cta';
   cta.dataset.cta = 'true';
-  cta.href = page === 'home' ? `#${CTA.target}` : `${PAGES.home}#${CTA.target}`;
+  cta.href = hrefFor(CTA);
   cta.textContent = CTA.label;
+  if (CTA.page === page) cta.setAttribute('aria-current', 'page');
   nav.append(cta);
 
   // Measured here rather than in main.js: the mount there is one line

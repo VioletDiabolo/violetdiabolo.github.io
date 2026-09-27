@@ -1,5 +1,6 @@
 import { BOARD } from '../content/index.js';
 import { buildPicture } from './picture.js';
+import { CTA, hrefFor } from './nav.js';
 
 function card(member) {
   const article = document.createElement('article');
@@ -50,7 +51,40 @@ function card(member) {
   return article;
 }
 
-export function mountBoard(el) {
+/**
+ * The last card on the current board: a dashed tile with a plus, linking to Join us.
+ *
+ * The client's reference ends its team grid the same way. It is a link and not a
+ * `[data-member]` card, because it is not a member — every count of the roster, in the
+ * tests and anywhere else, has to keep meaning people. Its label and target are the
+ * nav's own call to action, so the two can never point at different places.
+ */
+function joinCard() {
+  const a = document.createElement('a');
+  a.className = 'board-card board-join';
+  a.href = hrefFor(CTA);
+  const tile = document.createElement('span');
+  tile.className = 'board-join-tile';
+  tile.setAttribute('aria-hidden', 'true');
+  const plus = document.createElement('span');
+  plus.className = 'board-join-plus';
+  plus.textContent = '+';
+  tile.append(plus);
+  const label = document.createElement('span');
+  label.className = 'board-join-label';
+  label.textContent = CTA.label;
+  a.append(tile, label);
+  return a;
+}
+
+/**
+ * The roster and the select that picks its semester.
+ *
+ * `controls` is where the select goes, when that is not beside the grid: the About page
+ * seats it in the panel's head, level with the BOARD heading, the way a filter sits on a
+ * section title. Omitted, both land in `el`, which is all a test needs.
+ */
+export function mountBoard(el, { controls = el } = {}) {
   const semesters = Object.keys(BOARD);
 
   const select = document.createElement('select');
@@ -68,11 +102,16 @@ export function mountBoard(el) {
   list.className = 'board-list';
 
   const paint = () => {
-    list.replaceChildren(...BOARD[select.value].map(card));
+    const cards = BOARD[select.value].map(card);
+    // The newest board only: an invitation to join is about the club as it is now, and on
+    // Fall 2023's roster it would be an invitation to a board that no longer exists.
+    if (select.value === semesters[0]) cards.push(joinCard());
+    list.replaceChildren(...cards);
   };
 
   select.addEventListener('change', paint);
   paint();
 
-  el.append(select, list);
+  controls.append(select);
+  el.append(list);
 }

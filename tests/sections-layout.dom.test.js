@@ -3,8 +3,20 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { renderSections, renderMediaPage } from '../src/ui/sections.js';
+import { RENDERERS, renderSections, buildFooter } from '../src/ui/sections.js';
 import { buildNav } from '../src/ui/nav.js';
+
+/**
+ * A page's whole <body> as main.js assembles it: the nav, the rendered <main>, then the
+ * footer after it. `page` is a RENDERERS key.
+ */
+function pageBody(page) {
+  const root = document.createElement('main');
+  RENDERERS[page](root);
+  const body = document.createElement('body');
+  body.append(buildNav({ page }), root, buildFooter());
+  return body;
+}
 
 // A plain path, not `new URL(..., import.meta.url)`: under this file's jsdom environment,
 // Vitest's global URL shim resolves relative file: URLs against http://localhost:3000
@@ -12,7 +24,7 @@ import { buildNav } from '../src/ui/nav.js';
 // workaround in tests/ui.dom.test.js's "content boundary" test).
 const SECTIONS_CSS = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/styles/sections.css');
 
-describe('the grid panel title size', () => {
+describe('the plate panel title size', () => {
   it("is not swallowed by the shared title-size rule (dead-by-specificity guard)", () => {
     // The historical bug: `.section:not([data-section='hero']):not([data-panel='story'])
     // h2` was meant to size every panel's h2 except hero (its own h1, elsewhere) and story
@@ -28,7 +40,8 @@ describe('the grid panel title size', () => {
     // Checked with the real selector engine (Element.matches), not hand-rolled
     // specificity arithmetic -- hand-rolled arithmetic is exactly what produced the bug.
     // Whatever rule currently sets --type-title on a panel's h2 must not ALSO match a
-    // grid panel's h2, independent of which one the cascade would pick if it did.
+    // plate's h2 -- the grid panel's successor, and the same small title beside a control
+    // -- independent of which one the cascade would pick if it did.
     // Comments stripped first: they contain no braces of their own, so left in, the
     // greedy `[^{}]+` below walks straight through one and captures a comment's prose
     // as if it were the selector -- caught by running this once with the comment left in.
@@ -43,22 +56,22 @@ describe('the grid panel title size', () => {
       .toBeGreaterThan(0);
 
     document.body.innerHTML = `
-      <section class="section" data-section="media" data-panel="grid">
-        <div class="room"><div class="room-head"><h2>Media</h2></div></div>
+      <section class="section" data-section="board" data-panel="plate" data-surface="glass">
+        <div class="room"><div class="room-head"><h2>BOARD</h2></div></div>
       </section>`;
     const h2 = document.querySelector('h2');
     const leaking = rules
       .flatMap((rule) => rule[1].trim().split(',').map((s) => s.trim()))
       .filter((s) => h2.matches(s));
-    expect(leaking, "a rule setting --type-title also matches a grid panel's h2").toEqual([]);
+    expect(leaking, "a rule setting --type-title also matches a plate's h2").toEqual([]);
   });
 
-  it('gives the grid panel its own, smaller h2 rule, so the guard above has something to protect', () => {
+  it('gives the plate its own, smaller h2 rule, so the guard above has something to protect', () => {
     // Without this, the test above would pass just as well if the grid rule were ever
     // deleted outright rather than merely shadowed -- "no shared rule matches" is not the
     // same claim as "the grid panel is sized correctly", and this is what tells them apart.
     const css = readFileSync(SECTIONS_CSS, 'utf8');
-    expect(css).toMatch(/\[data-panel='grid'\]\s*h2\s*\{[^}]*font-size:\s*clamp\(/);
+    expect(css).toMatch(/\[data-panel='plate'\]\s*h2\s*\{[^}]*font-size:\s*clamp\(/);
   });
 });
 
@@ -112,9 +125,11 @@ const NARROW_CONDITIONS = new Map([
   // direction that can hide a rule -- so it is worth saying that the block it excludes
   // declares `overflow-x` and `animation` and nothing positional at all.
   ['(prefers-reduced-motion: reduce)', false],
-  // The media page's editorial grid, where the lead video takes a 2x2 cell. False at
-  // 375 -- and the block declares grid-column, grid-row, flex and aspect-ratio, none of
-  // which is `position`.
+  // The media page's two blocks. At 560 each goes two across with its lead spanning
+  // both; at 900 four across, the lead a 2x2 cell. Both false at 375 -- and they declare
+  // grid-template-columns, grid-column, grid-row, flex, min-height, aspect-ratio and
+  // font-size, none of which is `position`.
+  ['(min-width: 560px)', false],
   ['(min-width: 900px)', false],
 ]);
 
@@ -224,24 +239,24 @@ describe('nothing sticks to the viewport', () => {
       ).toBe(true);
     }
 
-    // The real page: every room's real markup plus the real nav, in the same order
-    // main.js assembles them (document.body.prepend(buildNav()) after renderSections) --
-    // not that any selector in these two files depends on sibling order (checked: no `+`
-    // or `~` combinator appears in either), but matching it exactly leaves no doubt.
-    const root = document.createElement('main');
-    renderSections(root);
-    document.body.replaceChildren(buildNav(), root);
-
+    // Every page, each as main.js assembles it -- nav, <main>, footer. Every page rather
+    // than the home page alone, since the site stopped being one page: a sticky rule
+    // written for the board or the videos would match nothing on index.html. (Sibling
+    // order matters to one selector in these files, `li + li` in the footer and the
+    // marquee, which declares no `position`; matching the real order leaves no doubt.)
     const stuck = [];
-    for (const element of document.body.querySelectorAll('*')) {
-      const position = winningDeclaration(element, 'position', rules);
-      if (position?.value !== 'sticky') continue;
-      const where = element.className || element.tagName.toLowerCase();
-      const section = element.closest('[data-section]')?.dataset.section ?? 'n/a';
-      stuck.push(
-        `.${where} in [data-section=${section}] resolves to position: sticky via ` +
-        `"${position.selector}" (${position.rule.sheet}` +
-        `${position.rule.condition ? ` @media ${position.rule.condition}` : ''})`);
+    for (const page of Object.keys(RENDERERS)) {
+      const body = pageBody(page);
+      for (const element of body.querySelectorAll('*')) {
+        const position = winningDeclaration(element, 'position', rules);
+        if (position?.value !== 'sticky') continue;
+        const where = element.className || element.tagName.toLowerCase();
+        const section = element.closest('[data-section]')?.dataset.section ?? 'n/a';
+        stuck.push(
+          `${page}: .${where} in [data-section=${section}] resolves to position: sticky via ` +
+          `"${position.selector}" (${position.rule.sheet}` +
+          `${position.rule.condition ? ` @media ${position.rule.condition}` : ''})`);
+      }
     }
     expect(stuck, stuck.join('\n')).toEqual([]);
   });
@@ -264,7 +279,7 @@ describe('nothing sticks to the viewport', () => {
     const rules = STYLESHEETS.flatMap((s) => leafRulesWithMedia(s.css, s.name));
     const root = document.createElement('main');
     renderSections(root);
-    document.body.replaceChildren(buildNav(), root);
+    document.body.replaceChildren(buildNav(), root, buildFooter());
 
     const nav = document.querySelector('.site-nav');
     expect(nav, 'buildNav() put no .site-nav in the fixture').not.toBeNull();
@@ -318,6 +333,28 @@ describe('the hero wordmark size cap', () => {
       expect(fontSize, `hero h1 font-size "${fontSize.trim()}" does not take a min() -- ` +
         'a cap that is not the smaller of the two terms is not a cap').toMatch(/min\s*\(/);
     }
+  });
+
+  it('keeps that container stretched to its column on a phone, never shrunk to fit', () => {
+    // The container's width IS the cap: 100cqi is whatever the head measures. An
+    // inline-size container's own intrinsic width is zero by definition, so if the head
+    // is ever sized to fit its content rather than stretched to its column, the cap
+    // resolves to 100cqi = 0. It happened: the narrow hero became a column FLEXBOX to put
+    // the marquee on the first screen, and the wide rule's `align-items: end` -- the
+    // cross axis, in a column -- shrank the head to 0px at x 335. The wordmark went to
+    // 0px and the tagline stacked one word per line out to x 480.
+    //
+    // Resolved through the real cascade at phone width (the machinery above), because
+    // the defect was a declaration from ANOTHER rule winning, not a missing line.
+    const rules = STYLESHEETS.flatMap((s) => leafRulesWithMedia(s.css, s.name));
+    const room = pageBody('home').querySelector('#hero .room');
+    const display = winningDeclaration(room, 'display', rules);
+    expect(display?.value, 'the phone hero room is no longer a flexbox -- revisit this guard')
+      .toBe('flex');
+    const align = winningDeclaration(room, 'align-items', rules);
+    expect(align?.value, `the phone hero aligns its head with "${align?.value}" via ` +
+      `"${align?.selector}" -- anything but stretch sizes the query container to fit, ` +
+      'and an inline-size container fits to zero').toBe('stretch');
   });
 
   it('establishes the query container the cap measures against', () => {
@@ -379,37 +416,37 @@ describe('the marquee duration', () => {
 });
 
 describe("the contrast probe's block list", () => {
+  /** The probe's names for the pages: the file each one is, without `.html`. */
+  const FILES = { home: 'index', about: 'about', media: 'media', join: 'join' };
+
   /** The [label, selector, page] triples out of check-contrast.html's BLOCKS array. */
   const blocks = () => {
     const src = readFileSync(PROBE, 'utf8');
     const body = /const BLOCKS = \[([\s\S]*?)\n\];/.exec(src);
     expect(body, 'BLOCKS is gone or no longer a flat array literal').not.toBeNull();
     const pairs = [...body[1].matchAll(
-      /\[\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*,\s*'(both|index|media)'\s*\]/g,
-    )].map((m) => ({ label: m[1], selector: m[2].replace(/\\'/g, "'"), page: m[3] }));
+      /\[\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*,\s*'(all|(?:index|about|media|join)(?: (?:index|about|media|join))*)'\s*\]/g,
+    )].map((m) => ({
+      label: m[1],
+      selector: m[2].replace(/\\'/g, "'"),
+      // 'all', or the page files it claims: 'index join' is the schedule on both.
+      pages: m[3] === 'all' ? Object.values(FILES) : m[3].split(' '),
+    }));
     expect(pairs.length, 'parsed no blocks out of BLOCKS — the third column may be missing')
       .toBeGreaterThan(20);
     return pairs;
   };
 
-  /** Each page as it actually renders, so the guard sees the whole site and not half of it. */
-  const pages = () => {
-    const built = {};
-    for (const [page, render] of [['index', renderSections], ['media', renderMediaPage]]) {
-      const root = document.createElement('main');
-      render(root);
-      const body = document.createElement('body');
-      body.append(buildNav({ page }), root);
-      built[page] = body;
-    }
-    return built;
-  };
+  /** Each page as it actually renders, so the guard sees the whole site and not a quarter of it. */
+  const pages = () => Object.fromEntries(
+    Object.keys(RENDERERS).map((page) => [FILES[page], pageBody(page)]),
+  );
 
-  it('covers every element on either page that paints text', () => {
+  it('covers every element on every page that paints text', () => {
     const all = blocks();
     const uncovered = [];
     for (const [page, body] of Object.entries(pages())) {
-      const selectors = all.filter((b) => b.page === 'both' || b.page === page).map((b) => b.selector);
+      const selectors = all.filter((b) => b.pages.includes(page)).map((b) => b.selector);
       // Elements holding a direct, non-whitespace text node: the leaves that paint. A
       // container whose text comes from a child is covered by that child.
       const painters = [...body.querySelectorAll('*')].filter((el) =>
@@ -427,16 +464,17 @@ describe("the contrast probe's block list", () => {
   });
 
   it('lists no selector that matches nothing on the page it claims', () => {
-    // The other direction. Page-aware since the site stopped being one page: four MEDIA
-    // selectors resolve on media.html and nowhere else, and calling those dead because
-    // the home page has no #media would be the guard misreading a correct list.
+    // The other direction. Page-aware since the site stopped being one page: a board
+    // selector resolves on about.html and nowhere else, and calling it dead because the
+    // home page has no board would be the guard misreading a correct list.
+    //
+    // EVERY page it names, not any one of them: a block claiming 'index join' that only
+    // matched on index would let the probe's run over join.html report that block as
+    // matching nothing -- a loud failure there, and a claim here that was never true.
     const built = pages();
-    const dead = blocks()
-      .filter(({ selector, page }) => {
-        const where = page === 'both' ? ['index', 'media'] : [page];
-        return where.every((k) => built[k].querySelector(selector) === null);
-      })
-      .map(({ label, selector, page }) => `${label} (${selector}) — claimed on ${page}`);
-    expect(dead, 'these BLOCKS selectors match nothing the page they name renders').toEqual([]);
+    const dead = blocks().flatMap(({ label, selector, pages: where }) => where
+      .filter((page) => built[page].querySelector(selector) === null)
+      .map((page) => `${label} (${selector}) — claimed on ${page}.html, matches nothing there`));
+    expect(dead, 'these BLOCKS selectors match nothing on a page they name').toEqual([]);
   });
 });

@@ -89,9 +89,10 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   };
 }
 
-// Five, not six: media moved to media.html. boot() picks its renderer off
-// document.body.dataset.page, and these specs run against the default (home).
-const SECTION_IDS = ['hero', 'about', 'events', 'board', 'contact'];
+// The home page's two: About, Board and Media are pages of their own now and Contact is
+// the footer. boot() picks its renderer off document.body.dataset.page, and these specs
+// run against the default (home) unless they set one.
+const SECTION_IDS = ['hero', 'events'];
 
 /** The current test's hand-driven rAF. Reassigned by the file-level beforeEach. */
 let frames;
@@ -106,6 +107,9 @@ beforeEach(() => {
   vi.restoreAllMocks();
   document.documentElement.removeAttribute('data-stage');
   document.body.innerHTML = '<canvas id="gradient" aria-hidden="true"></canvas><main id="content"></main>';
+  // innerHTML replaces the body's children and leaves its ATTRIBUTES alone, so a
+  // data-page set by one test would pick the next test's page for it.
+  delete document.body.dataset.page;
   // main.js only ever assigns window.__vd by spreading whatever was already there
   // (`{ ...(window.__vd ?? {}), gradient, lifecycle }`), so a value left behind by one
   // test would otherwise leak into the next -- most importantly into a test asserting
@@ -200,6 +204,53 @@ describe('boot', () => {
   });
 });
 
+describe('which page boots', () => {
+  beforeEach(() => {
+    vi.doMock('../src/fallback/detect.js', () => ({
+      supportsWebGL: () => false,
+      prefersReducedMotion: () => false,
+    }));
+  });
+
+  // The first section each page opens on, which is enough to tell the four apart.
+  const OPENS_ON = { home: 'hero', about: 'about', media: 'media', join: 'join' };
+
+  for (const [page, first] of Object.entries(OPENS_ON)) {
+    it(`renders the ${page} page when <body> says data-page="${page}"`, async () => {
+      document.body.dataset.page = page;
+      await import('../src/main.js');
+      expect(document.querySelector('[data-section]').dataset.section).toBe(first);
+      // The nav marks the page it was built on; home has no button of its own.
+      const current = document.querySelector('.site-nav [aria-current="page"]');
+      if (page === 'home') expect(current).toBeNull();
+      else expect(current.getAttribute('href')).toBe(`./${page}.html`);
+    });
+  }
+
+  it('falls back to the home page for a data-page nobody renders, rather than to nothing', async () => {
+    document.body.dataset.page = 'events';
+    await import('../src/main.js');
+    expect(document.querySelector('[data-section]').dataset.section).toBe('hero');
+  });
+
+  it('mounts the footer after <main>, not inside it, on every page', async () => {
+    // Nested in <main>, a <footer> is not the page's contentinfo landmark. Checked on
+    // each page because the boot is shared: a page that lost its footer would be a page
+    // with no address and no socials on it at all.
+    for (const page of Object.keys(OPENS_ON)) {
+      vi.resetModules();
+      document.body.innerHTML = '<canvas id="gradient" aria-hidden="true"></canvas><main id="content"></main>';
+      document.body.dataset.page = page;
+      await import('../src/main.js');
+      const footers = document.querySelectorAll('footer');
+      expect(footers, `${page} has ${footers.length} footers`).toHaveLength(1);
+      expect(footers[0].previousElementSibling, `${page}'s footer does not follow <main>`)
+        .toBe(document.getElementById('content'));
+      expect(document.getElementById('content').contains(footers[0])).toBe(false);
+    }
+  });
+});
+
 describe('the gradient mount', () => {
   // DOM reset comes from the file-level beforeEach above; this one adds only the doMock
   // + import both tests below share. No WebGL stub is needed: jsdom has no real WebGL
@@ -223,7 +274,8 @@ describe('the gradient mount', () => {
 
   it('renders every section even with no WebGL', () => {
     // Content is never gated behind the graphics.
-    expect(document.querySelectorAll('[data-section]').length).toBeGreaterThan(4);
+    expect([...document.querySelectorAll('[data-section]')].map((el) => el.dataset.section))
+      .toEqual(SECTION_IDS);
   });
 });
 
@@ -524,7 +576,7 @@ describe('boot without IntersectionObserver', () => {
     await withoutIntersectionObserver(async () => {
       await import('../src/main.js');
       const rooms = document.querySelectorAll('.room');
-      expect(rooms.length, 'renderSections did not build the expected five rooms')
+      expect(rooms.length, 'renderSections did not build one room per home-page section')
         .toBe(SECTION_IDS.length);
       for (const room of rooms) expect(room.classList.contains(PENDING_CLASS)).toBe(false);
     });
@@ -542,8 +594,10 @@ describe('boot without IntersectionObserver', () => {
   it('does not construct Lenis: a nav click reaches the browser instead of being swallowed', async () => {
     await withoutIntersectionObserver(async () => {
       await import('../src/main.js');
-      const link = document.querySelector('.site-nav-links a[href="#about"]');
-      expect(link, 'nav did not render its About link').not.toBeNull();
+      // The wordmark's '#hero': the one in-page anchor the nav still has, now that every
+      // button leads to a page -- and an in-page anchor is exactly what Lenis intercepts.
+      const link = document.querySelector('.site-nav-mark[href="#hero"]');
+      expect(link, 'nav did not render the wordmark\'s in-page link').not.toBeNull();
 
       // Neutralise jsdom's own in-page hash navigation strictly AFTER reading what the
       // app decided, exactly as the external-link test in smooth.dom.test.js does -- this

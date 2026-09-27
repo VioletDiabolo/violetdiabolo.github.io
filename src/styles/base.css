@@ -17,13 +17,11 @@
  * it) and the gradient is what stands in the middle of the page now. Leaving the old one
  * here would have described a page that does not exist.
  *
- * WHAT CARRIES THE BOLDNESS, exactly once: the story panel. It is the only violet SURFACE
- * on the page -- tinted glass, set in Instrument Serif, carrying the club's own account
- * of itself and a photograph. Everything around it is quiet Inter on near-black. The
- * client chose tinted glass over the opaque violet sheet this used to be, and over the
- * clear glass that briefly replaced it: violet identity kept, the gradient still moving
- * behind it, and a violet-weighted ground that makes the contrast a number rather than a
- * guess (see --story-tint).
+ * FOUR PAGES, ONE GROUND. Home, About us, Media and Join us all open on the same moving
+ * gradient, at the client's request ("all pages can have the swirling background"), and
+ * every panel laid over it is glass so the ribbons keep moving behind the content. The
+ * violet-tinted story panel that used to carry the page's one bold surface went with the
+ * single-page layout it belonged to; About is a page of its own now.
  *
  * WHY NO TEXT ON THIS PAGE NEEDS A PLATE. Every colour the gradient can emit is a
  * component-wise mix along deep -> mid -> bright (src/gradient/palette.js), each stop
@@ -36,9 +34,8 @@
  *
  * The corollary is a rule worth stating outright, because it is easy to break by
  * accident: OVER BARE GRADIENT, ONLY --ink. --ink-dim measures 2.37:1 on that same
- * ceiling. Dim text is for a surface -- solid, glass or tinted -- and there are exactly
- * two places on the page that sit on no surface at all (the hero's own head and the
- * footer line), both of which take --ink.
+ * ceiling. Dim text is for a surface, and the text that sits on no surface at all -- the
+ * hero's own head, and each sub-page's header -- takes --ink.
  *
  * Colour is rationed to two roles that never collapse into each other:
  *
@@ -46,9 +43,9 @@
  *     only element that carries it is the canvas.
  *
  *   the PAGE's violet, --accent, is a mark. It says "this is live": every link, the focus
- *     ring, .board-position, the nav's call to action, and the two form pills. Plus the
- *     one place it becomes an area rather than a mark -- the story panel's tint, which is
- *     --accent's hue taken down to a surface that can carry white text.
+ *     ring, .board-position, and the filled controls -- the nav's call to action and every
+ *     .button. Plus two places it becomes a small area rather than a mark: the label pill
+ *     over each sub-page's heading, and the tint behind a practice's place (--mark).
  */
 
 :root {
@@ -92,9 +89,6 @@
    *
    *        --glass       0.80 over bright -> rgb(34, 14, 65), L = 0.0104.
    *                      --ink 15.71:1, --ink-dim 7.10:1. Dim body copy is safe on it.
-   *        --story-tint  0.76 over bright -> rgb(59, 25, 104), L = 0.0262.
-   *                      --ink 12.44:1. Violet enough to read as the club's colour,
-   *                      open enough that the ribbons still drift through it.
    *        --chip        0.82 over bright -> rgb(33, 14, 62), L = 0.0099.
    *                      --ink 15.84:1. The nav's pills.
    *        --chip-cta    0.92 over bright -> rgb(192, 111, 255), L = 0.2980.
@@ -102,10 +96,12 @@
    *                      chip's worst ground: near-black ink wants the ground BRIGHT, so
    *                      the DARK end of the gradient is what binds it, not the light one.
    *
-   *      Those five figures replace numbers that were not source-over composites of these
-   *      tokens at all: --glass was written rgb(37, 30, 61) / --ink 12.9:1, --story-tint
-   *      rgb(59, 38, 103) / --ink 10.1:1, --chip rgb(31, 22, 63) / --ink 13.0:1, and the
-   *      CTA's ink 6.36:1. Each overstated the GREEN channel of the composite by 8-16
+   *      A place in the practice schedule sits on --mark, --accent at 0.22 laid over the
+   *      glass composite above: rgb(70, 37, 107), where --ink measures 10.9:1.
+   *
+   *      Those figures replace numbers that were not source-over composites of these
+   *      tokens at all: --glass was written rgb(37, 30, 61) / --ink 12.9:1, --chip
+   *      rgb(31, 22, 63) / --ink 13.0:1, and the CTA's ink 6.36:1. Each overstated the GREEN channel of the composite by 8-16
    *      levels and so understated the contrast -- every real ratio is HIGHER than the
    *      one it replaces, which is why no readability claim in this file moved. The
    *      per-block table they were meant to summarise was never wrong; it is recomputed
@@ -117,44 +113,37 @@
    *      through the bar and through some of the panels; these alphas are the version of
    *      that which still has a measured floor. ---- */
   --glass:      rgba(11, 8, 18, 0.80);
-  --story-tint: rgba(37, 21, 56, 0.76);
+  --mark:       rgba(198, 118, 255, 0.22);
   --chip:       rgba(12, 9, 20, 0.82);
   --chip-hover: rgba(52, 32, 82, 0.88);
   --chip-cta:   rgba(198, 118, 255, 0.92);
 
-  /* ---- Type. The display voice is a HAIRLINE GROTESQUE, not a serif: an Inter 200
-   *      headline set at 9rem is itself a line drawn across the page, which is the same
-   *      gesture the ribbons make. A high-contrast serif at that size reads literary --
-   *      a magazine feature about a club rather than the club.
+  /* ---- Type. One family, Inter, at every size: the display voice is a grotesque, not a
+   *      serif, because a high-contrast serif at 9rem reads literary -- a magazine feature
+   *      about a club rather than the club.
    *
-   *      Instrument Serif keeps one job rather than being dropped: the story panel, the
-   *      single printed surface on the page. Confining it there is what makes that panel
-   *      feel like a different material instead of a different colour.
-   *
-   *      TWO FAMILIES, and the third is gone. --font-mono, --mono-2xs and --mono-xs
-   *      belonged to exactly one thing: the 3D object's part labels, deleted with the
-   *      rest of that system earlier on this branch. They have been sitting here at zero
-   *      uses since, next to a note saying the call belonged to "a later task" -- and the
-   *      design pass IS that task, so it is made here rather than deferred again. The
-   *      Space Mono request goes from index.html with them: a page does not ask for a
-   *      webfont it has no glyph to set. ---- */
+   *      ONE FAMILY, where there were three. Space Mono set the 3D object's part labels
+   *      and went with the object. Instrument Serif set the story panel's prose, the one
+   *      printed surface on the single-page site, and went with the panel: About is a page
+   *      of its own now, laid out after the client's team-page reference in the same Inter
+   *      as everything else. A page does not ask for a webfont it has no glyph to set. ---- */
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-panel:   'Instrument Serif', 'Iowan Old Style', Georgia, serif;
 
   /* ---- Scale. A fourth (x1.333) at the top, tightening to a minor third lower down,
    *      where the steps have to stay distinguishable at small sizes. ---- */
   --type-hero:  clamp(3.4rem, 9.6vw, 9rem); /* 9.6, not 10.5: see the h1 in sections.css */
   --type-title: clamp(2.1rem, 5vw, 4.25rem);
-  --type-panel: clamp(2.2rem, 4.6vw, 3.9rem);
   --type-lead:  clamp(1.05rem, 1.4vw, 1.3rem);
   --type-micro: 0.78rem;
 
   /* ---- Measures. --text-col is the head of a hero panel. --measure is the reading
-   *      column for Inter; the story panel sets its own, because 48ch of Instrument
-   *      Serif is about the same line length as 62ch of Inter. ---- */
-  --text-col:  min(38%, 30rem);
-  --measure:   62ch;
+   *      column for Inter. --content-max is the widest a sub-page's plate lets its
+   *      content run: four board cards across, which is the client's reference, and never
+   *      five, which would wrap every bio at about twenty-five characters. ---- */
+  --text-col:    min(38%, 30rem);
+  --measure:     62ch;
+  --content-max: 76rem;
 
   /* ---- The hero wordmark's widest word, in em of the face it is set in. A DIVISOR:
    *      a column W wide can hold that word at W / --wordmark-em, so the hero h1 is
@@ -178,17 +167,28 @@
    *      a vw preferred value wins and overflows the column. ---- */
   --wordmark-em: 4.25;
 
-  /* Two radii, because they mean different things: a card is a cut rectangle, a control
-     is a pressable pill. One radius on everything is how a page stops having hierarchy. */
-  --radius:      6px;
-  --radius-pill: 999px;
+  /* Radii, because they mean different things. One radius on everything is how a page
+     stops having hierarchy.
+
+       --radius          a photograph or a thumbnail: a cut rectangle.
+       --radius-card     a card you read as a unit -- a board member, a way to join --
+                         rounder, after the client's team-page reference.
+       --radius-control  anything you press: the nav's buttons, every .button, the
+                         socials, the semester select. 8px, "squarer and just slightly
+                         round" in the client's words; it was a full pill.
+       --radius-pill     a label that is NOT pressable -- the tag over a page heading.
+                         The pill stays, for exactly the thing that is not a button. */
+  --radius:         6px;
+  --radius-card:    12px;
+  --radius-control: 8px;
+  --radius-pill:    999px;
 
   /* The bar's own ground. --stage at 0.82 rather than an opaque fill: the gradient still
      moves behind it, just far enough down that nothing in the bar has to compete. */
   --bar: rgba(8, 6, 13, 0.82);
-  /* The one hairline on the page: under the nav bar, and over the sign-off line inside
-     the last panel. Named for what it IS rather than where it first appeared -- it was
-     --bar-edge until the footer wanted the same rule. */
+  /* The one hairline on the page: under the nav bar, over the sign-off line in the
+     footer, and round a card on the Join us page. Named for what it IS rather than where
+     it first appeared -- it was --bar-edge until the footer wanted the same rule. */
   --hairline: rgba(245, 242, 250, 0.10);
 
   --gutter: clamp(1.25rem, 5vw, 4.5rem);
@@ -220,8 +220,9 @@
   /* The gap between panels, where nothing but the gradient shows. This is the page's
      only structural device: plate, light, plate. It replaces every rule and divider the
      brief rules out, and it is why the panels are full-bleed rather than inset cards --
-     a gap that runs edge to edge reads as the page opening, not as a margin. */
-  --panel-gap: clamp(3rem, 9vh, 7rem);
+     a gap that runs edge to edge reads as the page opening, not as a margin. Opened up a
+     little with the sub-pages, which the client asked to be spaced out vertically. */
+  --panel-gap: clamp(3.5rem, 11vh, 8rem);
 
   color-scheme: dark;
 }
@@ -545,7 +546,7 @@ a:hover {
      whole deficit onto the pill row (see .site-nav-links). */
   flex: 0 1 auto;
   min-width: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   padding: 0.45rem 0.9rem;
   background: var(--chip);
   font-size: var(--type-micro);
@@ -608,7 +609,8 @@ a:hover {
 .site-nav-links a,
 .site-nav-cta {
   flex: 0 0 auto;
-  border-radius: var(--radius-pill);
+  /* --radius-control, not the pill these were: "squarer and just slightly round". */
+  border-radius: var(--radius-control);
   padding: 0.45rem 0.9rem;
   font-size: var(--type-micro);
   font-weight: 600;
@@ -671,9 +673,9 @@ a:hover {
 
 /*
  * Narrow screens. At 375px the wordmark chip alone takes 140 of the 335px the bar has,
- * which is the one item genuinely redundant there: the hero's h1 says the club's name in
- * 9rem type about sixty pixels below it. Dropping it leaves the four section links plus
- * the call to action fitting outright.
+ * which is the one item genuinely redundant there: every page names the club in its own
+ * heading a few lines below. Dropping the name leaves the page buttons and the call to
+ * action fitting outright.
  */
 @media (max-width: 767px) {
   .site-nav {
@@ -801,13 +803,15 @@ a:hover {
  *   a sibling of #content, so no [data-panel] selector can ever reach it: it has to be
  *   named separately, which is the trap an earlier version of this rule fell into.
  *
- *   the story panel is tinted glass over a moving gradient. Its ground is the least
- *   predictable on the page and it is the one panel whose prose is most likely to grow a
- *   link, so it takes the same any-ground treatment rather than a narrower one tuned to a
- *   ground that no longer exists.
+ *   the panels with no surface at all -- the home page's hero and each sub-page's header
+ *   -- sit straight on the moving gradient, the least predictable ground on the site, and
+ *   the accent band is 2.06:1 on a bright ribbon. They take the same any-ground treatment
+ *   as the nav. (This was the story panel's, when that tinted-glass panel was the
+ *   unpredictable ground; it went with the single-page layout.)
  */
 .site-nav :focus-visible,
-[data-panel='story'] :focus-visible {
+[data-panel='hero'] :focus-visible,
+[data-panel='header'] :focus-visible {
   outline-color: var(--ink);
   box-shadow: 0 0 0 7px var(--stage);
 }

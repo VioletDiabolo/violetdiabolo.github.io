@@ -8,8 +8,8 @@
  * transparent) would have been invisible on a dark panel anyway.
  *
  * Simplified constructions, not the brands' own artwork: a rounded square with a circle
- * and a dot, a rounded rectangle with a play triangle, a globe. Recognisable at 20px,
- * which is the whole job.
+ * and a dot, a rounded rectangle with a play triangle, a globe, and a controller outline
+ * with two eyes for Discord. Recognisable at 20px, which is the whole job.
  *
  * `aria-hidden` on every one of them. The accessible name is the link's own label
  * (SOCIALS[].label, src/content/index.js) — an icon that announces itself as well would
@@ -27,6 +27,12 @@ const PATHS = {
     '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
     '<path d="M3 12h18M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18" ' +
     'fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  discord:
+    '<path d="M5.2 7.3C7.4 6 9.6 5.4 12 5.4s4.6.6 6.8 1.9c1.5 2.3 2.2 4.9 2.1 7.7' +
+    '-1.6 1.2-3.3 2-5.2 2.5l-.9-1.5M9.2 16l-.9 1.5C6.4 17 4.7 16.2 3.1 15 3 12.2 3.7 9.6 5.2 7.3z" ' +
+    'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>' +
+    '<circle cx="9.3" cy="12.2" r="1.35" fill="currentColor"/>' +
+    '<circle cx="14.7" cy="12.2" r="1.35" fill="currentColor"/>',
 };
 
 /** The mark names this module can draw, so a guard can check content against it. */

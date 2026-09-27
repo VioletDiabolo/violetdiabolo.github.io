@@ -151,19 +151,22 @@ describe('glass', () => {
     }
   });
 
-  it('styles both surfaces', () => {
-    const css = read('../src/styles/sections.css');
-    for (const surface of ['solid', 'glass']) {
-      expect(css).toMatch(new RegExp(`\\[data-surface=["']?${surface}`));
-    }
+  it('styles glass, the one surface left', () => {
+    // There were two, solid and glass. The client asked for the swirling background on
+    // every page, and a solid plate is the one thing that hides it, so every panel is
+    // glass now. A `solid` rule coming back would be a surface nothing is meant to use --
+    // tests/panels.dom.test.js holds the rendered pages to the same line.
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(/\[data-surface=["']?glass/);
+    expect(css, 'a solid surface is styled again').not.toMatch(/\[data-surface=["']?solid/);
   });
 });
 
 describe('the editorial pairing', () => {
-  it('loads Instrument Serif and Inter', () => {
-    const html = read('../index.html');
-    expect(html).toMatch(/Instrument\+Serif/);
-    expect(html).toMatch(/family=Inter/);
+  it('loads Inter on every page', () => {
+    for (const page of ['index', 'about', 'media', 'join']) {
+      expect(read(`../${page}.html`), `${page}.html does not load Inter`).toMatch(/family=Inter/);
+    }
   });
 
   it('drops Space Grotesk, which was the technical voice', () => {
@@ -199,8 +202,13 @@ describe('the editorial pairing', () => {
 
     // Every family the page DOES request is set by a token, and every token's family is
     // requested. This is the part that cannot go stale.
+    //
+    // Instrument Serif went the same way in the four-page restructure: its one job was the
+    // story panel's prose, and the story panel went with the single-page layout.
+    expect(css, 'a stylesheet sets Instrument Serif, which no page loads any more')
+      .not.toMatch(/Instrument Serif/);
     const requested = [...html.matchAll(/family=([A-Za-z+]+)/g)].map((m) => m[1].replace(/\+/g, ' '));
-    expect(requested.sort()).toEqual(['Instrument Serif', 'Inter']);
+    expect(requested.sort()).toEqual(['Inter']);
     for (const family of requested) {
       expect(css, `${family} is loaded but no token sets it`).toMatch(new RegExp(`'${family}'`));
     }
@@ -226,13 +234,10 @@ describe('the light spill is gone', () => {
 
 describe('the four panel patterns', () => {
   it('styles every panel pattern', () => {
-    // The old version of this test also asserted the story panel (then 'panel') carried
-    // an opaque background -- true when it was the one printed sheet covering the 3D
-    // object. It is glass now (`[data-surface='glass']`, deliberately, so the gradient
-    // shows through): that assertion is gone with the premise, not merely unported, and
-    // 'glass > styles both surfaces' below covers the surface system that replaced it.
+    // hero and feature on the home page, header and plate on the three sub-pages. story
+    // and grid went with the single-page layout they were drawn for.
     const css = read('../src/styles/sections.css');
-    for (const panel of ['hero', 'story', 'feature', 'grid']) {
+    for (const panel of ['hero', 'feature', 'header', 'plate']) {
       expect(css, `${panel} has no styling`).toMatch(new RegExp(`\\[data-panel=["']?${panel}["']?\\]`));
     }
   });
@@ -331,12 +336,14 @@ describe('the focus ring on every ground it is laid over', () => {
    */
   const grounds = () => {
     const t = tokens();
-    const sections = read('../src/styles/sections.css');
-    expect(sections, 'the accent-filled form button no longer exists, so this list of ' +
-      'grounds is out of date').toMatch(/\.form-card button\s*\{[^}]*background:\s*var\(--accent\)/);
+    // Comments stripped, like every other rule-matching guard in this file: the prose
+    // above a rule sits between it and the `}` this anchors on.
+    const sections = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(sections, 'the accent-filled .button no longer exists, so this list of ' +
+      'grounds is out of date').toMatch(/(?:^|\})\s*\.button\s*\{[^}]*background:\s*var\(--accent\)/);
     return [
       ['the near-black page ground', t['--stage']],
-      ['an opaque accent fill (the nav CTA, the form buttons)', t['--accent']],
+      ['an opaque accent fill (the nav CTA, every .button)', t['--accent']],
     ];
   };
 
@@ -356,7 +363,7 @@ describe('the focus ring on every ground it is laid over', () => {
       .toBeLessThan(MIN);
   });
 
-  it('keeps a band that reads on the page ground AND against accent, for the nav and the story panel', () => {
+  it('keeps a band that reads on the page ground AND against accent, for the nav and the panels with no surface', () => {
     const t = tokens();
     const css = baseCss();
 
@@ -376,11 +383,16 @@ describe('the focus ring on every ground it is laid over', () => {
       "the fixed nav is no longer covered, and every one of its own chips is opaque " +
       '--surface or --accent')
       .toBe(true);
-    expect(selectors.some((s) => /\[data-panel='story'\]/.test(s)),
-      "the story panel's own focusable content is no longer covered; a link in the club's " +
-      'story sits on glass over an unpredictable, moving gradient -- the one ground this ' +
-      'ring cannot afford to assume is safe')
-      .toBe(true);
+    // And every panel that sits on NO surface: the hero and a sub-page's header are laid
+    // straight on the moving gradient, where the accent band is 2.06:1 on a bright ribbon.
+    // (This was the story panel's slot, when that tinted-glass panel was the page's least
+    // predictable ground.)
+    for (const panel of ['hero', 'header']) {
+      expect(selectors.some((s) => new RegExp(`\\[data-panel='${panel}'\\]`).test(s)),
+        `focusable content in the ${panel} panel is no longer covered; it sits on bare, ` +
+        'moving gradient -- the one ground this ring cannot afford to assume is safe')
+        .toBe(true);
+    }
 
     const body = rule[2];
     const bands = [...body.matchAll(/var\((--[\w-]+)\)/g)].map((m) => t[m[1]]);
@@ -494,7 +506,7 @@ describe("the gradient's luminance ceiling", () => {
 
   it('keeps --ink readable on the brightest pixel the shader can emit', () => {
     // 4.5:1 is WCAG AA for body text, and body text is what sits out there: the hero's
-    // tagline at 13px and the footer line at 12.5px are both on bare canvas.
+    // tagline at 13px and each sub-page's lead are on bare canvas.
     const ink = lum01(hex01(tokens()['--ink']));
     const measured = ratio(ink, lum01(PALETTE.bright));
     expect(measured, `--ink measures ${measured.toFixed(2)}:1 against the gradient's ` +
@@ -512,11 +524,13 @@ describe("the gradient's luminance ceiling", () => {
     expect(ratio(dim, lum01(PALETTE.bright))).toBeLessThan(4.5);
   });
 
-  it('puts --ink, not --ink-dim, on the two text blocks with no surface under them', () => {
+  it('puts --ink, not --ink-dim, on the text blocks with no surface under them', () => {
+    // The footer line used to be the second of these. It is on the footer's glass now,
+    // and still --ink; the block that took its place on bare canvas is a page's lead.
     const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
     for (const [label, selector] of [
       ['the hero tagline', "\\[data-panel='hero'\\] \\.room-head p"],
-      ['the footer line', '\\.footer-line'],
+      ["a sub-page header's lead", '\\.page-lead'],
     ]) {
       const rule = css.match(new RegExp(`${selector}\\s*\\{[^}]*\\}`));
       expect(rule, `${label} has no rule any more -- update this guard`).not.toBeNull();
@@ -899,10 +913,12 @@ describe("the nav's height", () => {
       'MINIMUM height. A wrapped bar is taller than its minimum by however much it ' +
       'wrapped, and the offset misses by exactly that. Read --nav-clear instead.')
       .toEqual([]);
-    // Non-vacuity: the five offsets have to be somewhere. Four in sections.css (hero
-    // wide, hero narrow, story, feature) and one in base.css (scroll-margin-top).
+    // Non-vacuity: the offsets have to be somewhere. Three in sections.css -- the hero,
+    // wide and narrow, and a sub-page's header, the panels that open a page under the bar
+    // -- and one in base.css (scroll-margin-top). The story and feature panels read it
+    // too when each could be a screen-tall panel reached by a jump link; neither is now.
     expect(clears, 'nothing reads --nav-clear any more, so this guard proves nothing')
-      .toBeGreaterThanOrEqual(5);
+      .toBeGreaterThanOrEqual(4);
   });
 
   it('lands a jump link below the bar rather than under it', () => {
@@ -922,53 +938,6 @@ describe("the nav's height", () => {
       'every offset falls back to the fixed clamp')
       .toMatch(/new ResizeObserver\(/);
     expect(nav, 'nav.js no longer writes --nav-offset').toMatch(/--nav-offset/);
-  });
-});
-
-/* ---------------------------------------------------------------------------
- * The story panel's material.
- * ------------------------------------------------------------------------- */
-
-describe('the story panel', () => {
-  it('is violet-tinted glass, not the clear glass every other glass panel gets', () => {
-    // The client's call, made after the spec: violet identity kept, gradient still
-    // moving behind it. Clear glass loses the identity; an opaque --accent sheet (what
-    // it was two revisions ago) loses the gradient and needs near-black ink that no
-    // longer suits a ground that moves. This asserts it has its own fill AND that the
-    // fill is not simply the shared glass token under another name.
-    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    const rule = css.match(/\[data-panel='story'\]\[data-surface='glass'\]\s*\{([^}]*)\}/);
-    expect(rule, 'the story panel has no material of its own any more').not.toBeNull();
-    const background = rule[1].match(/background:\s*var\((--[\w-]+)\)/);
-    expect(background, 'the story panel no longer sets its own background').not.toBeNull();
-    expect(background[1], 'the story panel is back on the shared glass token, so it is ' +
-      'not tinted at all').not.toBe('--glass');
-
-    // and the token it does use has to actually be violet: more blue than red, more red
-    // than green, which is the same shape palette.test.js pins for the gradient's mid.
-    const base = read('../src/styles/base.css');
-    const token = base.match(new RegExp(`${background[1]}:\\s*rgba?\\(([^)]*)\\)`));
-    expect(token, `${background[1]} is not declared as an rgba() token`).not.toBeNull();
-    const [r, g, b, alpha] = token[1].split(',').map((v) => parseFloat(v));
-    expect(b, 'the story tint is not violet').toBeGreaterThan(r);
-    expect(r, 'the story tint is not violet').toBeGreaterThan(g);
-
-    // And it has to be GLASS. The hue test above passes for rgba(37, 21, 56, 1), which
-    // is precisely the opaque violet plate the client rejected -- the decision on record
-    // is "tinted glass, NOT the opaque violet plate it replaced", and an alpha of 1
-    // satisfies every other assertion in this test while reversing that decision.
-    //
-    // The range, not just `< 1`: below about 0.55 the tint stops being a surface and
-    // becomes a wash (--ink-dim composited over the gradient's brightest pixel measures
-    // 4.50:1 at 0.55 and falls under AA below it), and above 0.9 it is a plate in all
-    // but name -- at 0.95 the composite is rgb(42, 22, 66) against the token's own
-    // rgb(37, 21, 56), a difference nobody can see.
-    expect(alpha, `${background[1]} has no alpha at all, so it is an opaque plate`)
-      .toBeTypeOf('number');
-    expect(alpha, 'the story panel is an opaque violet plate again, which is the thing ' +
-      'the client replaced with tinted glass').toBeLessThan(1);
-    expect(alpha, 'the story tint is too transparent to read as a surface').toBeGreaterThanOrEqual(0.55);
-    expect(alpha, 'the story tint is opaque in all but name').toBeLessThanOrEqual(0.9);
   });
 });
 
@@ -1009,7 +978,7 @@ describe('the story panel', () => {
  * ------------------------------------------------------------------------- */
 
 describe('the horizontal overflow at 200% text zoom', () => {
-  it('lets the contact block break its one unbreakable word, with the declaration that does not depend on engine behaviour', () => {
+  it("lets the footer's address break its one unbreakable word, with the declaration that does not depend on engine behaviour", () => {
     // overflow-wrap: break-word is banned here NOT because it fails to resolve the
     // overflow. Measured, it is identical to anywhere: scrollWidth 375, the link's own
     // box 282.03px, either way. (An earlier version of this comment, and of the failure
@@ -1022,9 +991,13 @@ describe('the horizontal overflow at 200% text zoom', () => {
     // it is the spec-correct declaration for this failure mode and does not depend on
     // an intrinsic-sizing interaction `break-word` is not obliged to honour on every
     // engine.
+    //
+    // The address moved from the Contact panel into the footer (src/ui/sections.js
+    // buildFooter), where it is a link inside a flex item -- whose automatic minimum IS its
+    // min-content, which is the one place the two properties do behave differently.
     const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    const rule = css.match(/\[data-section='contact'\]\s*\.room-head\s*p\s*,\s*\[data-section='contact'\]\s*\.room-head\s*p\s*a\s*\{([^}]*)\}/);
-    expect(rule, 'no rule sets overflow-wrap on the contact paragraph and its link').not.toBeNull();
+    const rule = css.match(/\.footer-contact li\s*,\s*\.footer-contact a\s*\{([^}]*)\}/);
+    expect(rule, 'no rule sets overflow-wrap on the footer address and its list item').not.toBeNull();
     expect(rule[1], 'the contact block should read anywhere, not break-word -- break-word measures identically here (scrollWidth 375, link 282.03px, same as anywhere) but is not spec-guaranteed to affect intrinsic sizing the way anywhere is, so anywhere is the declaration that does not depend on engine behaviour')
       .not.toMatch(/overflow-wrap:\s*break-word/);
     expect(rule[1], 'the contact block no longer breaks its one unbreakable word')
@@ -1051,28 +1024,36 @@ describe('the horizontal overflow at 200% text zoom', () => {
       .toMatch(/overflow-wrap:\s*anywhere/);
   });
 
-  it("lets a form button's label break, the same fix as the contact block, one column further in", () => {
-    // .form-card is align-items: flex-start, same fit-content shape as the contact
-    // block's room-head, so the widest single word in "Open <form title>" can push the
-    // whole card past a narrow column exactly the same way.
+  it("lets a button's label break, the same fix as the footer address, one column further in", () => {
+    // A .button sizes to fit its label, inside a card that is align-items: flex-start, so
+    // the widest single word in "Open <form title>" can push the whole card past a narrow
+    // column. Anchored to the rule whose selector IS `.button`, not one that ends in it.
     const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    const rule = css.match(/\.form-card button\s*\{([^}]*)\}/);
-    expect(rule, 'the form button has no rule of its own any more').not.toBeNull();
-    expect(rule[1], 'the form button label can push its card past a narrow column again')
+    const rule = /(?:^|\})\s*\.button\s*\{([^}]*)\}/.exec(css);
+    expect(rule, 'the .button rule is gone').not.toBeNull();
+    expect(rule[1], 'a button label can push its card past a narrow column again')
       .toMatch(/overflow-wrap:\s*anywhere/);
+    expect(rule[1], 'a button can outgrow its own column again').toMatch(/max-width:\s*100%/);
   });
 
   it("does not let a card grid's automatic minimum size push its own ancestor wider than the viewport", () => {
-    // A grid item's default automatic minimum size is its own min-content, the same
-    // mechanism .site-nav-links already overrides -- here one grid level further out.
-    // Measured: without it, .room (a grid item of the section's own one-cell grid)
-    // inherited whatever automatic minimum bubbled up from .board-list's cards, taking a
-    // 200px nominal track to 269.8px at 280x812/32px root.
+    // A grid or flex item's default automatic minimum size is its own min-content, the
+    // same mechanism .site-nav-links overrides. Measured on the old grid panel: .room, a
+    // grid item, inherited the automatic minimum bubbling up from .board-list's cards and
+    // took a 200px track to 269.8px at 280x812/32px root. That panel is gone, but the
+    // mechanism is not: the hero and feature rooms are grids whose items are the head
+    // and body, and a Join us card is a grid item holding a button and, once opened, a
+    // Google Form. Each of those is where the firewall has to be.
     const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    const rule = css.match(/\[data-panel='grid'\]\s*\.room\s*\{([^}]*)\}/);
-    expect(rule, "[data-panel='grid'] .room has no rule of its own any more").not.toBeNull();
-    expect(rule[1], 'a grid panel\'s .room can be pushed past the viewport by its own cards again')
-      .toMatch(/min-width:\s*0/);
+    for (const [label, selector] of [
+      ['the head and body of every room', '\\.room-head,\\s*\\.room-body'],
+      ['a Join us card', '\\.join-card'],
+    ]) {
+      const rule = new RegExp(`(?:^|\\})\\s*${selector}\\s*\\{([^}]*)\\}`).exec(css);
+      expect(rule, `${label} has no rule of its own any more`).not.toBeNull();
+      expect(rule[1], `${label} can be pushed past the viewport by what it holds again`)
+        .toMatch(/min-width:\s*0/);
+    }
   });
 
   it("floors a card grid's column at its own container's width, not a bare pixel value", () => {
@@ -1081,7 +1062,7 @@ describe('the horizontal overflow at 200% text zoom', () => {
     // width wide enough to give 240px on its own, and only trims it where 240 was never
     // going to fit regardless -- exactly the shape of every other fix in this group.
     const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    for (const [name, px] of [['board-list', 240], ['media-list', 230]]) {
+    for (const [name, floor] of [['board-list', '240px'], ['join-ways', '17rem']]) {
       // `(?:^|\})\s*` anchors this to the rule whose selector IS `.media-list`, not to
       // any rule whose selector merely ENDS in it. Unanchored, the media page's
       // `[data-panel='page'] .media-list` override matched first -- it sits earlier in
@@ -1091,7 +1072,21 @@ describe('the horizontal overflow at 200% text zoom', () => {
       const rule = new RegExp(`(?:^|\\})\\s*\\.${name}\\s*\\{([^}]*)\\}`).exec(css);
       expect(rule, `.${name} has no base rule any more`).not.toBeNull();
       expect(rule[1], `.${name}'s column floor can push its grid past the viewport again`)
-        .toMatch(new RegExp(`minmax\\(\\s*min\\(\\s*${px}px\\s*,\\s*100%\\s*\\)`));
+        .toMatch(new RegExp(`minmax\\(\\s*min\\(\\s*${floor}\\s*,\\s*100%\\s*\\)`));
+    }
+    // The media blocks have no floor to guard, and that is the claim: their column counts
+    // are fixed per width, and minmax(0, 1fr) cannot outgrow the grid it is in. A pixel
+    // floor coming back is how the other two needed their min() in the first place.
+    const blockColumns = leafRules(css)
+      .filter(({ selector }) => selector.trim() === '.media-block')
+      .map(({ body }) => /grid-template-columns:([^;]*)/.exec(body)?.[1])
+      .filter(Boolean);
+    // The base rule and the two widths above it; fewer means a breakpoint went unread.
+    expect(blockColumns.length, 'no .media-block column rule found -- this check is reading nothing')
+      .toBeGreaterThanOrEqual(3);
+    for (const columns of blockColumns) {
+      expect(columns, '.media-block has a column floor that can outgrow its grid')
+        .toMatch(/^\s*(repeat\(\s*\d+\s*,\s*)?minmax\(\s*0\s*,\s*1fr\s*\)\)?\s*$/);
     }
   });
 

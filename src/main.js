@@ -1,5 +1,5 @@
 import { buildNav } from './ui/nav.js';
-import { renderSections, renderMediaPage } from './ui/sections.js';
+import { RENDERERS, buildFooter } from './ui/sections.js';
 import { initReveal } from './ui/reveal.js';
 import { supportsWebGL, prefersReducedMotion } from './fallback/detect.js';
 import { createGradient } from './gradient/gradient.js';
@@ -11,14 +11,18 @@ export const APP_NAME = 'violet-diabolo';
 
 function boot() {
   const content = document.getElementById('content');
-  // One boot, two pages. index.html and media.html differ by this attribute alone —
-  // everything below (the graphics branch, the reduced-motion return, the
-  // no-IntersectionObserver guard) is the same sequence for both, because a second copy
-  // of a load-bearing ordering is a second thing to get wrong.
-  const page = document.body.dataset.page === 'media' ? 'media' : 'home';
-  if (page === 'media') renderMediaPage(content);
-  else renderSections(content);
+  // One boot, four pages. The page files differ by this attribute alone — everything
+  // below (the graphics branch, the reduced-motion return, the no-IntersectionObserver
+  // guard) is the same sequence for all of them, because a second copy of a load-bearing
+  // ordering is a second thing to get wrong. An unknown or missing value renders the
+  // home page rather than nothing.
+  const requested = document.body.dataset.page;
+  const page = Object.hasOwn(RENDERERS, requested) ? requested : 'home';
+  RENDERERS[page](content);
   document.body.prepend(buildNav({ page }));
+  // After <main>, not inside it: a <footer> is the page's contentinfo landmark only when
+  // it is not nested in <main>.
+  content.after(buildFooter());
   // Mounted before any graphics branch: content must never wait on WebGL.
   initReveal();
 
