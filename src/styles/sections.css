@@ -1,5 +1,5 @@
 /*
- * The four panel patterns.
+ * The panel patterns.
  *
  * Every section is one self-contained panel, described by two attributes rather than a
  * place in a scroll choreography (src/ui/sections.js stamps both):
@@ -9,40 +9,26 @@
  *                                                    <div class="room-body">  everything else
  *
  * `data-panel` is the LAYOUT, one of the four patterns below. `data-surface` is the
- * MATERIAL. The hero alone carries no surface: the gradient itself is the hero.
+ * MATERIAL.
  *
- *   hero      full-bleed, no surface. Head bottom-left, photograph bottom-right.
- *   story     violet-tinted glass. Serif, the club's own account of itself, and a photo.
- *   feature   glass. Title across the top, the practice details dropped bottom-right.
- *   grid      cards beside a title column. Media, board and contact.
+ *   hero     the home page's first screen. Wordmark bottom-left, photograph bottom-right,
+ *            and the performed-for marquee across the foot of both. No surface.
+ *   feature  the home page's events panel: the schedule left, a photograph right. Glass.
+ *   header   a sub-page's opening: a label, a heading and a lead, centred. No surface.
+ *   plate    a sub-page's content -- the board, the videos, the ways to join. Glass.
  *
- * WHERE THE SURFACES GO, AND WHY IT IS NOT AN EVEN SPLIT.
- *
- *   story    tinted glass   the one violet surface on the page
- *   events   glass          mostly air; the gradient moving behind "come on Saturday"
- *                           IS the argument, so the panel lets it through
- *   media    solid          ten video cards, the densest grid on the page
- *   board    solid          photographs and prose; a blurred backdrop behind a roster
- *                           buys atmosphere nobody reading a bio wants
- *   contact  solid          the page's practical endpoint. Closing on a plate and then
- *                           releasing to bare gradient under the footer is a firmer end
- *                           than fading out through glass
- *
- * That is three solid to two glass, and it is a deliberate revision of the spec this
- * task inherited, which had three glass panels out of five. The client's own words were
- * that panels should have "a background color" with "some" semi-transparent; a page
- * where most sections are translucent reads as one continuous wash rather than as
- * panels. Both surfaces are still used and both are styled, which is what the guards
- * actually pin.
+ * ONE MATERIAL. Every surface on the site is glass now, where it used to be three solid
+ * panels to two glass. The client asked for the swirling background on every page, and a
+ * solid plate is the one thing that hides it; glass keeps a measured floor under the text
+ * (the composites are in base.css) while the ribbons keep moving behind it. The two
+ * patterns with no surface are the two that OPEN a page, where the gradient is the point
+ * -- and which therefore carry nothing but --ink.
  *
  * SPACE, AND WHAT IT IS DOING. The panels are full-bleed and separated by --panel-gap,
- * where nothing but the gradient shows. That alternation -- plate, light, plate -- is the
- * only structural device in the file. There is no grid overlay, no hairline rule, no
- * counter, and no plate behind a heading or a paragraph. The two filled boxes that exist
- * (the hero's photograph and the media thumbnails) are objects you read as units, never
- * a backing put behind running text to rescue it -- and nothing on this page needs
- * rescuing, because the gradient's own luminance ceiling keeps --ink legible on it
- * (src/gradient/palette.js).
+ * where nothing but the gradient shows: plate, light, plate. That alternation is the only
+ * structural device in the file. On the sub-pages it is the layout -- the client asked
+ * for them to be "spaced out vertically", and the gradient between the header and each
+ * plate is what that space is made of.
  */
 
 /* Horizontal-scroll safety. */
@@ -51,98 +37,64 @@ body { overflow-x: hidden; }
 .section {
   padding-inline: var(--gutter);
   /* The gap where only the gradient shows. See --panel-gap in base.css: this is the
-     page's structure, not a leftover margin. */
+     page's structure, not a leftover margin. The last section keeps it too -- the footer
+     follows, so what the gap separates is the last plate from the footer's own glass,
+     and the page still ends flush on the footer. */
   margin-bottom: var(--panel-gap);
 }
-
-/*
- * ...except after the last one, where it was just trailing space. Between this gap and
- * the standalone footer strip that used to follow it, the page ended on the better part
- * of a screen of nothing. The footer is gone (the sign-off is a line inside this panel
- * now) and the page ends flush on the plate.
- */
-.section:last-child { margin-bottom: 0; }
 
 .room-head,
 .room-body { min-width: 0; }
 
 /* ---------------------------------------------------------------------------
- * Panel surfaces, declared before any layout because they are not layout: `data-panel`
- * is the arrangement, this is the MATERIAL.
+ * The surface, declared before any layout because it is not layout: `data-panel` is the
+ * arrangement, this is the MATERIAL.
  *
- * Every alpha here is measured against one worst case -- the gradient's brightest
- * possible pixel, rgb(128, 36, 255) -- because that is the only ground these panels are
- * ever laid over that could fail. The composites and their ratios are in base.css beside
- * the tokens.
+ * The alpha is measured against one worst case -- the gradient's brightest possible
+ * pixel, rgb(128, 36, 255) -- because that is the only ground a panel is ever laid over
+ * that could fail. The composites and their ratios are in base.css beside the tokens.
  *
- * `backdrop-filter` appears on exactly one selector and must stay that way: a guard in
- * tests/visual-language.test.js fails any rule that blurs without being glass. The blur
- * is 22px rather than the 18px this shipped at because the ribbons are narrower now --
- * at 18px a ribbon core still read as a hard edge through the panel instead of as a
- * colour in it.
+ * `backdrop-filter` appears on exactly one selector here and must stay that way: a guard
+ * in tests/visual-language.test.js fails any rule that blurs without being glass (or the
+ * nav bar). 22px, because at 18px a ribbon's core still read as a hard edge through the
+ * panel instead of as a colour in it.
  *
  * EXCLUDED FROM THAT ARITHMETIC, ON PURPOSE: `saturate(1.15)` on this same filter, which
  * runs on the gradient before the glass tint composites over it. Saturating the ceiling
- * pixel itself, rgb(128, 36, 255), gives approximately rgb(137, 31, 255) -- L 0.135
- * against the unsaturated 0.1307 the composites in base.css are built from. That is a
- * higher ceiling than the one certified, so strictly, "a guarantee over every frame" is
- * very slightly stronger than the arithmetic behind it. It is not folded in because the
- * margin it could cost is immaterial at the ratios involved (worst case around 15:1;
- * blur already averages the sampled pixel down from any true peak, which saturate then
- * has less of a peak to act on) and because doing so would mean re-deriving every glass
- * composite in base.css from a filtered ground rather than the plain one PALETTE emits --
- * a second, parallel arithmetic to keep in sync rather than a cheaper way to state the
- * same guarantee. Recorded here instead, next to the filter that causes it.
+ * pixel gives approximately rgb(137, 31, 255) -- L 0.135 against the unsaturated 0.1307
+ * the composites are built from. That is immaterial at the ratios involved (worst case
+ * around 15:1, and blur averages the sampled pixel down from any true peak before
+ * saturate acts on it), and folding it in would mean a second, parallel arithmetic to
+ * keep in sync with the first. Recorded here instead, next to the filter that causes it.
+ *
+ * It lands on more than panels: the marquee band and the footer carry it too
+ * (src/ui/sections.js), for the same reason a panel does -- dim text and accent links
+ * need a floor that a bare ribbon does not give them.
  * ------------------------------------------------------------------------- */
-
-[data-surface='solid'] {
-  background: var(--surface);
-}
 
 [data-surface='glass'] {
   background: var(--glass);
   backdrop-filter: blur(22px) saturate(1.15);
 }
 
-/*
- * The story panel's own material: violet-tinted glass, and the one place on the page
- * where the club's colour is a SURFACE rather than a mark.
- *
- * This is the client's call, made after the spec was written, and it settles an argument
- * the file has had twice. The panel began as an opaque --accent sheet -- the sheet in the
- * client's own reference image -- with near-black ink on it at 7.05:1. That could not
- * survive the surface system: an opaque --accent rule would have cancelled the glass
- * outright, and leaving the ink tuned for a fixed violet sheet while the ground moved
- * underneath was worse. Task 5 deleted it and shipped clear glass, which kept the
- * gradient but lost the violet identity entirely.
- *
- * Tinted glass keeps both. --story-tint is --accent's hue taken down to a value that can
- * carry WHITE text instead of black: at alpha 0.76 over the gradient's brightest pixel it
- * composites (source-over, sRGB) to rgb(59, 25, 104), where --ink measures 12.44:1, and
- * over the near-black ground to rgb(30, 17, 46) at 16.14:1. The panel is unmistakably
- * violet at both ends of that range, and the range is narrow enough that the contrast is
- * a fact rather than a hope.
- *
- * Specificity note: this is (0,2,0) against [data-surface='glass']'s (0,1,0), so it wins
- * the background regardless of source order, and it deliberately does NOT restate
- * backdrop-filter -- the glass rule above still applies it, and restating it here would
- * put a second blur declaration in front of the guard for no reason.
- */
-[data-panel='story'][data-surface='glass'] {
-  background: var(--story-tint);
-}
-
 /* ---------------------------------------------------------------------------
  * Hero. The gradient is the hero, so this panel has no surface and nothing is laid over
- * the canvas except type and one card.
+ * the canvas except type, one photograph and the marquee band.
  *
- * The composition is a corner: everything is in the bottom band, the top two thirds are
- * left to the ribbons. That is the whole idea -- a diabolo lives in the air above the
- * hands, so the air is what the first screen is mostly made of.
+ * The composition is a corner: everything is in the bottom band, the top of the screen
+ * is left to the ribbons. A diabolo lives in the air above the hands, so the air is what
+ * the first screen is mostly made of -- and the marquee closes that band, which is what
+ * puts it on the first screen at every width this page is built for.
  * ------------------------------------------------------------------------- */
 
 [data-panel='hero'] .room {
-  min-height: 100dvh;
+  /* svh, not dvh: the SMALL viewport, the one a phone shows with its toolbar out. The
+     marquee is the hero's last row and has to be on the first screen ("immediately
+     visible"); measured against dvh it would sit behind the toolbar on first load, and
+     the hero would also change height the moment the toolbar retracted. The vh line is
+     the fallback for a browser without svh. */
+  min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
   column-gap: var(--gutter);
@@ -151,34 +103,23 @@ body { overflow-x: hidden; }
   /* --nav-clear, not --nav-h: the bar's measured height plus a gap (base.css). A fixed
      clamp cannot know the bar has wrapped, and a wrapped bar is what paints over the
      h1 at 200% text zoom. */
-  padding-block: var(--nav-clear) clamp(2.5rem, 9vh, 5.5rem);
+  padding-block: var(--nav-clear) clamp(1.25rem, 4vh, 2.5rem);
 }
 
 /*
  * The hero head is a QUERY CONTAINER, and that is the whole mechanism behind the h1's
- * size cap below. Its width is the grid track -- min(38%, 30rem) of the panel, whatever
- * that comes to -- and no viewport formula reproduces that number, because the track is
- * a percentage of a box that already has the gutters taken out of it. 100cqi IS that
- * number, so the cap is derived from the column the word actually has to fit in.
+ * size cap below. Its width is the grid track -- min(38%, 30rem) of the panel -- and no
+ * viewport formula reproduces that number, because the track is a percentage of a box
+ * that already has the gutters taken out. 100cqi IS that number.
  *
  * Safe to contain: the track is minmax(0, --text-col), a definite size that never
- * depended on this box's contents, so inline-size containment takes nothing away that
- * the layout was using. Measured before and after at 1024, 768 and 1440 -- the head's
- * width is identical.
+ * depended on this box's contents, so inline-size containment takes nothing away.
  */
 [data-panel='hero'] .room-head {
   grid-column: 1;
   container-type: inline-size;
 }
 
-/*
- * flex + justify-content, not `justify-self: end` on the item. The item shrink-to-fit that
- * justify-self relies on was circular for the teaser card this replaced -- it sized itself
- * with a percentage against this very box -- and the browser resolved it back to the full
- * track, putting the card at the LEFT edge of the second column, measured 339px in at 768.
- * The photograph is `width: 100%` so it would not hit that cycle, but stretching the box
- * and pushing the content inside it is what the rest of the file does and it costs nothing.
- */
 [data-panel='hero'] .room-body {
   grid-column: 2;
   display: flex;
@@ -187,69 +128,45 @@ body { overflow-x: hidden; }
 }
 
 /*
+ * The photograph gives way to the marquee rather than pushing it off the screen. It is
+ * 4:3, so capping its WIDTH at 4/3 of a height budget caps its height at that budget
+ * without cropping it: 56% of the small viewport, which at 1440x900 is 504px of picture
+ * with the band and both paddings still inside the first screen. At 1024x768 the column
+ * binds first and the cap changes nothing.
+ */
+[data-section='hero'] .section-photo {
+  max-width: min(100%, calc(56vh * 4 / 3));
+  max-width: min(100%, calc(56svh * 4 / 3));
+}
+
+/*
  * The hairline grotesque, run as large as the viewport allows. 9ch breaks the club's two
- * words onto two lines at every width, which is the shape the composition wants: a tall
- * block of thin line in the corner, not one long rule of text.
+ * words onto two lines at every width.
  *
- * --type-hero is 9.6vw rather than the 10.5vw it started at, and this is why. A single
- * long word cannot wrap, so `max-width` does not contain it -- the h1's BOX stays inside
- * its column while the ink runs out the side, silently, and no layout rule anywhere
- * notices. Measured at 768: "DIABOLO" set 80.6px painted 322px of ink out of a 263px
- * column and crossed 21px into the second column's contents -- the teaser card then, the
- * hero photograph now. At 9.6vw the ink ended 92px clear of it at 768, the narrowest
- * width this side-by-side composition is used at; at 767 and below the panel stacks and
- * the second column sits under the headline at full width. Desktop is untouched in
- * practice: 9.6vw reaches the 9rem ceiling at 1500px.
- *
- * That clearance is no longer what holds the line: the h1 is capped at a size its widest
- * word FITS (the rule below), so the ink cannot leave its column at any width. This
- * paragraph is why --type-hero is 9.6 and not 10.5, and it stays for that.
- *
- * A THIRD find from the same fix pass that added `overflow-wrap: anywhere` to the contact
- * block: both `--type-hero` here and the mobile override below are `clamp()`s with a
- * REM-based floor (3.4rem / 2.9rem) under a VIEWPORT-based preferred value (9.6vw / 15vw).
- * At a 32px root font (200% text zoom) the rem floor is twice its normal size while the vw
- * term is untouched, so the floor wins at every width this page ships -- exactly the trap
- * `--nav-h` fell into before src/ui/nav.js started measuring it. The single word "VIOLET"
- * (wider than "DIABOLO" in this face) then has no space left to break at and paints past
- * the column with nothing to stop it -- measured at 375x812, 32px root: ink to x 411.1
- * against a 375 viewport, exactly the page's whole scrollWidth/clientWidth gap at that
- * size.
- *
- * The fix -- `overflow-wrap: anywhere` -- turned out not to belong here specifically: the
- * feature panel's "EVENTS" (--type-title, base.css) hit the identical rem-floor trap on a
- * DIFFERENT clamp, and a per-panel fix on this rule alone did not reach it. It is declared
- * once, on every heading, in base.css's shared `h1, h2, h3` rule, which is what actually
- * covers both. That declaration is what makes the club's own name break here at extreme
- * zoom rather than this one; costs nothing at any width this file has verified, for the
- * same reason it cost nothing there.
+ * --type-hero is 9.6vw rather than the 10.5vw it started at: a single long word cannot
+ * wrap, so the h1's BOX stays inside its column while the ink runs out the side, and at
+ * 768 "DIABOLO" at 10.5vw crossed 21px into the photograph's column. The cap below is
+ * what holds the line now; this is why the ceiling is 9.6.
  */
 [data-panel='hero'] h1 {
   /*
-   * min(), so --type-hero is a CEILING and the column has the final say. The second
-   * term is the largest size at which "DIABOLO" still fits the head's real width
+   * min(), so --type-hero is a CEILING and the column has the final say. The second term
+   * is the largest size at which "DIABOLO" still fits the head's real width
    * (--wordmark-em, base.css). Below that width the type shrinks; it never breaks.
    *
-   * This is the fix for the client's screenshot: at 1024x768 the head is 350px and
-   * --type-hero resolved to 98.3px, where DIABOLO paints 393px of ink. It had nowhere
-   * to go but a second line, and base.css's `overflow-wrap: anywhere` gave it one --
-   * "VIOLET" / "DIABOL" / "O". The cap puts the size where the word fits instead.
-   *
-   * Both terms had to be viewport-derived for this to hold at 200% text zoom, and both
-   * are: 100cqi tracks the container, and --wordmark-em is a bare number. --type-hero's
-   * rem floor can still win inside the min(), but only by being the SMALLER of the two,
-   * which is the direction that is always safe.
+   * The fix for the client's screenshot: at 1024x768 the head is 350px and --type-hero
+   * resolved to 98.3px, where DIABOLO paints 393px of ink -- "VIOLET" / "DIABOL" / "O".
+   * Both terms are viewport-derived, so it holds at 200% text zoom: --type-hero's rem
+   * floor can still win inside the min(), but only by being the SMALLER of the two.
    *
    * The plain declaration first is the fallback, not a duplicate: a browser that does not
-   * know `cqi` drops the whole min() at parse time, and with nothing before it the hero
-   * would fall to the UA's default h1 size -- the entire type scale gone, not merely the
-   * cap. One line turns that into "uncapped, as it shipped before this fix".
+   * know `cqi` drops the whole min() at parse time and would otherwise fall to the UA's
+   * default h1 size -- the type scale gone, not merely the cap.
    */
   font-size: var(--type-hero);
   font-size: min(var(--type-hero), calc(100cqi / var(--wordmark-em)));
-  /* 400, up from 200, at the client's request ("thicker font for this"). Not the 700 the
-     shared h1/h2 rule now carries: at 115px that is a slab. --wordmark-em was MEASURED at
-     200 and the letters are wider at 400, so it was re-measured with this -- see base.css. */
+  /* 400, not the 700 the shared h1/h2 rule carries: at 115px that is a slab.
+     --wordmark-em was measured at this weight -- see base.css. */
   font-weight: 400;
   line-height: 0.88;
   letter-spacing: -0.045em;
@@ -257,19 +174,10 @@ body { overflow-x: hidden; }
 }
 
 /*
- * The tagline. --ink, not --ink-dim, and that is a consequence of the gradient rather
- * than a taste change: this line sits on bare canvas, where --ink-dim measures 2.37:1
- * against the brightest pixel the shader can emit and --ink measures 5.25:1 (see the
- * "over bare gradient, only --ink" rule in base.css). Nothing dim can live out here.
- *
- * So the hierarchy between the club's name and its tagline is carried by SCALE instead
- * of by colour -- 144px of 200-weight against 13px of 400-weight is not a comparison
- * anyone has to squint at -- and by the gap above it. Colour was always the crudest of
- * the three tools available here; losing it costs the composition nothing.
- *
- * The tracking is not a label style applied to lowercase text: the club's own copy is
- * already capitals (content/index.js SITE.tagline), and capitals set solid are
- * unreadable.
+ * The tagline. --ink, not --ink-dim: this line sits on bare canvas, where --ink-dim
+ * measures 2.37:1 against the brightest pixel the shader can emit and --ink measures
+ * 5.25:1 (the "over bare gradient, only --ink" rule in base.css). The hierarchy between
+ * the name and the tagline is carried by SCALE instead of colour.
  */
 [data-panel='hero'] .room-head p {
   margin-top: clamp(1.25rem, 3vh, 2.25rem);
@@ -281,252 +189,26 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Story. The club's own account of itself, on the one violet surface.
- * ------------------------------------------------------------------------- */
-
-[data-panel='story'] .room {
-  min-height: 100dvh;
-  display: grid;
-  /* Both tracks fluid, unlike the hero's: there is no object-shaped half to keep clear
-     here and the text can have real width. */
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  /* 2.5rem at the top, down from 5. At 1440 the old clamp opened to 80px between a
-     column of prose and the photograph beside it, which the client read as the two
-     halves coming apart rather than as a pairing. */
-  column-gap: clamp(1.25rem, 3vw, 2.5rem);
-  align-content: center;
-  align-items: center;
-  padding-block: calc(var(--nav-clear) + clamp(2rem, 6vh, 4rem)) clamp(2.5rem, 8vh, 5rem);
-}
-
-[data-panel='story'] .room-head { grid-column: 1; }
-[data-panel='story'] .room-body { grid-column: 2; }
-
-/*
- * Instrument Serif's one job on the page. Set at real size on the club's own story, it
- * marks this panel as a change of material even before the tint and the blur do.
+ * The performed-for marquee: the last row of the hero, on the first screen.
  *
- * No colour override: --ink is right on this ground and measured (12.44:1 at the tint's
- * worst composite, which is over the gradient's brightest stop). The near-black
- * --accent-ink this used to take belonged to the opaque violet sheet the panel no longer
- * is, and would run 1.11:1 to 1.45:1 across the same range here.
- */
-/*
- * ABOUT US takes the same Inter 700 as every other section title, and NOT the serif.
- *
- * The client's note was that the headings were all one weight. Instrument Serif ships
- * regular only — there is no bold to give this one — so leaving it on the serif would
- * have left exactly one title on the page unable to join the change. The serif keeps the
- * job it was brought in for, which is the story's PROSE below: that is the printed
- * surface the pairing was about, and it is untouched.
- */
-[data-panel='story'] h2 {
-  font-size: var(--type-panel);
-  line-height: 0.96;
-}
-
-[data-panel='story'] p {
-  margin-top: clamp(1.1rem, 3vh, 2.1rem);
-  font-family: var(--font-panel);
-  font-size: clamp(1.15rem, 1.6vw, 1.7rem);
-  /* A serif wants a little more leading than the sans default, and a little more
-     measure: 48ch of Instrument Serif is about the same line length as 62ch of Inter. */
-  line-height: 1.45;
-  max-width: 48ch;
-}
-
-/* ---------------------------------------------------------------------------
- * Feature. The title runs across the top of a full screen and the practice details drop
- * to the bottom right, which leaves the bottom-left quadrant as nothing but glass over
- * the gradient. That empty quadrant is the point of the pattern: this is the panel that
- * asks a visitor to turn up, and the ribbons moving through it are the reason to.
- * ------------------------------------------------------------------------- */
-
-/*
- * Two columns on ONE row: everything you read on the left, the photograph on the right.
- *
- * It was a title spanning the top with the copy, the picture and both buttons stacked in
- * the right-hand column underneath — which left the bottom-left quadrant of a full-screen
- * panel completely empty. The old comment called that emptiness "the point of the
- * pattern"; the client called it "unnecessary white space on the left side", and on a
- * panel whose job is to tell you when practice is, they are right.
- *
- * 0.78fr on the right, and a max-width on the figure below: the events photograph is a
- * PORTRAIT, so an equal column would have made it the tallest thing on the page.
- */
-[data-panel='feature'] .room {
-  min-height: 100dvh;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.78fr);
-  column-gap: clamp(1.5rem, 4vw, 3.5rem);
-  align-content: center;
-  align-items: center;
-  padding-block: calc(var(--nav-clear) + clamp(1.5rem, 5vh, 3rem)) clamp(2.5rem, 8vh, 5rem);
-}
-
-[data-panel='feature'] .room-head {
-  grid-column: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: clamp(1.1rem, 2.6vh, 1.8rem);
-}
-
-[data-panel='feature'] .room-body {
-  grid-column: 2;
-  justify-self: end;
-  width: 100%;
-}
-
-/* The picture is the supporting half here, not the subject. 24rem keeps a 3:4 portrait
-   under about 32rem tall, which is what stops it setting the height of the whole panel. */
-[data-section='events'] .section-photo { max-width: min(100%, 24rem); margin-left: auto; }
-
-/* ---------------------------------------------------------------------------
- * Grid. A title column beside a column of cards. Media, board and contact.
- * ------------------------------------------------------------------------- */
-
-/*
- * The section itself becomes a one-cell grid purely so .room STRETCHES to fill it rather
- * than ending wherever its own content does and leaving the rest of the section's height
- * as bare background. Hero, story and feature deliberately do NOT get this: their .room
- * takes a 100dvh floor of its own instead of stretching to a parent grid cell.
- */
-[data-panel='grid'] { display: grid; }
-
-[data-panel='grid'] .room {
-  display: grid;
-  grid-template-columns: minmax(0, var(--text-col)) minmax(0, 1fr);
-  column-gap: var(--gutter);
-  padding-block: clamp(3.5rem, 11vh, 7rem);
-  /*
-   * A grid item's default automatic minimum size is its own min-content -- the SAME
-   * mechanism `.site-nav-links` already overrides in base.css, here one grid level
-   * further out. Without it, .room (a grid item of the section's own one-cell grid) has
-   * no floor of its own, so it inherits whatever automatic minimum bubbles up from
-   * .board-list's cards -- 200px of nominal track becoming 269.8px at 280x812/32px root,
-   * dragging document.documentElement.scrollWidth to 310 with it, even though no single
-   * card's own content asked for more than ~147px. `min-width: 0` is the same firewall,
-   * one layer higher: it does not change how anything is SIZED (every measured width at
-   * every previously-verified viewport is unaffected, since none of them were ever
-   * bumping into this floor), only how far an unrelated descendant's automatic minimum
-   * can travel before something stops it.
-   */
-  min-width: 0;
-  /* Head and body sit side by side in two tracks, so the row still has to size to
-     content rather than stretch -- stretched, it would take the room's full height and
-     tear the cards away from the top of the title. */
-  align-content: start;
-}
-
-[data-panel='grid'] .room-head { grid-column: 1; }
-
-[data-panel='grid'] .room-body {
-  grid-column: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: clamp(1.25rem, 3vh, 2rem);
-}
-
-[data-section='contact'] .room-head {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: clamp(0.9rem, 2.2vh, 1.4rem);
-}
-
-/*
- * The club's email address (CONTACT.email, content/index.js) is one unbreakable token --
- * no spaces, so nothing upstream of it can create a soft-wrap opportunity inside it. At a
- * 32px root font (200% text zoom) that token alone is wider than the mobile column.
- * Measured at 375x812, 32px root, with no overflow-wrap on this rule: 434px scrollWidth
- * against 375 clientWidth, 59px clipped by `body { overflow-x: hidden }` (this file,
- * line 49) rather than scrolled -- silent, not a scrollbar.
- *
- * NOT a fit-content-column problem. An earlier version of this comment said the
- * paragraph's own box grows to match the address; that was wrong. The paragraph
- * measures 295px in every state tested (no rule, break-word, anywhere), and never
- * moves. Only the inline `<a>` overflows -- the same box-vs-ink split as the shared
- * `h1, h2, h3` rule's own comment (base.css) and check-contrast.html's Range-based scan:
- * a long unbreakable run of inline content can paint past the end of its line without
- * the line's box, or its block ancestor's box, growing to contain it.
- * `getBoundingClientRect()` on the paragraph reports 295px throughout; only a `Range`
- * over the link's own content, or `document.documentElement.scrollWidth`, shows the
- * address running past the column.
- *
- * `overflow-wrap: break-word` DOES resolve this, measured: scrollWidth 375, the link's
- * own box 282.03px -- identical to `anywhere`. (An earlier version of this comment, and
- * the guard in tests/visual-language.test.js, both claimed break-word measured no
- * change at all, 434px before and after; that was also wrong, and is corrected
- * alongside this comment.) The two properties differ, by spec, in whether they feed a
- * line's soft-wrap opportunities into min-content/max-content intrinsic-size
- * calculations -- but nothing in this stack sizes itself from the paragraph's or link's
- * intrinsic width (see above), so that difference has nothing to act on here, and both
- * properties produce the same rendered line breaks. `anywhere` is used regardless, not
- * because break-word fails on this page, but because `anywhere` is the spec-correct
- * declaration for this failure mode and does not depend on an intrinsic-sizing
- * interaction that, per spec, `break-word` is not obliged to honour on every engine.
- */
-[data-section='contact'] .room-head p,
-[data-section='contact'] .room-head p a {
-  overflow-wrap: anywhere;
-}
-
-/* ---------------------------------------------------------------------------
- * Section titles and body copy.
- *
- * Feature is the only panel left to size here: hero sets its own h1 above, story sets its
- * own h2 above, and grid sets its own h2 below. This used to be written the other way
- * round -- `.section:not([data-section='hero']):not([data-panel='story']) h2`, meant to
- * size "every panel but hero and story" and trust the grid rule below to win for grid by
- * coming later. :not() takes the specificity of its own argument, so that selector was
- * (0,3,1) against the grid rule's (0,1,1); the LESS specific grid rule lost on font-size
- * regardless of source order, and media/board/contact rendered at up to 68px inside a
- * label column of at most 208px. Naming the one panel this rule is actually for removes
- * the conflict instead of trying to out-rank a selector that was never competing on
- * purpose.
- * ------------------------------------------------------------------------- */
-
-[data-panel='feature'] h2 {
-  font-size: var(--type-title);
-}
-
-[data-panel='grid'] h2 {
-  font-size: clamp(1.45rem, 2.4vw, 2.3rem);
-  letter-spacing: -0.02em;
-}
-
-[data-panel='feature'] .room-head p,
-[data-panel='grid'] .room-head p,
-[data-panel='page'] .room-head p {
-  margin-top: 0.9rem;
-  font-size: var(--type-lead);
-  line-height: 1.55;
-  color: var(--ink-dim);
-}
-
-/* ---------------------------------------------------------------------------
- * The performed-for marquee, across the foot of the About panel.
- *
- * The client asked for "one of those scroll wheel things for places we've been invited
- * to perform" and showed a logo ticker. There are no logos -- these are student clubs,
- * university offices and neighbourhood associations, most without a mark worth setting --
- * so it runs as names, which is also the honest form: a wall of borrowed logos implies
- * sponsorship, a list of names says where the club has played.
+ * It sat at the foot of the About panel, a screen and a half down; the client asked for
+ * it to be "immediately visible ... directly under the image and violet diabolo text".
+ * A band of glass rather than type on bare gradient: the names are --ink-dim and the
+ * marks were chosen against a dark panel, and neither would survive a bright ribbon.
  * ------------------------------------------------------------------------- */
 
 .marquee {
   grid-column: 1 / -1;
-  margin-top: clamp(1.75rem, 4.5vh, 3rem);
-  /* Room around the marks once they grow. Without it a 52px logo sits hard against the
-     panel's own padding and the strip reads as cramped rather than as a band. */
-  padding-block: clamp(0.35rem, 1.4vh, 1rem);
+  margin-top: clamp(1.5rem, 4vh, 2.75rem);
+  /* Full-bleed: out through the section's gutters to both edges of the page. The band
+     is a strip the page scrolls past, not a card inside it. */
+  margin-inline: calc(-1 * var(--gutter));
+  padding-block: clamp(0.6rem, 1.6vh, 1.1rem);
   overflow: hidden;
-  /* Both ends fade instead of being cut. Without this the loop reads as text hitting a
-     wall; with it the strip reads as continuing past the panel, which is what it does. */
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  /* Both ends fade instead of being cut -- the band's glass with them -- so the loop
+     reads as continuing past the page rather than as text hitting a wall. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
 }
 
 /*
@@ -540,12 +222,8 @@ body { overflow-x: hidden; }
   /*
    * The duration comes from the MEASURED track width (observeMarqueeSpeed in
    * src/ui/sections.js), so the strip holds a constant speed instead of a constant time.
-   *
-   * It was a hand-tuned constant twice, and rotted both times: a fixed duration over a
-   * fixed distance means the SPEED is whatever the content length makes it. Seven names
-   * to eighteen took it from 56px/s to 87px/s; taller logos on desktop would have done it
-   * again. The 65s here is now only the fallback for the moment before the first
-   * measurement, and for a browser with no ResizeObserver.
+   * It was a hand-tuned constant twice, and rotted both times. 65s is only the fallback
+   * for the moment before the first measurement, and for a browser with no ResizeObserver.
    */
   animation: marquee-slide var(--marquee-duration, 65s) linear infinite;
 }
@@ -563,27 +241,14 @@ body { overflow-x: hidden; }
 }
 
 /*
- * A mark beside its name.
- *
- * Capped by HEIGHT, not width: these arrive at every aspect ratio — a 1:1 club avatar, a
- * 3.5:1 wordmark — and a shared height is the only thing that makes a row of them read as
- * one row. In their own colours, which is the point of showing them at all; the two that
- * were invisible on this ground were re-coloured in the ASSET rather than filtered here,
- * because a filter that rescues one mark wrecks the nine beside it.
- *
- * The radius is for the club avatars, which are square cards; on a transparent wordmark
- * it rounds nothing.
+ * A mark beside its name, capped by HEIGHT: these arrive at every aspect ratio -- a 1:1
+ * club avatar, a 3.5:1 wordmark -- and a shared height is the only thing that makes a row
+ * of them read as one row. 28px on a phone, up to 52px on a desktop, where the client
+ * asked for the strip to earn the space the logos need.
  */
 .marquee-list li[data-logo] img {
   display: block;
   width: auto;
-  /*
-   * 28px on a phone, up to 52px on a desktop. At 28 the marks were present but not really
-   * legible -- a crest, a panda, a bao all resolve to a coloured square at that size, and
-   * the client asked for the strip to earn the space the logos need. The floor stays 28
-   * because a phone has no width to spare, and vw between them so it is one continuous
-   * ramp rather than a jump at a breakpoint.
-   */
   height: clamp(1.75rem, 3.4vw, 3.25rem);
   border-radius: 6px;
 }
@@ -594,8 +259,7 @@ body { overflow-x: hidden; }
   gap: clamp(0.6rem, 1.1vw, 0.95rem);
   white-space: nowrap;
   /* On the LI, not on .marquee-name: the name inherits it, and the contrast probe reads
-     this element's computed font-size. Set it on the span instead and the probe measures
-     a size nothing paints at. */
+     this element's computed font-size. */
   font-size: clamp(0.78rem, 0.95vw, 0.95rem);
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -603,8 +267,8 @@ body { overflow-x: hidden; }
   color: var(--ink-dim);
 }
 
-/* A separator that is not a character, so a screen reader reads seven names and not
-   seven names interleaved with bullets. */
+/* A separator that is not a character, so a screen reader reads the names and not the
+   names interleaved with bullets. */
 .marquee-list li + li::before {
   content: '';
   flex: 0 0 auto;
@@ -620,112 +284,208 @@ body { overflow-x: hidden; }
   to   { transform: translateX(-50%); }
 }
 
-/*
- * Reduced motion stops it dead and hands the visitor the scrollbar instead. A ticker
- * that cannot be stopped is the usual accessibility complaint against this pattern, and
- * hover/focus pausing above only helps someone who can reach it with a pointer.
- */
+/* Reduced motion stops it dead and hands the visitor the scrollbar instead. A ticker that
+   cannot be stopped is the usual accessibility complaint against this pattern. */
 @media (prefers-reduced-motion: reduce) {
   .marquee { overflow-x: auto; }
   .marquee-track { animation: none; }
 }
 
 /* ---------------------------------------------------------------------------
- * The media PAGE. Same panel vocabulary as the rest of the site, given a whole page:
- * the title and its line of intro top-left, then the work at full width.
+ * Feature: the home page's events panel. Everything you read on the left -- the schedule
+ * and the button to Join us -- and the photograph on the right.
+ *
+ * 0.78fr on the right, and a max-width on the figure: the events photograph is a
+ * PORTRAIT, so an equal column would make it the tallest thing on the page.
  * ------------------------------------------------------------------------- */
 
-[data-panel='page'] .room {
-  display: block;
-  padding-block: calc(var(--nav-clear) + clamp(2rem, 6vh, 3.5rem)) clamp(3rem, 9vh, 6rem);
+[data-panel='feature'] .room {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.78fr);
+  column-gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: center;
+  padding-block: clamp(3.5rem, 10vh, 6.5rem);
 }
 
-[data-panel='page'] .room-head {
-  max-width: var(--measure);
-  margin-bottom: clamp(2rem, 5vh, 3.25rem);
-}
-
-[data-panel='page'] h2 {
-  font-size: var(--type-title);
-}
-
-[data-panel='page'] .room-body {
+[data-panel='feature'] .room-head {
+  grid-column: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: clamp(1.25rem, 3vh, 2rem);
 }
 
-/*
- * The editorial grid the client asked for: one piece leads and the rest sit beside it,
- * rather than a uniform wall of thumbnails.
- *
- * Only from 900px. Below that a 2x2 lead would leave the other cards at a quarter width
- * and unreadable, so the narrow layout stays the plain two-column grid -- the lead simply
- * stops being a lead, which is the right thing for it to do rather than a compromise.
- */
-@media (min-width: 900px) {
-  [data-panel='page'] .media-list {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  [data-panel='page'] .media-list > .media-card:first-child {
-    grid-column: span 2;
-    grid-row: span 2;
-  }
-
-  /* The lead card's facade fills the taller cell instead of keeping 16:9 and leaving a
-     gap under it; `min-height: 0` is what lets a flex child shrink inside that cell. */
-  [data-panel='page'] .media-list > .media-card:first-child .media-facade {
-    flex: 1;
-    min-height: 0;
-    aspect-ratio: auto;
-  }
-
-  [data-panel='page'] .media-list > .media-card:first-child h3 {
-    font-size: 1.15rem;
-  }
+[data-panel='feature'] .room-body {
+  grid-column: 2;
+  justify-self: end;
+  width: 100%;
 }
+
+[data-panel='feature'] h2 {
+  font-size: var(--type-title);
+}
+
+/* 24rem keeps a 3:4 portrait under about 32rem tall, which is what stops it setting the
+   height of the whole panel. */
+[data-section='events'] .section-photo { max-width: min(100%, 24rem); margin-left: auto; }
 
 /* ---------------------------------------------------------------------------
- * Contact: the socials nav.
+ * The practice schedule (schedule() in src/ui/sections.js), on the events panel and on
+ * the Join us page.
+ *
+ * It was a sentence; the client asked for bullets with the dates and places standing out.
+ * WHEN is bold and WHERE is marked, because they answer different questions and someone
+ * scanning for one should not have to read the other. The notes under them are the fine
+ * print, and set as such.
  * ------------------------------------------------------------------------- */
 
-.socials {
+.schedule {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+  flex-direction: column;
+  gap: clamp(0.9rem, 2.2vh, 1.35rem);
 }
 
-/*
- * A 44px target, which is the smallest a pointer target should be, around a 20px mark.
- * The mark takes `currentColor` (src/ui/icons.js), so the hover and focus states below
- * are one colour change rather than a second set of artwork.
- */
-.socials a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: var(--radius-pill);
-  background: var(--chip);
+.schedule-intro {
+  font-size: var(--type-lead);
+  line-height: 1.5;
   color: var(--ink-dim);
-  text-decoration: none;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.socials a:hover,
-.socials a:focus-visible {
-  background: var(--chip-hover);
+.schedule ul {
+  display: grid;
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+/* The bullet is the accent, the one mark the page spends on "this is the part to read". */
+.schedule li::marker { color: var(--accent); }
+
+.schedule-sessions {
+  gap: 0.65rem;
+  font-size: clamp(1.05rem, 1.55vw, 1.35rem);
+  line-height: 1.5;
   color: var(--ink);
 }
 
-.social-icon { display: block; }
+.schedule-sessions strong { font-weight: 700; }
+
+/*
+ * The place, highlighted: --mark is --accent at 0.22 over the glass it sits on, and --ink
+ * measures 10.9:1 on the composite (base.css). `box-decoration-break: clone` keeps the
+ * tint round each line when a long place name wraps at a phone's width, instead of one
+ * box broken open at the line end.
+ */
+.schedule-sessions mark {
+  padding: 0.04em 0.34em;
+  border-radius: 4px;
+  background: var(--mark);
+  color: var(--ink);
+  font-weight: 600;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.schedule-notes {
+  gap: 0.3rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
 
 /* ---------------------------------------------------------------------------
- * Section photographs (About, Contact) -- the club's two carried-over photos
- * (src/content/index.js PHOTOS), built via src/ui/picture.js.
+ * Header: the opening of the About us, Media and Join us pages, after the client's
+ * team-page reference -- a label pill, a statement heading and a lead, centred, with the
+ * gradient all round it.
+ *
+ * No surface, so --ink only (the label is the exception, and it is its own chip).
+ * ------------------------------------------------------------------------- */
+
+[data-panel='header'] .room {
+  max-width: 52rem;
+  margin-inline: auto;
+  /* The bar, then real air: this is the top of a page, and the room above the heading
+     is the same air the home page's hero leaves above its wordmark. */
+  padding-top: calc(var(--nav-clear) + clamp(2.5rem, 10vh, 6.5rem));
+  text-align: center;
+}
+
+[data-panel='header'] .room-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1rem, 2.5vh, 1.5rem);
+}
+
+/*
+ * The label over the heading: the one pill left on the site, because it is the one
+ * thing that is not a button. --accent on --chip measures 6.21:1 over the gradient's
+ * brightest pixel and 6.95:1 over its darkest.
+ */
+.page-label {
+  display: inline-block;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 38%, transparent);
+  color: var(--accent);
+  font-size: var(--type-micro);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-panel='header'] h1 {
+  font-size: var(--type-title);
+  line-height: 1.04;
+  max-width: 18ch;
+  text-wrap: balance;
+}
+
+.page-lead {
+  font-size: var(--type-lead);
+  line-height: 1.55;
+  color: var(--ink);
+  max-width: 46ch;
+  text-wrap: pretty;
+}
+
+/* ---------------------------------------------------------------------------
+ * Plate: a sub-page's content, on glass at full bleed, with the content itself held to
+ * --content-max and centred under the header.
+ * ------------------------------------------------------------------------- */
+
+[data-panel='plate'] .room {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-block: clamp(2.5rem, 7vh, 4.5rem);
+}
+
+/* The panel's title and, where there is one, its control, on one line -- the BOARD
+   heading and the semester select, the way a filter sits beside a section title. */
+[data-panel='plate'] .room-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
+}
+
+/*
+ * The plate's own, smaller h2. Named on its own rather than sized by a shared rule: the
+ * shared version of this once sized every panel's h2 through a :not() chain whose
+ * specificity outranked the rule meant to override it, and a title column rendered at
+ * 68px (tests/sections-layout.dom.test.js).
+ */
+[data-panel='plate'] h2 {
+  font-size: clamp(1.45rem, 2.4vw, 2.3rem);
+}
+
+/* ---------------------------------------------------------------------------
+ * Section photographs: the hero's and the events panel's. Both carry a width/height
+ * pair in content (PHOTOS), so the <img>'s own attributes reserve the box before the
+ * bytes land and no aspect-ratio has to be declared here.
  * ------------------------------------------------------------------------- */
 
 .section-photo {
@@ -740,91 +500,56 @@ body { overflow-x: hidden; }
   border-radius: var(--radius);
 }
 
-/*
- * Reserve the box before the bytes arrive. buildPicture (src/ui/picture.js) sets no width
- * or height attribute and defaults to loading="lazy", so with `height: auto` and no
- * intrinsic size these compute to ZERO height until the image lands, and the panel below
- * jumps when it does. Measured at 1440: the contact panel stood 372px tall with its
- * photograph at 0px and settled 256px taller once it loaded.
- *
- * The two photographs are different shapes -- PHOTOS.group is 4:3 and PHOTOS.wide is a
- * 2000x686 strip -- so the ratio is declared per section rather than shared. Both are the
- * assets' own intrinsic ratios (confirmed against public/images/*-2000.webp), so nothing
- * is cropped or letterboxed; this only tells the layout the shape in advance.
- */
-/*
- * The hero and events photographs need no aspect-ratio rule: PHOTOS.hero and PHOTOS.events
- * carry a width/height pair, so the <img>'s own attributes give the browser the shape and
- * `height: auto` above resolves against it. The two below predate that mechanism and their
- * content entries have no pair, so the ratio has to come from here.
- */
-[data-section='about'] .section-photo img { aspect-ratio: 4 / 3; }
-[data-section='contact'] .section-photo img { aspect-ratio: 1000 / 343; }
-
 /* ---------------------------------------------------------------------------
- * Board cards -- no fill and no border. A photograph is already a shape; putting a box
- * round it as well is the card kit this page is not.
+ * The board, on the About page: four across, after the client's team-page reference --
+ * a rounded photograph, the name, the role in the accent, the bio dim.
  * ------------------------------------------------------------------------- */
 
 .board-list {
   display: grid;
-  /* 240px, not the 190px this started at: at 190 a wide screen fits five tracks and each
-     bio wraps at about 25 characters, which is a column of confetti rather than prose.
-     min(240px, 100%): a bare 240px floor never shrinks below itself even when the grid's
-     OWN box is narrower than that -- at 280x812/32px root the track is the widest thing
-     on the page (measured 269.8px against a 200px column before this fix). 100% is
-     always at least as narrow as the grid actually is, so wrapping the floor in min()
-     costs nothing at any width wide enough to give 240px on its own -- every width this
-     file has verified -- and only trims it where 240 was never going to fit regardless. */
+  /*
+   * 240px, which is four across inside --content-max and never five. min(240px, 100%):
+   * a bare 240px floor never shrinks below itself even when the grid's OWN box is
+   * narrower -- at 280x812/32px root it was the widest thing on the page, 269.8px against
+   * a 200px column. 100% is always at least as narrow as the grid, so the min() costs
+   * nothing wherever 240 fits and only trims it where 240 was never going to.
+   */
   grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
-  gap: clamp(1.25rem, 2.5vw, 2.25rem);
+  gap: clamp(1.75rem, 3.5vw, 2.75rem) clamp(1.25rem, 2.5vw, 2rem);
   width: 100%;
 }
 
 .board-card {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.2rem;
 }
 
 .board-card img {
   display: block;
   width: 100%;
-  /* buildPicture (src/ui/picture.js) sets neither a width nor a height attribute,
-     so there is no competing definite dimension here -- `aspect-ratio` alone forces
-     the square box, and `height: auto` lets it compute from the rendered width. */
   height: auto;
   aspect-ratio: 4 / 5;
   object-fit: cover;
-  border-radius: var(--radius);
-  margin-bottom: 0.45rem;
+  border-radius: var(--radius-card);
+  margin-bottom: 0.85rem;
 }
 
 /*
  * The stand-in for a seated member whose photograph has not arrived. Same 4:5 box the
- * picture would occupy, so a half-photographed roster keeps its rows level instead of
- * standing 300px short in the cards that have nothing.
+ * picture would occupy, so a half-photographed roster keeps its rows level.
  *
- * --stage, and NOT --surface as this first shipped. Measured on the live page: --surface
- * is #16121f and a solid panel's background is #16121f, so the tile was exactly the
- * colour of the thing it sat on and the initials floated in nothing. --stage is the
- * page's own ground, so the tile now reads as a hole punched through the panel -- which
- * is both visible and a fair description of what it is.
- *
- * A fill rather than a border, because .board-card's own rule is "no fill and no border"
- * on the grounds that a photograph is already a shape. This has to BE the shape a
- * photograph would have been, and a framed empty box is the card kit that rule rejects.
- *
- * Not a tint of --accent either: this is an absence, and a violet tile would read as a
- * design element someone chose.
+ * --stage, not --surface: the tile is a hole punched through the glass to the page's own
+ * ground, which is both visible and a fair description of what it is. Not a tint of
+ * --accent either: this is an absence, and a violet tile would read as a design element.
  */
 .board-photo-pending {
   display: grid;
   place-items: center;
   width: 100%;
   aspect-ratio: 4 / 5;
-  margin-bottom: 0.45rem;
-  border-radius: var(--radius);
+  margin-bottom: 0.85rem;
+  border-radius: var(--radius-card);
   background: var(--stage);
 }
 
@@ -836,34 +561,76 @@ body { overflow-x: hidden; }
   color: var(--ink-dim);
 }
 
-.board-card h3 { font-size: 1rem; }
+.board-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
 
 .board-position {
-  font-size: 0.76rem;
+  font-size: 0.95rem;
   font-weight: 500;
   color: var(--accent);
   max-width: none;
 }
 
 .board-card p:not(.board-position) {
-  font-size: 0.88rem;
+  margin-top: 0.45rem;
+  font-size: 0.9rem;
   line-height: 1.55;
   color: var(--ink-dim);
   max-width: none;
 }
 
-/* The open slot: no image, so it reads as a deliberate gap in the roster rather than a
-   card that failed to load one. Space and a dim tone, never a dashed box. Aligned to the
-   top like every other card -- floated to the bottom of a stretched cell it just looked
-   mis-set. */
-.board-card[data-placeholder='true'] {
-  align-self: start;
-}
-
+/* The open slot on an older board: no image, so it reads as a deliberate gap in the
+   roster rather than a card that failed to load one. */
+.board-card[data-placeholder='true'] { align-self: start; }
 .board-card[data-placeholder='true'] h3 { color: var(--ink-dim); }
 
+/*
+ * The way in, at the end of the current board: the reference's dashed card with a plus.
+ * A dashed box is exactly what the open slot above is NOT given, and that is the point --
+ * an open slot is an absence, this is an invitation, and they should not look alike.
+ */
+.board-join {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.board-join:hover { color: var(--ink); }
+
+.board-join-tile {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  margin-bottom: 0.85rem;
+  border: 1.5px dashed color-mix(in oklab, var(--ink) 30%, transparent);
+  border-radius: var(--radius-card);
+  transition: border-color 0.2s ease;
+}
+
+.board-join:hover .board-join-tile { border-color: var(--accent); }
+
+.board-join-plus {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.75rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.board-join-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
 /* ---------------------------------------------------------------------------
- * Semester select -- a control, so it is a filled pill (base.css --radius-pill).
+ * The semester select -- a control, so it takes the control radius.
  * ------------------------------------------------------------------------- */
 
 .semester-select {
@@ -872,15 +639,11 @@ body { overflow-x: hidden; }
   background-color: var(--surface);
   color: var(--ink);
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   padding: 0.55rem 2.3rem 0.55rem 1.1rem;
-  /* A <select>'s closed-state box has no explicit width, so it sizes to its own content
-     (the longest option's text plus the padding above) regardless of what shrinks around
-     it -- unlike a paragraph, it cannot wrap. At 280x812/32px root that natural width
-     (269.8px, "Fall 2025" plus the chevron gutter) exceeds its 200px column outright.
-     max-width: 100% is the standard fix for a form control in a shrinking container: it
-     caps the box at whatever room actually exists without touching its size anywhere
-     that room was never in short supply. */
+  /* A <select>'s closed-state box sizes to its own widest option and cannot wrap: at
+     280x812/32px root that natural width (269.8px) exceeded its column outright.
+     max-width: 100% caps it at whatever room actually exists. */
   max-width: 100%;
   font-family: var(--font-body);
   font-weight: 500;
@@ -906,59 +669,69 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Media facades
+ * Media: the videos, in blocks of five (src/ui/media.js) -- one large and four small,
+ * the large one on the left in the first block and on the right in the next, as in the
+ * client's reference.
+ *
+ * Each block is its own grid. The lead of a left-led block is its FIRST card and the
+ * lead of a right-led block its LAST, which keeps reading order and tab order the same
+ * way round in both. The lead is placed by row AND column, which is what lets the four
+ * small cards auto-place into the cells beside it; a lead placed by column alone walks
+ * the auto-placement cursor past the left-hand cells and drops a small video a row low.
  * ------------------------------------------------------------------------- */
 
 .media-list {
   display: grid;
-  /* min(230px, 100%): see .board-list's identical wrapper above -- the same floor, one
-     card style over. Only 10px of margin protected this one at 280x812/32px root (270px
-     measured against a 280px viewport); the wrapper is what makes that margin a fact
-     rather than a coincidence of today's copy. */
-  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
   gap: clamp(1.25rem, 2.5vw, 2rem);
   width: 100%;
 }
 
-/* ---------------------------------------------------------------------------
- * The practice gallery, below the video facades in the same panel.
- * ------------------------------------------------------------------------- */
-
-.gallery-heading {
-  margin: clamp(2.5rem, 6vh, 4rem) 0 clamp(1rem, 2.5vh, 1.5rem);
-  font-size: var(--type-micro);
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-}
-
-.photo-grid {
+/* One column on a phone. minmax(0, 1fr) rather than a pixel floor: the column counts are
+   fixed per width, so there is no floor that could outgrow the grid. */
+.media-block {
   display: grid;
-  /* min(230px, 100%), matching .media-list directly above it -- the two grids sit in one
-     panel and a different floor would give them visibly different column counts at the
-     same width. The min() wrapper is there for the reason that rule documents. */
-  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
-  gap: clamp(0.75rem, 1.8vw, 1.25rem);
-  /* start, not the default stretch: these are mixed 3:4 and 4:3 photographs and each
-     cell keeps its own height. Stretching would hand a landscape cell the height of the
-     portrait beside it and leave the picture floating in dead space. */
-  align-items: start;
-  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1.25rem, 2.5vw, 2rem);
 }
 
-.photo-cell { margin: 0; }
+/* Two across, the lead across both: a 2x2 lead would leave the others at a quarter width
+   and unreadable below 900. */
+@media (min-width: 560px) {
+  .media-block { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-.photo-cell img {
-  display: block;
-  width: 100%;
-  /* The ratio comes from the img's own width/height ATTRIBUTES (src/ui/picture.js, fed
-     from PRACTICE_PHOTOS), so `height: auto` resolves against a known intrinsic size and
-     the cell is the right height before the bytes arrive. No aspect-ratio is declared
-     here on purpose -- one value cannot serve both shapes, and the attributes already
-     carry the right one per picture. */
-  height: auto;
-  border-radius: var(--radius);
+  .media-block[data-lead='left'] > .media-card:first-child,
+  .media-block[data-lead='right'] > .media-card:last-child { grid-column: 1 / -1; }
+}
+
+@media (min-width: 900px) {
+  .media-block { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  .media-block[data-lead='left'] > .media-card:first-child {
+    grid-column: 1 / span 2;
+    grid-row: 1 / span 2;
+  }
+
+  .media-block[data-lead='right'] > .media-card:last-child {
+    grid-column: 3 / span 2;
+    grid-row: 1 / span 2;
+  }
+
+  /* The lead's facade -- and the video once it is playing -- fills the taller cell
+     instead of keeping 16:9 and leaving a gap under it; `min-height: 0` is what lets a
+     flex child shrink inside that cell. */
+  .media-block[data-lead='left'] > .media-card:first-child .media-facade,
+  .media-block[data-lead='right'] > .media-card:last-child .media-facade,
+  .media-block[data-lead='left'] > .media-card:first-child iframe,
+  .media-block[data-lead='right'] > .media-card:last-child iframe {
+    flex: 1;
+    min-height: 0;
+    aspect-ratio: auto;
+  }
+
+  .media-block[data-lead='left'] > .media-card:first-child h3,
+  .media-block[data-lead='right'] > .media-card:last-child h3 {
+    font-size: 1.15rem;
+  }
 }
 
 .media-card {
@@ -984,11 +757,8 @@ body { overflow-x: hidden; }
   transition: transform 0.25s ease;
 }
 
-/*
- * Play affordance: a triangle in a circle, drawn in line like everything else. White, not
- * the accent -- the accent marks the three things that ask a visitor to commit (the nav's
- * call to action and the two forms). Pressing play commits to nothing.
- */
+/* Play affordance: a triangle in a circle, drawn in line. White, not the accent --
+   pressing play commits to nothing, and the accent marks the things that do. */
 .media-facade::before {
   content: '';
   position: absolute;
@@ -1047,106 +817,193 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Form facades -- the feature panel's pill buttons, and the second and third places the
- * accent is spent. Both of these ask a visitor to actually do something.
+ * The filled control: every button and button-shaped link that asks a visitor to do
+ * something -- open a form, join the Discord, go to Join us. The accent is spent here and
+ * on the nav's call to action, and nowhere else as a fill.
  * ------------------------------------------------------------------------- */
 
-.form-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  width: 100%;
-}
-
-.form-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-/* The button's label already carries the form's title ("Open <title>"), so this heading
-   does repeat it -- but only until the button is pressed: src/ui/forms.js REPLACES the
-   button with the embedded form, and after that this heading is the only thing naming
-   what the iframe is. Set small and dim so it reads as the card's title rather than as a
-   second call to action. */
-.form-card h3 {
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  color: var(--ink-dim);
-  max-width: none;
-}
-
 /*
- * The button's label is "Open " plus the form's own title (FORMS, content/index.js) --
- * e.g. "Open Performance / Teaching Request". .form-card is a column flex with
- * align-items: flex-start, the same shape as the contact block's room-head, so it sizes
- * itself to fit-content rather than to its own container: at a 32px root font "Performance"
- * (the widest unbreakable word in that label) is wide enough on its own to push the
- * button, and so the card, past a narrow column. Measured at 280x812, 32px root: the card
- * to x 303.4 against a 280px viewport. overflow-wrap: anywhere is the same fix as the
- * contact block's, for the same reason -- every word in every label already clears its
- * line at every width this file has verified, so there is nothing for it to act on until
- * a column gets this narrow.
+ * overflow-wrap: anywhere, because a label is one line of text in a box that sizes to
+ * fit it: at a 32px root "Performance" alone -- the widest word in "Open Performance /
+ * Teaching Request" -- is wide enough to push the button, and its card, past a narrow
+ * column (measured: to x 303.4 in a 280px viewport). Every word clears its line at every
+ * width this file has verified, so there is nothing for it to act on until a column gets
+ * that narrow.
  */
-.form-card button {
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  max-width: 100%;
   overflow-wrap: anywhere;
+  padding: 0.72rem 1.25rem;
+  border: none;
+  border-radius: var(--radius-control);
   background: var(--accent);
   color: var(--accent-ink);
-  border: none;
-  border-radius: var(--radius-pill);
-  padding: 0.7rem 1.35rem;
   font-family: var(--font-body);
-  font-weight: 600;
   font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.form-card button:hover {
+/* (0,2,0), which is what it takes to beat `a:hover { color: var(--ink) }` in base.css on
+   the button-shaped links; --ink on the lightened accent would fall to about 2:1. */
+.button:hover {
   background: color-mix(in oklab, var(--accent) 72%, white);
+  color: var(--accent-ink);
 }
 
-.form-card:has(iframe) { width: 100%; }
+.button .social-icon { flex: 0 0 auto; }
 
-.form-card iframe {
+/* ---------------------------------------------------------------------------
+ * The Join us page's ways in: the interest form, the Discord and the booking request,
+ * a card each.
+ * ------------------------------------------------------------------------- */
+
+.join-ways {
+  display: grid;
+  /* min(17rem, 100%) for the same reason as .board-list's floor: a bare 17rem cannot
+     shrink below itself when the plate is narrower than that. */
+  grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr));
+  gap: clamp(1rem, 2.5vw, 1.75rem);
+}
+
+.join-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  min-width: 0;
+  padding: clamp(1.25rem, 2.5vw, 1.75rem);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+}
+
+.join-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* A form, once opened, takes the whole row: a Google Form is a page tall and a third of
+   the plate's width would make every field in it a sliver. */
+.join-card:has(iframe) { grid-column: 1 / -1; }
+
+.form-frame {
   width: 100%;
   border: none;
   border-radius: var(--radius);
 }
 
 /* ---------------------------------------------------------------------------
- * Footer -- not a `.section`: there is no room here, so it skips the pattern layout
- * entirely. It sits on BARE GRADIENT, below the last panel, which is the page releasing
- * back to the thing it opened on. Separated from Contact by space alone, not a rule.
+ * The footer: what the Contact panel became, on every page -- the socials, the address
+ * and the Linktree, then the sign-off, in one centred column at the full width of the
+ * page. It is a sibling of <main>, so it is lifted above the canvas the same way
+ * #content is.
  * ------------------------------------------------------------------------- */
 
+.site-footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.9rem, 2.2vh, 1.25rem);
+  padding: clamp(1.75rem, 4vh, 2.5rem) var(--gutter) clamp(1.25rem, 3vh, 1.75rem);
+  text-align: center;
+}
+
+.socials {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+/* A 44px target, the smallest a pointer target should be, around a 20px mark. The mark
+   takes `currentColor` (src/ui/icons.js), so hover and focus are one colour change. */
+.socials a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-control);
+  background: var(--chip);
+  color: var(--ink-dim);
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.socials a:hover,
+.socials a:focus-visible {
+  background: var(--chip-hover);
+  color: var(--ink);
+}
+
+.social-icon { display: block; }
+
+.footer-contact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem 1.1rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.92rem;
+}
+
+.footer-contact li {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The separator, drawn rather than typed, so it is never read out. */
+.footer-contact li + li::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink-dim);
+}
+
 /*
- * Centred, and a third of the height it was, at the client's request.
- *
- * min-height goes entirely: one line of text needed 40vh of floor for no reason, and on a
- * 987px-tall window that was 395px of gradient after the last thing on the page. The
- * padding alone now sets the height, which is about 150px — enough to read as an ending,
- * not as a second screen. Left-alignment was the house rule; the client overruled it here
- * and only here, which is fair: a single sign-off line has no column to align to.
+ * The club's address is one unbreakable token, and at a 32px root it alone is wider than
+ * a phone's column -- measured at 375x812: 434px of scrollWidth against 375, silently
+ * clipped by `body { overflow-x: hidden }` rather than scrolled. Only the inline link
+ * overflows; its line box does not grow to contain it, which is why no box-based check
+ * saw it. `anywhere` rather than `break-word`: both render the same breaks here, but only
+ * `anywhere` is specified to feed its break opportunities into min-content sizing, and
+ * this link sits inside flex items whose automatic minimum IS their min-content.
  */
+.footer-contact li,
+.footer-contact a {
+  overflow-wrap: anywhere;
+}
+
 /*
- * The sign-off, as the last line inside the last panel rather than a strip after it.
- *
- * `grid-column: 1 / -1` because the panels it lands in are two-track grids; on the media
- * page's single-column panel the same declaration is simply the one column. Centred, and
- * separated by the page's one hairline so it reads as an ending rather than as another
- * paragraph of the panel it sits in.
- *
- * --ink, not --ink-dim, is the rule this line has always carried -- and it is no longer
- * on bare canvas, so it now clears its requirement by a wider margin than it used to
- * rather than a narrower one.
+ * The sign-off, under a hairline that spans the footer -- all of it, where the old one
+ * stopped at the edge of the Contact panel's left column, a third of the way across
+ * (the client's first screenshot). --ink, the rule this line has always carried.
  */
 .footer-line {
-  grid-column: 1 / -1;
-  margin-top: clamp(2rem, 5vh, 3rem);
-  padding-top: clamp(1.1rem, 2.5vh, 1.6rem);
+  align-self: stretch;
+  max-width: none;
+  margin-top: clamp(0.25rem, 1vh, 0.75rem);
+  padding-top: clamp(1rem, 2.2vh, 1.4rem);
   border-top: 1px solid var(--hairline);
   font-size: var(--type-micro);
   font-weight: 400;
@@ -1156,65 +1013,59 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Narrow screens. Every panel collapses to one full-width column in reading order and
- * flows with the page. Nothing is pinned, nothing overlaps, and the only thing that
- * changes besides the column count is the type scale.
+ * Narrow screens. The two-column panels collapse to one column in reading order and flow
+ * with the page. Nothing is pinned, nothing overlaps, and the only thing that changes
+ * besides the column count is the type scale.
  * ------------------------------------------------------------------------- */
 
 @media (max-width: 767px) {
-  [data-panel] .room {
-    display: block;
-    min-height: 0;
-    padding-block: clamp(2.5rem, 7vh, 4rem);
-  }
-
-  /* Hero and feature alone keep a taller floor than the reset above -- a little
-     breathing room for a short composition on a phone. Story is deliberately not in
-     this list; it is the club's own story and wants whatever space its serif and
-     photograph actually take, not a fixed floor. The grid panels need no floor either,
-     for the obvious reason that their cards have to scroll. */
-  [data-panel='hero'] .room,
-  [data-panel='feature'] .room {
-    min-height: 70dvh;
-  }
-
+  /*
+   * The hero stays a screen tall and bottom-aligned, as it is on a desktop: a column
+   * rather than a grid, so the photograph sits under the wordmark, and the marquee is
+   * still the last thing on the first screen.
+   *
+   * The top padding never drops below the bar standing over it: max() keeps the
+   * composition wherever it already cleared the bar and hands the bar the decision where
+   * it did not -- at 375x812 with a 32px root the bar is 188.8px tall.
+   */
   [data-panel='hero'] .room {
-    /* The hero opens the page, so it gets less top padding than a panel lower down --
-       but never less than the bar standing over it. This override dropped --nav-h
-       entirely, which is why the 200%-zoom overlap showed up HERE rather than in the
-       wide rule: at 375x812 with a 32px root it resolved to 112px against a bar of
-       188.8px. max() keeps the composition at every width where it already cleared the
-       bar (unchanged at 375x812 and 1440x900 at a 16px root) and hands the bar the
-       decision where it did not. */
-    padding-block: max(clamp(3.5rem, 9vh, 5rem), var(--nav-clear)) clamp(2.5rem, 7vh, 4rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    /* stretch, overriding the wide rule's `align-items: end`, which in a COLUMN flexbox
+       is the cross axis: it right-aligned the head at its shrink-to-fit width, and the
+       head is an inline-size container, whose intrinsic width is zero by definition.
+       Measured at 375x812: the head, the h1 and the tagline all 0px wide at x 335, the
+       wordmark sized to min(..., 100cqi / 4.25) = 0, and the tagline's words stacked
+       one per line out to x 480. */
+    align-items: stretch;
+    padding-block: max(clamp(3.5rem, 9vh, 5rem), var(--nav-clear)) clamp(1rem, 3vh, 1.75rem);
   }
 
-  [data-panel] .room-head,
-  [data-panel] .room-body {
+  [data-panel='hero'] .room-body {
     display: block;
-    margin-top: 0;
+    margin-top: clamp(1.5rem, 4vh, 2.25rem);
   }
-
-  [data-panel] .room-body { margin-top: clamp(1.75rem, 5vh, 2.5rem); }
 
   [data-panel='hero'] h1 {
-    /* Same cap as the wide rule, against the same container: the narrow branch turns
-       .room into a block, but .room-head is still the query container, so 100cqi is
-       still the width the wordmark actually has. Without this line the 280px/32px-root
-       case keeps its mid-word break -- the mobile clamp's 2.9rem floor resolves to
-       92.8px there against a 200px column. The bare declaration above it is the same
-       no-`cqi` fallback the wide rule carries, for the same reason. */
+    /* Same cap as the wide rule, against the same container: .room-head is still the
+       query container, so 100cqi is still the width the wordmark actually has. Without
+       this the 280px/32px-root case keeps its mid-word break -- the clamp's 2.9rem floor
+       resolves to 92.8px against a 200px column. The bare line is the no-`cqi`
+       fallback, for the same reason the wide rule carries one. */
     font-size: clamp(2.9rem, 15vw, 4.5rem);
     font-size: min(clamp(2.9rem, 15vw, 4.5rem), calc(100cqi / var(--wordmark-em)));
     max-width: none;
   }
 
-  [data-panel='story'] p { font-size: 1.15rem; }
+  [data-panel='feature'] .room {
+    display: block;
+    padding-block: clamp(2.5rem, 7vh, 4rem);
+  }
 
-  .form-list { flex-direction: column; align-items: flex-start; }
+  [data-panel='feature'] .room-body { margin-top: clamp(1.75rem, 5vh, 2.5rem); }
 
   /* min(150px, 100%): the same wrapper as the base rule, for the same reason -- this
-     override lowers the floor but does not remove it, and a bare floor is one narrower
-     device or one more doubled rem away from binding here too. */
+     override lowers the floor but does not remove it. */
   .board-list { grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); }
 }

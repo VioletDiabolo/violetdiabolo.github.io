@@ -1453,3 +1453,143 @@ Forcing a paint published both immediately: `--nav-offset: 59.39px`, `--marquee-
 91.77s`, 66 px/s. Worth recording because the first reading looked exactly like a broken
 observer, and the thing that distinguished them was checking whether the OLD observer was
 working either.
+
+## 20. Four pages, one footer, and the marquee on the first screen
+
+The client's brief, in order:
+- squarer nav buttons, and only Media, Join us and About us in the bar;
+- an About us page with the board on it, laid out after a team-page reference;
+- a Join us page;
+- the swirling background on every page, with the pages spaced out vertically;
+- the footer text centred;
+- the marquee directly under the hero's wordmark and photograph;
+- the Hell's Kitchen sentence cut from the About copy;
+- the practice sentence as bullets, with dates and places emphasised;
+- Contact compacted into a footer, with Discord added to the links;
+- the photographs off Media, with the videos kept in alternating blocks;
+- a more human Media lead.
+
+### 20.1 The site, measured
+
+Chromium, dev server, viewport emulation. Geometry is `getBoundingClientRect` at rest,
+not a screenshot.
+
+| viewport | marquee (top–bottom) | first screen | overflow |
+|---|---|---|---|
+| 1440×900 | 786–864 | ✓ | none |
+| 1280×720 | 637–703 | ✓ | none |
+| 1024×768 | 690–749 | ✓ | none |
+| 768×1024 | 935–996 | ✓ | none |
+| 375×812 | 746–800 | ✓ | none |
+| 320×568 | 516–563 | ✓ | none |
+| 375×812, 32px root | 741–836 | the band's top | none |
+
+- **The hero photograph gives way.** At 1440×900 the photograph is capped at 504px tall,
+  56svh of height budget turned into a width cap on a 4:3 picture, so the band still fits.
+  At 1024 the column binds first and the cap does nothing.
+- **Nav buttons** measure an 8px radius (`--radius-control`) on the mark, the page buttons
+  and the call to action.
+- **The footer** is a sibling of `<main>`, full width at 1440. Its hairline runs 72–1368px,
+  the whole content width. The old one stopped at the left column's edge, about a third of
+  the way across, which is what the client's first screenshot showed.
+- **About us** runs four cards across at 1440, three at 1024 and two at 375. Emily's and
+  Megan's photographs are pending, so they get initials tiles. The dashed "+" card ends
+  only the current board.
+- **Media blocks** match the reference exactly at 1440:
+  - block 1's lead is at (112, 447), 592×433, with the four small cards in the two columns
+    to its right;
+  - block 2 has the four small cards on the left and the lead (the Promo) at (736, 913),
+    592×455.
+
+  At 768 each block goes two across with the lead spanning both, first in block 1 and last
+  in block 2. At 375 it is one column.
+- **Join us.** Opening a form (a blank iframe swapped in, so no request went to Google)
+  took its card from 387px to the full 1216px row, and the other two cards flowed under it.
+
+### 20.2 Contrast and overflow, all four pages
+
+`scripts/check-contrast.html?page=…`, 12 time steps at 1440×900, bound over all three
+stops:
+
+| page | blocks | tightest | lowest others |
+|---|---|---|---|
+| index | 16/16 | hero tagline 5.25 (needs 4.5) | nav CTA 6.08, footer link 6.16, button 7.05 |
+| about | 17/17 | page lead 5.25 | board position 6.16, page label 6.21, board bio 7.10 |
+| media | 10/10 | page lead 5.25 | footer link 6.16, media card title 7.10 |
+| join | 17/17 | page lead 5.25 | page label 6.21, button 7.05, schedule note 7.10 |
+
+- The page lead and the hero tagline both sit on bare gradient, at the --ink ceiling
+  (5.25:1). That is the design's floor, not a regression.
+- The two new surfaces measure what base.css predicted before anything ran: the page label
+  at 6.21:1 (accent on --chip) and a highlighted place at 10.92:1 (--ink on --mark over
+  glass).
+- The overflow check, at 375 and 280 with a 32px root, passes on every page. Its scan now
+  includes the footer, which is its own subtree.
+
+### 20.3 Found by the probe: the phone hero's container collapsed to zero
+
+The first overflow run failed on index at both widths. A class-less `<p>` painted ink out
+to x 480 at 375, and out to x 385 at 280. It was the tagline, and the cause was a
+different element:
+
+- **What happened.** To keep the marquee on the first screen, the phone hero became a
+  column flexbox, bottom-aligned. The wide rule's `align-items: end` still applied, and in
+  a column that is the cross axis, so the head was right-aligned at its shrink-to-fit
+  width.
+- **Why that meant zero.** The head is the inline-size container the wordmark cap measures
+  against, and such a container's intrinsic width is zero by definition. The head measured
+  0px at x 335. The wordmark was sized to `min(…, 100cqi / 4.25)`, which is 0px, and the
+  tagline stacked one word per line.
+- **Why nothing else caught it.** jsdom has no layout, and at 16px on a desktop nothing
+  looked wrong.
+- **The fix.** `align-items: stretch` in the phone rule: 56px wordmark, full column, no
+  overflow.
+- **The guard.** `tests/sections-layout.dom.test.js` now resolves the phone hero room's
+  winning `align-items` through the real cascade. It fails on anything but `stretch`, and
+  deleting the fix fails it.
+
+### 20.4 Falsification
+
+Every new or ported guard was mutated to prove it fails. 30 of 30 were caught:
+- a page missing from the build inputs;
+- one `<head>` drifting from the others;
+- a page file booting as the wrong page;
+- a pipeline target nobody renders, and a stray master or derivative;
+- a plate going solid, or a header getting plated;
+- the marquee leaving the hero;
+- a renderer building its own footer, or the footer mounted inside `<main>`;
+- the boot ignoring `data-page`;
+- the media blocks no longer alternating;
+- the schedule losing its bold;
+- the Join us cards reordering;
+- `formById` accepting an unknown id;
+- the CTA marked current on every page;
+- the join tile showing on old boards;
+- the select ignoring its controls box;
+- a probe block claiming a page it is not on, or forgetting one;
+- the focus-ring override dropping the header;
+- a pixel floor on the media blocks;
+- the Join us card losing its `min-width: 0`;
+- `break-word` on the footer address;
+- a solid surface rule coming back;
+- a button label losing `overflow-wrap`;
+- the Hell's Kitchen sentence returning;
+- a page lead going dim;
+- the phone hero shrinking its container.
+
+The run restored every file byte for byte afterwards.
+
+### 20.5 What went, and where it is
+
+- **The two photographs from the old site**, the USADA group shot on About and the stage
+  strip on Contact, went with those panels. The About page follows the reference, which has
+  no standalone photograph, and Contact is the footer now.
+- **The six practice-gallery photographs** went with the Media page's pictures.
+
+Their eight masters and 40 derivatives are removed and recoverable from git history. The
+Drive originals are untouched. `dist/images` is 2.7 MB.
+
+- **Instrument Serif** is no longer requested. Its one job was the story panel's prose,
+  and that panel is gone.
+- **The two form buttons** moved from the home page to Join us, and the events panel links
+  there instead.

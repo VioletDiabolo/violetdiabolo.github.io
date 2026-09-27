@@ -1,8 +1,8 @@
 // tests/content.test.js
 import { describe, it, expect } from 'vitest';
 import {
-  SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, SECTION_HEADINGS, PHOTOS,
-  PRACTICE_PHOTOS, PERFORMED_FOR,
+  SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, PAGE_COPY, PHOTOS,
+  PERFORMED_FOR, DISCORD,
 } from '../src/content/index.js';
 
 describe('content', () => {
@@ -11,22 +11,34 @@ describe('content', () => {
     expect(SITE.tagline).toBe('PREMIER DIABOLO TEAM AT NYU');
   });
 
-  it("preserves the founding year and Hell's Kitchen credit in the about copy", () => {
+  it("keeps the founding year in the about copy, and not the sentence the client cut", () => {
     expect(ABOUT.body).toContain('Spring of 2019');
-    expect(ABOUT.body).toContain("Hell’s Kitchen");
+    // Removed at the client's request: "The club has appeared on Gordon Ramsey's Hell's
+    // Kitchen and at hundreds of galas, festivals, schools and fundraisers across the
+    // tri-state area." Pinned as absent, because it is exactly the kind of line that
+    // comes back with a copy-paste from the old site.
+    expect(ABOUT.body).not.toMatch(/Hell.s Kitchen/);
+    expect(ABOUT.body).not.toContain('hundreds of galas');
   });
 
   it('carries both weekly practices, with a day, a time and a place for each', () => {
-    // Fall 2026: two practices on two different days. The "first practice will be on
-    // September 20" line that used to be pinned here went with them -- it dated the 2025
-    // season, and a past date standing beside a new timetable reads as this year's.
+    // Fall 2026: two practices on two different days, as fields rather than a sentence,
+    // because the client asked for the dates and places to stand out and a string can
+    // only be bolded by parsing it back apart.
     //
-    // Each day is checked NEXT TO its own time, not merely present somewhere in the
-    // string: the first draft of this copy had both practices on Sunday, and every
-    // assertion that looked for the pieces separately passed on it just as happily.
-    expect(EVENTS.body).toContain('Sundays 3-5PM in Kimmel Center, Room 606');
-    expect(EVENTS.body).toContain('Fridays 5-7PM');
-    expect(EVENTS.body).toContain('Bust of Sylvette');
+    // Each day is checked TOGETHER WITH its own time and place, as one record: the first
+    // draft of this copy had both practices on Sunday, and every assertion that looked
+    // for the pieces separately passed on it just as happily.
+    expect(EVENTS.sessions.map((s) => `${s.day} ${s.time} ${s.at} ${s.place}`)).toEqual([
+      'Sundays 3–5 PM in Kimmel Center, Room 606',
+      'Fridays 5–7 PM outdoors at the Bust of Sylvette',
+    ]);
+    expect(EVENTS.notes).toEqual([
+      'Come to either or both.',
+      'All equipment is provided.',
+      'Anyone is welcome, regardless of experience!',
+    ]);
+    expect(EVENTS.intro).toBe('Two practices a week');
   });
 
   it('gives the hero and the events panel a photograph each, with alt text', () => {
@@ -137,20 +149,15 @@ describe('content', () => {
     expect(names).not.toContain('Minh Gala');
   });
 
-  it('describes every practice photograph without naming anyone', () => {
-    expect(PRACTICE_PHOTOS.photos.length).toBeGreaterThan(0);
+  it('describes every photograph without naming anyone', () => {
+    // The practice gallery this used to cover went with the Media page's photographs, at
+    // the client's request; the rule it enforced did not, and the two photographs that
+    // are left were taken at the same session. Nobody has said which face belongs to
+    // which name, so no alt text may claim one.
     const boardNames = [...new Set(Object.values(BOARD).flat().map((m) => m.name))];
-    for (const photo of PRACTICE_PHOTOS.photos) {
-      expect(photo.alt.length, `${photo.base} has no alt text`).toBeGreaterThan(0);
-      // A base name, not a path or a filename: buildPicture expands it into the srcset.
-      expect(photo.base).not.toMatch(/[/.]/);
-      // An intrinsic size PAIR, or the browser reserves nothing and the panel jumps when
-      // the picture lands. Both, or neither is any use — picture.js requires both too.
-      expect(Number.isFinite(photo.width) && Number.isFinite(photo.height),
-        `${photo.base} is missing a width/height pair`).toBe(true);
-      // Nobody has said which face belongs to which name, so no alt text may claim one.
+    for (const [key, photo] of Object.entries(PHOTOS)) {
       for (const name of boardNames) {
-        expect(photo.alt, `${photo.base}'s alt text names "${name}"`).not.toContain(name);
+        expect(photo.alt, `PHOTOS.${key}'s alt text names "${name}"`).not.toContain(name);
       }
     }
   });
@@ -170,10 +177,16 @@ describe('content', () => {
     expect(CONTACT.email).toBe('violetdiabolo@gmail.com');
     expect(FORMS).toHaveLength(2);
     for (const f of FORMS) expect(f.url).toContain('docs.google.com/forms');
-    // GitHub is gone at the client's request. Kept as an exact list rather than a
-    // length: the ORDER is the reading order of the icon row.
-    expect(SOCIALS.map((s) => s.label)).toEqual(['Instagram', 'YouTube', 'NYU Engage']);
+    // The Join us page places each form by id, so the ids have to exist and be distinct.
+    expect(FORMS.map((f) => f.id).sort()).toEqual(['interest', 'request']);
+    // GitHub is gone at the client's request, and Discord is in, also at the client's
+    // request. Kept as an exact list rather than a length: the ORDER is the reading
+    // order of the icon row.
+    expect(SOCIALS.map((s) => s.label)).toEqual(['Instagram', 'YouTube', 'NYU Engage', 'Discord']);
     expect(SOCIALS.some((s) => /github/i.test(s.href)), 'a GitHub link came back').toBe(false);
+    // The client's invite, verbatim, and read from the socials rather than restated.
+    expect(DISCORD).toBe('https://discord.gg/7Kn3udMrrf');
+    expect(SOCIALS.find((s) => s.label === 'Discord').href).toBe(DISCORD);
   });
 
   it("preserves the source apostrophes exactly, curly and ASCII alike", () => {
@@ -183,7 +196,6 @@ describe('content', () => {
 
     // U+2019 curly
     expect(ABOUT.body).toContain("NYU’s award-winning");
-    expect(ABOUT.body).toContain("Ramsey’s Hell’s Kitchen ");
     expect(jon.description).toContain("I’m all about carefully crafting ");
 
     // U+0027 ASCII
@@ -196,11 +208,20 @@ describe('content', () => {
     expect(jon.description).toContain("I'm not spinning");
   });
 
-  it('supplies a heading for every section that has no natural heading field', () => {
-    expect(Object.keys(SECTION_HEADINGS).sort()).toEqual(['board', 'contact', 'media']);
-    for (const heading of Object.values(SECTION_HEADINGS)) {
-      expect(typeof heading).toBe('string');
-      expect(heading.length).toBeGreaterThan(0);
+  it('gives every sub-page a heading, and the copy the client asked for', () => {
+    expect(Object.keys(PAGE_COPY).sort()).toEqual(['about', 'join', 'media']);
+    for (const [page, copy] of Object.entries(PAGE_COPY)) {
+      expect(typeof copy.heading, `${page} has no heading`).toBe('string');
+      expect(copy.heading.length).toBeGreaterThan(0);
     }
+    // The About page leads with the club's own account of itself -- the same string, not
+    // a copy of it that could drift.
+    expect(PAGE_COPY.about.lead).toBe(ABOUT.body);
+    // The client's rewording, verbatim: "something more human like 'Our performances and
+    // videos'", replacing "Performances, competitions and a Friday on the lawn -- the
+    // club's own record of itself."
+    expect(PAGE_COPY.media.lead).toBe('Our performances and videos');
+    // No label on Media, because it would say "Media" directly over "Media".
+    expect(PAGE_COPY.media.label).toBeUndefined();
   });
 });

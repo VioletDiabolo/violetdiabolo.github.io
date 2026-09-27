@@ -63,7 +63,7 @@
   document.documentElement.clientWidth` means, so it is asserted directly at the two
   narrow widths those fixes were measured against (375 and 280, both 812 tall) rather
   than trusted to stay fixed. The pass/fail is which of the real page's OWN elements
-  (under #content or .site-nav, including those two themselves, not only their
+  (under #content, .site-nav or .site-footer, including those themselves, not only their
   descendants) paint past clientWidth, measuring each one's OWN painted ink via a Range
   as well as its box -- both were real gaps found writing this section, not hypothetical
   ones: the nav bar's own unpinned width (base.css's `.site-nav`) is invisible to a scan
@@ -80,11 +80,12 @@
   every fix in this file's own list applied, so asserting it costs nothing.
 
   RUN IT:  npm run dev  ->  http://localhost:5173/scripts/check-contrast.html
-           ?width=1440&height=900&steps=12   (defaults; all three are overridable, so
-           the phone case can be re-run without editing this file)
+           ?page=index&width=1440&height=900&steps=12   (defaults; every one is
+           overridable -- page is index, about, media or join -- so each page and the
+           phone case can be re-run without editing this file)
 
-  Not part of the build: vite.config.js's entries are index.html and media.html, and neither
-  rollupOptions.input. Not a CI gate -- the unit suite cannot run WebGL and cannot
+  Not part of the build: vite.config.js's entries are the four page files, and none of
+  them references this one. Not a CI gate -- the unit suite cannot run WebGL and cannot
   resolve getComputedStyle against real layout, which is the whole reason this is a page.
 
   Results land on window.__contrastProbe.result once `ready` resolves, so a headless
@@ -198,54 +199,63 @@ const STOP_NAMES = Object.keys(STOPS);
  * size, weight and surface chain all come off the live page.
  * ------------------------------------------------------------------------- */
 /*
- * Third column: which page the block lives on. 'both' is the chrome that every page
- * carries; 'index' and 'media' are that page's own content.
+ * Third column: which pages the block lives on. 'all' is the chrome every page carries
+ * -- the nav and the footer; otherwise it is one page file's name or several, separated
+ * by spaces ('index join': the practice schedule renders on the home page and on Join
+ * us, from the same data).
  *
  * It exists because the site stopped being one page. Without it, running the probe over
- * index.html reported four MEDIA selectors as "matched nothing" -- a loud failure about
- * a page that was simply somewhere else -- and running it over media.html would have
- * reported twenty. A selector is only wrong when it matches nothing on the page it
- * claims.
+ * index.html would report every board selector as "matched nothing" -- a loud failure
+ * about a page that is simply somewhere else. A selector is only wrong when it matches
+ * nothing on a page it claims, and tests/sections-layout.dom.test.js holds every entry
+ * to exactly that, on every page it names.
  */
 const BLOCKS = [
-  ['nav wordmark', '.site-nav-mark', 'both'],
-  ['nav pill', '.site-nav-links a', 'both'],
-  ['nav CTA "Join us"', '.site-nav-cta', 'both'],
-  ['footer line', '.footer-line', 'both'],
+  ['nav wordmark', '.site-nav-mark', 'all'],
+  ['nav button', '.site-nav-links a', 'all'],
+  ['nav CTA "Join us"', '.site-nav-cta', 'all'],
+  ['footer link', '.footer-contact a', 'all'],
+  ['footer social icon', '.socials a', 'all'],
+  ['footer sign-off', '.footer-line', 'all'],
 
   ['hero h1', '#hero h1', 'index'],
   ['hero tagline', '#hero .room-head p', 'index'],
-  ['story h2 (ABOUT US)', '#about h2', 'index'],
-  ['story body (serif)', '#about .room-head p', 'index'],
   ['performed-for item', '.marquee-list li', 'index'],
   ['feature h2 (EVENTS)', '#events h2', 'index'],
-  ['feature body', '#events .room-head > p', 'index'],
-  ['form card label', '.form-card h3', 'index'],
-  ['form button label', '.form-card button', 'index'],
-  ['grid h2 (BOARD)', '#board h2', 'index'],
-  ['semester select', '.semester-select', 'index'],
-  ['board name', '.board-card h3', 'index'],
-  ['board position', '.board-position', 'index'],
-  ['board pending initials', '.board-photo-pending span', 'index'],
-  ['board bio', '.board-card p:not(.board-position)', 'index'],
-  ['grid h2 (CONTACT US)', '#contact h2', 'index'],
-  ['contact line', '#contact .room-head > p', 'index'],
-  ['contact email link', '#contact .room-head > p a', 'index'],
-  ['socials link', '.socials a', 'index'],
 
-  ['media h2', '#media h2', 'media'],
-  ['media intro', '#media .room-head > p', 'media'],
+  ['schedule intro', '.schedule-intro', 'index join'],
+  ['schedule session', '.schedule-sessions li', 'index join'],
+  ['schedule time (bold)', '.schedule-sessions strong', 'index join'],
+  ['schedule place (mark)', '.schedule-sessions mark', 'index join'],
+  ['schedule note', '.schedule-notes li', 'index join'],
+  ['button label', '.button', 'index join'],
+
+  ['page label', '.page-label', 'about join'],
+  ['page h1', '[data-panel="header"] h1', 'about media join'],
+  ['page lead', '.page-lead', 'about media join'],
+  ['plate h2', '[data-panel="plate"] h2', 'about media join'],
+
+  ['semester select', '.semester-select', 'about'],
+  ['board name', '.board-card h3', 'about'],
+  ['board position', '.board-position', 'about'],
+  ['board pending initials', '.board-photo-pending span', 'about'],
+  ['board bio', '.board-card p:not(.board-position)', 'about'],
+  ['join tile plus', '.board-join-plus', 'about'],
+  ['join tile label', '.board-join-label', 'about'],
+
   ['media card title', '.media-card h3', 'media'],
-  ['gallery heading', '.gallery-heading', 'media'],
+
+  ['join card title', '.join-card h3', 'join'],
 ];
 
-/** ?page=index (default) or ?page=media. Anything else falls back rather than 404s. */
-const PAGE = ['index', 'media'].includes(new URLSearchParams(location.search).get('page'))
+/** ?page=index (default), about, media or join. Anything else falls back rather than 404s. */
+const PAGES = ['index', 'about', 'media', 'join'];
+const PAGE = PAGES.includes(new URLSearchParams(location.search).get('page'))
   ? new URLSearchParams(location.search).get('page')
   : 'index';
 
 /** The blocks that apply to the page under test. */
-const PAGE_BLOCKS = BLOCKS.filter(([, , on]) => on === 'both' || on === PAGE);
+const PAGE_BLOCKS = BLOCKS.filter(([, , on]) => on === 'all' || on.split(' ').includes(PAGE));
 
 /** WCAG 1.4.3: 18pt (24px), or 14pt bold (18.66px), drops the requirement to 3:1. */
 const requirement = (px, weight) => (px >= 24 || (px >= 18.66 && weight >= 700) ? 3 : 4.5);
@@ -548,17 +558,15 @@ async function checkOverflow(frameEl, doc) {
 
     const clientWidth = doc.documentElement.clientWidth;
     const scrollWidth = doc.documentElement.scrollWidth;
-    const content = doc.getElementById('content');
-    const nav = doc.querySelector('.site-nav');
-    const offenders = [
-      ...(content ? overflowingElements(content, clientWidth) : []),
-      ...(nav ? overflowingElements(nav, clientWidth) : []),
-    ];
+    // The footer is its own subtree now: a sibling of #content, not a panel inside it,
+    // and it holds the one unbreakable token on the site -- the club's address.
+    const roots = [doc.getElementById('content'), doc.querySelector('.site-nav'), doc.querySelector('.site-footer')];
+    const offenders = roots.filter(Boolean).flatMap((root) => overflowingElements(root, clientWidth));
     rows.push({
       width, clientWidth, scrollWidth,
       offenders,
       // Two signals, both required. offenders.length === 0 catches real content under
-      // #content or .site-nav painting past clientWidth, named and measured. scrollWidth
+      // #content, .site-nav or .site-footer painting past clientWidth, named and measured. scrollWidth
       // === clientWidth catches everything else -- chiefly #gradient, which sits outside
       // both scanned subtrees and is exactly what moved this raw pair on its own before
       // fix pass 3 removed its explicit vw/vh width (see base.css). Equality holds
@@ -587,7 +595,7 @@ async function main() {
   const overflowRows = await checkOverflow($('page'), doc);
   const overflowFails = overflowRows.filter((r) => !r.pass);
   say('overflow', [
-    'Real content (#content, .site-nav) painting outside the viewport at a 32px root',
+    'Real content (#content, .site-nav, .site-footer) painting outside the viewport at a 32px root',
     'font (200% text zoom), at each width. PASS requires BOTH zero named offenders AND',
     'scrollWidth === clientWidth exactly -- the second catches anything outside the two',
     'scanned subtrees (chiefly the fixed #gradient canvas) that the offender scan below',
@@ -603,7 +611,7 @@ async function main() {
       ...r.offenders.map((o) => `    ${o.selector.padEnd(28)} right edge ${o.right}px  ${o.viaInk ? '(ink escapes box)' : '(box)'}`),
       ...(r.offenders.length === 0
         ? ['    (no scanned element accounts for it -- likely #gradient or another element'
-          + ' outside #content/.site-nav; see the header comment)']
+          + ' outside #content/.site-nav/.site-footer; see the header comment)']
         : []),
     ]),
   ].join('\n'), overflowFails.length ? 'bad' : 'ok');
@@ -613,7 +621,7 @@ async function main() {
   const rootStyle = getComputedStyle(doc.documentElement);
   const token = (name) => rootStyle.getPropertyValue(name).trim();
   const tokenNames = ['--stage', '--surface', '--accent', '--accent-ink', '--ink', '--ink-dim',
-    '--glass', '--story-tint', '--chip', '--chip-cta'];
+    '--glass', '--mark', '--chip', '--chip-cta'];
   const tokens = Object.fromEntries(tokenNames.map((n) => [n, token(n)]));
   const ink = anyColor(tokens['--ink']);
   const inkDim = anyColor(tokens['--ink-dim']);
@@ -633,7 +641,7 @@ async function main() {
   ].join('\n'), 'ok');
 
   /* --- 2. the surface composites, which is what base.css's token comment claims --- */
-  const surfaceTokens = ['--glass', '--story-tint', '--chip', '--chip-cta'];
+  const surfaceTokens = ['--glass', '--mark', '--chip', '--chip-cta'];
   const surfaceResult = {};
   const surfaceRows = [];
   for (const name of surfaceTokens) {

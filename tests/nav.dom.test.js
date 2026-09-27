@@ -3,28 +3,34 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NAV_LINKS, CTA, buildNav, observeNavHeight } from '../src/ui/nav.js';
-import { renderSections } from '../src/ui/sections.js';
+import {
+  NAV_LINKS, CTA, PAGES, buildNav, observeNavHeight,
+} from '../src/ui/nav.js';
+import { RENDERERS } from '../src/ui/sections.js';
 
 beforeEach(() => { document.body.innerHTML = '<main id="content"></main>'; });
 
 describe('NAV_LINKS', () => {
-  it('jumps to the sections a visitor most wants', () => {
-    expect(NAV_LINKS.map((l) => l.target)).toEqual(['about', 'events', 'media', 'board']);
+  it('keeps only About us and Media beside the call to action', () => {
+    // The client's words: "remove uncessary buttons, just keep media, join us, about us".
+    // Events and Board went -- the schedule is directly under the home page's first
+    // screen, and the board lives on the About page.
+    expect(NAV_LINKS.map((l) => l.label)).toEqual(['About us', 'Media']);
+    expect(NAV_LINKS.map((l) => l.page)).toEqual(['about', 'media']);
   });
 
   it('gives every link a label', () => {
     for (const link of NAV_LINKS) expect(link.label.length).toBeGreaterThan(0);
   });
 
-  it('sends the call to action to contact', () => {
-    expect(CTA.target).toBe('contact');
+  it('sends the call to action to the Join us page', () => {
+    expect(CTA.page).toBe('join');
     expect(CTA.label).toBe('Join us');
   });
 });
 
 describe('buildNav', () => {
-  it('renders one link per entry plus the call to action', () => {
+  it('renders one link per entry plus the wordmark and the call to action', () => {
     expect(buildNav().querySelectorAll('a')).toHaveLength(NAV_LINKS.length + 2);
   });
 
@@ -38,40 +44,58 @@ describe('buildNav', () => {
     expect(nav.getAttribute('aria-label')).toBeTruthy();
   });
 
-  it('points every link at a section that actually exists', () => {
-    // A nav that scrolls nowhere is worse than no nav.
-    const content = document.getElementById('content');
-    renderSections(content);
-    const nav = buildNav();
-    document.body.prepend(nav);
-    // Scoped to buildNav()'s own element, not `document.querySelectorAll('nav a')`:
-    // the page also has a second, real <nav> (the contact section's socials landmark,
-    // src/ui/sections.js), and an unscoped query would fold its external hrefs
-    // (mailto:..., https://instagram.com/...) into this loop too -- `.slice(1)` on
-    // those produces strings like `ttps://instagram.com/violet_diabolo`, not a valid
-    // CSS id selector, which throws a SyntaxError from querySelector rather than
-    // failing the assertion cleanly.
-    const links = nav.querySelectorAll('a');
-    // A query that silently matched nothing would pass this loop vacuously.
-    expect(links.length).toBeGreaterThan(0);
-    for (const a of links) {
-      const href = a.getAttribute('href');
-      // Media leaves the home page now. A cross-page link is checked as a FILE that
-      // exists rather than as a section id — treating it as an id would have looked for
-      // an element called `.media` and failed for the wrong reason.
-      if (!href.startsWith('#')) {
-        expect(href, `${href} is neither an anchor nor a page`).toMatch(/^\.\/[\w-]+\.html(#|$)/);
-        const file = href.replace(/^\.\//, '').split('#')[0];
-        // A plain path, not `new URL(..., import.meta.url)`: under jsdom Vitest's global
-        // URL shim resolves a relative file: URL against http://localhost:3000, so
-        // existsSync() is handed an http URL and answers false for every file on disk.
-        // The same workaround is documented in ui.dom.test.js and sections-layout.
-        const abs = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', file);
-        expect(existsSync(abs), `${file} does not exist`).toBe(true);
-        continue;
+  it('points every link, on every page, at a file or an anchor that actually exists', () => {
+    // A nav that goes nowhere is worse than no nav. Checked from every page rather than
+    // the home page alone: the wordmark's href depends on which page it is built for.
+    for (const page of Object.keys(PAGES)) {
+      document.body.innerHTML = '<main id="content"></main>';
+      const content = document.getElementById('content');
+      RENDERERS[page](content);
+      const nav = buildNav({ page });
+      document.body.prepend(nav);
+      // Scoped to buildNav()'s own element: the footer's socials are a second <nav>,
+      // and folding their external hrefs in here would test the wrong thing.
+      const links = nav.querySelectorAll('a');
+      // A query that silently matched nothing would pass this loop vacuously.
+      expect(links.length).toBeGreaterThan(0);
+      for (const a of links) {
+        const href = a.getAttribute('href');
+        if (!href.startsWith('#')) {
+          expect(href, `${href} is neither an anchor nor a page`).toMatch(/^\.\/[\w-]+\.html(#|$)/);
+          const file = href.replace(/^\.\//, '').split('#')[0];
+          // A plain path, not `new URL(..., import.meta.url)`: under jsdom Vitest's global
+          // URL shim resolves a relative file: URL against http://localhost:3000, so
+          // existsSync() is handed an http URL and answers false for every file on disk.
+          // The same workaround is documented in ui.dom.test.js and sections-layout.
+          const abs = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', file);
+          expect(existsSync(abs), `${file} does not exist`).toBe(true);
+          continue;
+        }
+        const id = href.slice(1);
+        expect(content.querySelector(`#${id}`), `${page}: ${id} has no section`).not.toBeNull();
       }
-      const id = href.slice(1);
-      expect(content.querySelector(`#${id}`), `${id} has no section`).not.toBeNull();
+    }
+  });
+
+  it('marks the page you are on, and only that one', () => {
+    // The visible state is the stylesheet's (base.css, [aria-current='page']); this is
+    // the half a screen reader hears.
+    for (const page of Object.keys(PAGES)) {
+      const current = [...buildNav({ page }).querySelectorAll('[aria-current="page"]')];
+      if (page === 'home') {
+        // The home page has no button of its own -- the wordmark is the way there.
+        expect(current, 'a button claims to be the home page').toHaveLength(0);
+      } else {
+        expect(current, `${page} is marked ${current.length} times`).toHaveLength(1);
+        expect(current[0].getAttribute('href')).toBe(PAGES[page]);
+      }
+    }
+  });
+
+  it('sends the wordmark home from every other page, and to the top from home itself', () => {
+    expect(buildNav({ page: 'home' }).querySelector('.site-nav-mark').getAttribute('href')).toBe('#hero');
+    for (const page of Object.keys(PAGES).filter((p) => p !== 'home')) {
+      expect(buildNav({ page }).querySelector('.site-nav-mark').getAttribute('href')).toBe(PAGES.home);
     }
   });
 });

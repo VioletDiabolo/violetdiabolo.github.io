@@ -4,61 +4,141 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  renderSections, renderMediaPage, marqueeItem, observeMarqueeSpeed, MARQUEE_SPEED,
+  renderSections, renderAboutPage, renderMediaPage, renderJoinPage, RENDERERS, buildFooter,
+  schedule, marqueeItem, observeMarqueeSpeed, MARQUEE_SPEED,
 } from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
-import { mountMedia } from '../src/ui/media.js';
-import { mountGallery } from '../src/ui/gallery.js';
-import { mountForms } from '../src/ui/forms.js';
+import { mountMedia, MEDIA_BLOCK } from '../src/ui/media.js';
+import { formButton, formById } from '../src/ui/forms.js';
+import { PAGES, CTA } from '../src/ui/nav.js';
 import {
-  BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS, PRACTICE_PHOTOS, PERFORMED_FOR,
+  BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS, PERFORMED_FOR, PAGE_COPY, DISCORD, SOCIALS,
 } from '../src/content/index.js';
 
 beforeEach(() => { document.body.innerHTML = '<main id="content"></main>'; });
 
-describe('sections', () => {
-  it('renders every scroll section with a data-section hook', () => {
-    // Five panels, not six: media moved to its own page at the client's request.
-    renderSections(document.getElementById('content'));
-    const found = [...document.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
-    // No 'footer' entry: the standalone strip is gone and the sign-off is a line inside
-    // the contact panel, which the client asked to be treated as the footer.
-    expect(found).toEqual(['hero', 'about', 'events', 'board', 'contact']);
+/** A page rendered into a fresh <main>, as main.js renders it. */
+const rendered = (render) => { const root = document.createElement('main'); render(root); return root; };
+const sectionIds = (root) => [...root.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
+
+describe('pages', () => {
+  it('renders the home page as the first screen and the schedule, and nothing else', () => {
+    // About, Board, Contact and Media all left the home page: the board to About us at
+    // the client's request, Contact to the footer on every page, Media to its own page.
+    expect(sectionIds(rendered(renderSections))).toEqual(['hero', 'events']);
   });
 
-  it('renders the media page, with the videos and the gallery on it', () => {
-    // The other half of that move, and the reason it is asserted here rather than left
-    // implied: deleting the media panel from renderSections passes its own test whether
-    // or not anything renders the videos anywhere else.
-    const root = document.getElementById('content');
-    renderMediaPage(root);
-    const found = [...root.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
-    expect(found).toEqual(['media']);
+  it('keeps the board off the home page', () => {
+    // "Board can be in about us page so it will not appear in the default page."
+    const home = rendered(renderSections);
+    expect(home.querySelector('.board-list')).toBeNull();
+    expect(home.querySelector('[data-member]')).toBeNull();
+  });
+
+  it('renders About us: its header, then the board', () => {
+    const root = rendered(renderAboutPage);
+    expect(sectionIds(root)).toEqual(['about', 'board']);
+    expect(root.querySelector('#about h1').textContent).toBe(PAGE_COPY.about.heading);
+    expect(root.querySelector('#about .page-label').textContent).toBe(PAGE_COPY.about.label);
+    expect(root.querySelector('#about .page-lead').textContent).toBe(ABOUT.body);
+    const newest = BOARD[Object.keys(BOARD)[0]];
+    expect(root.querySelectorAll('#board [data-member]')).toHaveLength(newest.length);
+    // The select sits in the panel's head, level with its heading, not above the grid.
+    expect(root.querySelector('#board .room-head .semester-select')).not.toBeNull();
+    expect(root.querySelector('#board .room-head h2').textContent).toBe(PAGE_COPY.about.team);
+  });
+
+  it('renders Media with the videos and not one photograph', () => {
+    // "Remove images from media. Keep only the videos."
+    const root = rendered(renderMediaPage);
+    expect(sectionIds(root)).toEqual(['media', 'videos']);
     expect(root.querySelectorAll('[data-video]')).toHaveLength(MEDIA.length);
-    expect(root.querySelectorAll('[data-photo]').length).toBeGreaterThan(0);
-    // Exactly one h1-less page: the club name belongs to the home page's hero.
-    expect(root.querySelectorAll('h1')).toHaveLength(0);
+    expect(root.querySelector('picture, img, [data-photo]'), 'a photograph is back on Media')
+      .toBeNull();
+    expect(root.querySelector('#media .page-lead').textContent).toBe('Our performances and videos');
+    // No label: it would repeat the heading word for word.
+    expect(root.querySelector('#media .page-label')).toBeNull();
   });
 
-  it('puts the club name in the one and only h1', () => {
-    renderSections(document.getElementById('content'));
-    const h1s = document.querySelectorAll('h1');
-    expect(h1s).toHaveLength(1);
-    expect(h1s[0].textContent).toContain(SITE.name);
+  it('gives the videos a heading for the outline, and keeps it off the screen', () => {
+    // h1, then each video's h3, would skip a level; the page header already says what
+    // the list is, so the h2 is there for a screen reader's outline and nobody else.
+    const heading = rendered(renderMediaPage).querySelector('#videos h2');
+    expect(heading).not.toBeNull();
+    expect(heading.className).toBe('visually-hidden');
+    expect(heading.textContent).toBe(PAGE_COPY.media.videos);
+  });
+
+  it('renders Join us: its header, the practices, then every way in', () => {
+    const root = rendered(renderJoinPage);
+    expect(sectionIds(root)).toEqual(['join', 'practices', 'get-involved']);
+    expect(root.querySelector('#join h1').textContent).toBe(PAGE_COPY.join.heading);
+    expect(root.querySelectorAll('#practices .schedule-sessions li')).toHaveLength(EVENTS.sessions.length);
+  });
+
+  it('puts one h1 on every page, and the club name in the home page\'s', () => {
+    for (const [page, render] of Object.entries(RENDERERS)) {
+      const h1s = rendered(render).querySelectorAll('h1');
+      expect(h1s, `${page} has ${h1s.length} h1s`).toHaveLength(1);
+    }
+    expect(rendered(renderSections).querySelector('h1').textContent).toContain(SITE.name);
+  });
+
+  it('has a renderer for every page the nav links to, and no other', () => {
+    // A page file with no renderer boots into the home page (main.js); a renderer with no
+    // page file is unreachable. Either way the two lists disagree.
+    expect(Object.keys(RENDERERS).sort()).toEqual(Object.keys(PAGES).sort());
   });
 });
 
-describe('contact', () => {
-  it('exposes its social links as a labelled nav landmark', () => {
+describe('the footer', () => {
+  it('is a real <footer>, on glass, so it is a landmark and its links have a floor', () => {
+    const footer = buildFooter();
+    expect(footer.tagName).toBe('FOOTER');
+    expect(footer.dataset.surface).toBe('glass');
+  });
+
+  it('exposes its social links as a labelled nav landmark, Discord among them', () => {
     // Regression guard: this landmark was briefly a <div role="navigation">, which maps
     // to the same accessible role but is a single attribute nothing asserted -- a typo
     // or an edit that dropped it would silently demote the landmark with a green suite.
     // A real <nav> can't be lost that quietly.
-    renderSections(document.getElementById('content'));
-    const contact = document.querySelector('[data-section="contact"]');
-    const socials = contact.querySelector('.socials');
+    const socials = buildFooter().querySelector('.socials');
     expect(socials.tagName, 'the socials landmark is no longer a real <nav>').toBe('NAV');
     expect(socials.getAttribute('aria-label'), 'socials nav has no accessible name').toBeTruthy();
+    const hrefs = [...socials.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(SOCIALS.map((s) => s.href));
+    expect(hrefs).toContain(DISCORD);
+    // Every icon link keeps its name in text, off screen, for the screen reader.
+    for (const a of socials.querySelectorAll('a')) expect(a.textContent.trim().length).toBeGreaterThan(0);
+  });
+
+  it('carries the address and the Linktree, and no sentence round them', () => {
+    // Contact was a panel with a paragraph ("Reach out to ... — also see our ..."); the
+    // client asked for it compacted into a footer, so it is two links now.
+    const contact = buildFooter().querySelector('.footer-contact');
+    const links = [...contact.querySelectorAll('a')];
+    expect(links.map((a) => a.getAttribute('href'))).toEqual([`mailto:${CONTACT.email}`, CONTACT.linktree]);
+    expect(links[0].textContent).toBe(CONTACT.email);
+    expect(contact.textContent.replace(/\s+/g, ''), 'there is copy between the links again')
+      .toBe(`${CONTACT.email}Linktree`);
+  });
+
+  it('signs off with the club name and a computed year, as its last line', () => {
+    const footer = buildFooter();
+    const line = footer.querySelector('.footer-line');
+    expect(line, 'no sign-off').not.toBeNull();
+    expect(line.textContent).toBe(`${SITE.name} ${new Date().getFullYear()}`);
+    expect(footer.lastElementChild).toBe(line);
+  });
+
+  it('is on no page body a renderer builds, because main.js mounts it after <main>', () => {
+    // A <footer> nested in <main> is not the page's contentinfo landmark. The renderers
+    // build the content; the footer is the boot's to place (tests/main.dom.test.js).
+    for (const [page, render] of Object.entries(RENDERERS)) {
+      expect(rendered(render).querySelector('footer, .footer-line'), `${page} renders its own footer`)
+        .toBeNull();
+    }
   });
 });
 
@@ -151,6 +231,35 @@ describe('board', () => {
     expect(slot.querySelector('img')).toBeNull();
   });
 
+  it('ends the current board with a way in, and no older board', () => {
+    // The client's reference ends its team grid with a dashed "+" card. It links to Join
+    // us, and it is not a member: every count of [data-member] still counts people.
+    const el = document.getElementById('content');
+    mountBoard(el);
+    const cards = el.querySelector('.board-list').children;
+    const last = cards[cards.length - 1];
+    expect(last.classList.contains('board-join'), 'the current board does not end on the way in').toBe(true);
+    expect(last.getAttribute('href')).toBe(PAGES.join);
+    expect(last.textContent).toBe(`+${CTA.label}`);
+    expect(last.dataset.member).toBeUndefined();
+    // The plus is decoration; the link's name is the label beside it.
+    expect(last.querySelector('.board-join-tile').getAttribute('aria-hidden')).toBe('true');
+
+    const select = el.querySelector('select');
+    select.value = Object.keys(BOARD).at(-1);
+    select.dispatchEvent(new Event('change'));
+    expect(el.querySelector('.board-join'), 'an old board invites people to join it').toBeNull();
+  });
+
+  it('seats the select wherever it is told to, and the grid where it is mounted', () => {
+    const grid = document.createElement('div');
+    const controls = document.createElement('div');
+    mountBoard(grid, { controls });
+    expect(controls.querySelector('.semester-select')).not.toBeNull();
+    expect(grid.querySelector('.semester-select')).toBeNull();
+    expect(grid.querySelector('.board-list')).not.toBeNull();
+  });
+
   it('renders a seated member whose photograph has not arrived, without an img', () => {
     // A distinct case from the open slot above, and new with the Fall 2026 board: a real
     // person holding a real role whose photo is not in public/images yet. The card must
@@ -199,6 +308,24 @@ describe('media facades', () => {
     expect(el.querySelector('iframe').src).toContain('youtube-nocookie.com');
   });
 
+  it('runs the videos in blocks of five that alternate which side leads', () => {
+    // The client's reference: one large video and four small, then the next five with the
+    // large one on the right. The lead of a right-led block is its LAST card, which is
+    // what keeps reading order and tab order running the same way in both.
+    const el = document.getElementById('content');
+    mountMedia(el);
+    const blocks = [...el.querySelectorAll('.media-block')];
+    expect(blocks).toHaveLength(Math.ceil(MEDIA.length / MEDIA_BLOCK));
+    expect(blocks.map((b) => b.dataset.lead)).toEqual(['left', 'right']);
+    for (const [i, block] of blocks.entries()) {
+      const ids = [...block.children].map((c) => c.dataset.video);
+      expect(ids).toEqual(MEDIA.slice(i * MEDIA_BLOCK, (i + 1) * MEDIA_BLOCK).map((m) => m.youtubeId));
+    }
+    // The order across the page is still the content's order, block after block.
+    expect([...el.querySelectorAll('[data-video]')].map((c) => c.dataset.video))
+      .toEqual(MEDIA.map((m) => m.youtubeId));
+  });
+
   it('keeps focus on the embed rather than dropping it to the body', () => {
     const el = document.getElementById('content');
     mountMedia(el);
@@ -210,77 +337,110 @@ describe('media facades', () => {
 });
 
 describe('form facades', () => {
-  it('renders one facade per form and loads no iframe up front', () => {
-    const el = document.getElementById('content');
-    mountForms(el);
-    expect(el.querySelectorAll('[data-form]')).toHaveLength(FORMS.length);
-    expect(el.querySelectorAll('iframe')).toHaveLength(0);
+  it('renders one facade per form on the Join us page and loads no iframe up front', () => {
+    const root = rendered(renderJoinPage);
+    expect(root.querySelectorAll('.join-card[data-form]')).toHaveLength(FORMS.length);
+    expect(root.querySelectorAll('iframe')).toHaveLength(0);
   });
 
   it('swaps in an iframe only once the facade is activated', () => {
     const el = document.getElementById('content');
-    mountForms(el);
-    el.querySelector('[data-form] button').click();
+    el.append(formButton(formById('interest')));
+    el.querySelector('button[data-form]').click();
     const frame = el.querySelector('iframe');
     expect(frame).not.toBeNull();
-    expect(frame.src).toContain('docs.google.com/forms');
+    expect(frame.src).toBe(formById('interest').url);
+    expect(frame.title).toBe(formById('interest').title);
   });
 
   it('keeps focus on the embed rather than dropping it to the body', () => {
     const el = document.getElementById('content');
-    mountForms(el);
-    const button = el.querySelector('[data-form] button');
+    el.append(formButton(formById('request')));
+    const button = el.querySelector('button[data-form]');
     button.focus();
     button.click();
     expect(document.activeElement.tagName).toBe('IFRAME');
   });
-});
 
-describe('the sign-off', () => {
-  it('closes each page inside its LAST panel, with the club name and a computed year', () => {
-    // It was a standalone <footer> after the contact panel. Between that panel's own
-    // bottom gap and the strip's padding the page ended on most of a screen of gradient,
-    // so the line moved inside and the strip went. Asserted per page: the media page has
-    // no contact panel, and a sign-off that only ever landed on the home page would
-    // leave that one ending on nothing.
-    for (const [render, lastPanel] of [[renderSections, 'contact'], [renderMediaPage, 'media']]) {
-      const root = document.createElement('main');
-      render(root);
-      expect(root.querySelector('[data-section="footer"]'),
-        'the standalone footer strip is back').toBeNull();
-
-      const line = root.querySelector('.footer-line');
-      expect(line, 'no sign-off on this page at all').not.toBeNull();
-      expect(line.textContent).toContain(SITE.name);
-      expect(line.textContent).toContain(String(new Date().getFullYear()));
-
-      // Inside the last panel, and the last thing in it.
-      const panels = [...root.querySelectorAll('[data-section]')];
-      expect(panels.at(-1).dataset.section).toBe(lastPanel);
-      expect(line.closest('[data-section]')).toBe(panels.at(-1));
-      expect(line.parentElement.lastElementChild).toBe(line);
-    }
+  it('refuses an id FORMS does not have, rather than rendering a card with nothing in it', () => {
+    expect(() => formById('newsletter')).toThrow(/newsletter/);
   });
 });
 
-describe('section photographs', () => {
-  it('renders the about and contact photos as real <picture> elements with avif/webp sources and alt text', () => {
-    renderSections(document.getElementById('content'));
-    for (const id of ['about', 'contact']) {
-      const el = document.querySelector(`[data-section="${id}"]`);
-      const picture = el.querySelector('picture');
-      expect(picture, `[data-section="${id}"] has no <picture>`).not.toBeNull();
-      expect(picture.querySelectorAll('source[type="image/avif"]').length).toBeGreaterThan(0);
-      expect(picture.querySelectorAll('source[type="image/webp"]').length).toBeGreaterThan(0);
-      const img = picture.querySelector('img');
-      expect(img).not.toBeNull();
-      expect(img.alt.length).toBeGreaterThan(0);
+describe('the Join us page', () => {
+  it('puts the interest form first and the booking request last, with the Discord between', () => {
+    const cards = [...rendered(renderJoinPage).querySelectorAll('.join-ways > .join-card')];
+    expect(cards.map((c) => c.dataset.form ?? c.dataset.link)).toEqual(['interest', 'discord', 'request']);
+    expect(cards.map((c) => c.querySelector('h3').textContent)).toEqual([
+      formById('interest').title, PAGE_COPY.join.discord.title, formById('request').title,
+    ]);
+  });
+
+  it('links the Discord out, in a new tab and without a referrer', () => {
+    const link = rendered(renderJoinPage).querySelector('[data-link="discord"] a');
+    expect(link.getAttribute('href')).toBe(DISCORD);
+    expect(link.target).toBe('_blank');
+    expect(link.rel).toBe('noreferrer');
+    expect(link.textContent).toBe(PAGE_COPY.join.discord.action);
+  });
+});
+
+describe('the practice schedule', () => {
+  it('lists each practice as a bullet, with the time in bold and the place marked', () => {
+    // The client: "in bullet points and bold/highlight important dates/locations".
+    const items = [...schedule().querySelectorAll('.schedule-sessions > li')];
+    expect(items).toHaveLength(EVENTS.sessions.length);
+    for (const [i, li] of items.entries()) {
+      const session = EVENTS.sessions[i];
+      expect(li.querySelector('strong').textContent).toBe(`${session.day}, ${session.time}`);
+      expect(li.querySelector('mark').textContent).toBe(session.place);
+      expect(li.textContent).toBe(`${session.day}, ${session.time} ${session.at} ${session.place}`);
     }
+  });
+
+  it('keeps the notes as bullets of their own, under the practices', () => {
+    const notes = [...schedule().querySelectorAll('.schedule-notes > li')].map((li) => li.textContent);
+    expect(notes).toEqual([...EVENTS.notes]);
+  });
+
+  it('states each practice once per page, on both pages that show it', () => {
+    // One source (EVENTS) rendered on two pages, and once on each: two copies of the
+    // times on one page is how they drifted apart in the first place.
+    for (const [render, where] of [[renderSections, '#events'], [renderJoinPage, '#practices']]) {
+      const root = rendered(render);
+      for (const fact of ['Kimmel', 'Sylvette', '3–5 PM', '5–7 PM']) {
+        const holders = [...root.querySelectorAll('*')].filter((el) =>
+          [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.includes(fact)));
+        expect(holders.length, `"${fact}" appears in ${holders.length} places, not 1`).toBe(1);
+        expect(holders[0].closest(where), `"${fact}" is outside ${where}`).not.toBeNull();
+      }
+    }
+  });
+
+  it('sends the home page on to Join us, where the forms went', () => {
+    const link = rendered(renderSections).querySelector('#events a.button');
+    expect(link, 'the events panel has no way on to Join us').not.toBeNull();
+    expect(link.getAttribute('href')).toBe(PAGES.join);
+    expect(link.textContent).toBe(CTA.label);
+    expect(rendered(renderSections).querySelector('[data-form], iframe'), 'a form is back on the home page')
+      .toBeNull();
   });
 });
 
 describe('the performed-for marquee', () => {
   const render = () => { const root = document.createElement('main'); renderSections(root); return root; };
+
+  it('sits on the first screen, directly under the wordmark and the photograph', () => {
+    // "Move the marquee so that it is immediately visible. So it should be directly under
+    // the image and violet diabolo text." It is the hero's last row, not a panel after it.
+    const strip = render().querySelector('.marquee');
+    expect(strip.closest('[data-section]').dataset.section).toBe('hero');
+    const room = strip.closest('.room');
+    expect(room.lastElementChild).toBe(strip);
+    expect([...room.children].map((c) => c.className)).toEqual(['room-head', 'room-body', 'marquee']);
+    // Its own band of glass: the hero under it is bare gradient.
+    expect(strip.dataset.surface).toBe('glass');
+  });
 
   it('runs the list twice, and hides the copy from assistive tech', () => {
     // The loop is two identical tracks translated by -50%; the duplicate is what makes
@@ -362,57 +522,15 @@ describe('the hero and events photographs', () => {
     expect(img.getAttribute('loading')).toBe('lazy');
   });
 
-  it('states the practice times once, in the events panel and nowhere else', () => {
-    // The hero used to carry a card restating them, which is why a guard existed to keep
-    // the two in step. The card is gone; this is the invariant that replaces it, and it
-    // is the stronger one — two places to edit is how they drifted in the first place.
+  it('renders both as real <picture> elements, with AVIF and WebP sources and alt text', () => {
     const root = render();
-    for (const fact of ['Kimmel', 'Sylvette', '3-5PM', '5-7PM']) {
-      const holders = [...root.querySelectorAll('*')].filter((el) =>
-        [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.includes(fact)));
-      expect(holders.length, `"${fact}" appears in ${holders.length} places, not 1`).toBe(1);
-      expect(holders[0].closest('#events'), `"${fact}" is outside the events panel`).not.toBeNull();
+    for (const id of ['hero', 'events']) {
+      const picture = root.querySelector(`#${id} picture`);
+      expect(picture, `#${id} has no <picture>`).not.toBeNull();
+      expect(picture.querySelectorAll('source[type="image/avif"]').length).toBeGreaterThan(0);
+      expect(picture.querySelectorAll('source[type="image/webp"]').length).toBeGreaterThan(0);
+      expect(picture.querySelector('img').alt.length).toBeGreaterThan(0);
     }
-    expect(root.querySelector('.teaser'), 'the hero teaser card is still being rendered').toBeNull();
-  });
-});
-
-describe('practice gallery', () => {
-  it('renders one cell per photograph, each with an AVIF and a WebP source', () => {
-    const el = document.getElementById('content');
-    mountGallery(el);
-    const cells = el.querySelectorAll('[data-photo]');
-    expect(cells).toHaveLength(PRACTICE_PHOTOS.photos.length);
-    for (const cell of cells) {
-      const types = [...cell.querySelectorAll('source')].map((x) => x.type);
-      expect(types).toEqual(['image/avif', 'image/webp']);
-    }
-  });
-
-  it('reserves each cell before the bytes land', () => {
-    // The defect this exists for is documented at the top of sections.css: buildPicture
-    // sets no intrinsic size by default, so with `height: auto` a cell computes to ZERO
-    // height until its picture loads and everything below it jumps. Measured there at
-    // 256px of shift on the contact panel. The about and contact photographs are fixed
-    // by a per-section aspect-ratio in CSS; these six cannot be, because they are two
-    // different shapes, so the size rides on the img's own attributes instead.
-    const el = document.getElementById('content');
-    mountGallery(el);
-    for (const cell of el.querySelectorAll('[data-photo]')) {
-      const img = cell.querySelector('img');
-      const declared = PRACTICE_PHOTOS.photos.find((p) => p.base === cell.dataset.photo);
-      expect(img.getAttribute('width'), `${cell.dataset.photo} has no width attribute`)
-        .toBe(String(declared.width));
-      expect(img.getAttribute('height')).toBe(String(declared.height));
-    }
-  });
-
-  it('carries both portrait and landscape cells, which is why no ratio is shared', () => {
-    // The non-vacuity control for the rule above. If every photograph were the same
-    // shape, a single CSS aspect-ratio would be the simpler answer and the attribute
-    // plumbing would be dead weight -- this fails the moment that becomes true.
-    const shapes = new Set(PRACTICE_PHOTOS.photos.map((p) => (p.width > p.height ? 'wide' : 'tall')));
-    expect([...shapes].sort()).toEqual(['tall', 'wide']);
   });
 });
 
@@ -424,11 +542,19 @@ describe('content boundary', () => {
     const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/ui/');
     const forbidden = [
       SITE.name, SITE.tagline, CONTACT.email,
-      ABOUT.body.slice(0, 60), EVENTS.body.slice(0, 60),
+      ABOUT.body.slice(0, 60), EVENTS.intro,
+      ...EVENTS.sessions.map((s) => s.place), ...EVENTS.notes,
+      PAGE_COPY.about.heading, PAGE_COPY.media.lead, PAGE_COPY.join.heading, PAGE_COPY.join.lead,
+      PAGE_COPY.join.discord.action,
       ...MEDIA.map((m) => m.name),
     ];
     for (const file of readdirSync(dir)) {
-      const source = readFileSync(path.join(dir, file), 'utf8');
+      // Code only. The comments quote the client's own words to explain a decision --
+      // the sentence the schedule used to be, the line Media's lead replaced -- and a
+      // quotation in a comment is the opposite of copy baked into the markup.
+      const source = readFileSync(path.join(dir, file), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|\s)\/\/.*$/gm, '$1');
       for (const literal of forbidden) {
         expect(source, `src/ui/${file} hardcodes club copy: "${literal}"`).not.toContain(literal);
       }

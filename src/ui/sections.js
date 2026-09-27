@@ -1,20 +1,25 @@
 import {
-  SITE, ABOUT, EVENTS, CONTACT, SOCIALS, SECTION_HEADINGS, PHOTOS, MEDIA_INTRO,
+  SITE, EVENTS, CONTACT, SOCIALS, PHOTOS, PAGE_COPY, PERFORMED_FOR, DISCORD,
 } from '../content/index.js';
 import { mountBoard } from './board.js';
 import { mountMedia } from './media.js';
-import { mountGallery } from './gallery.js';
 import { buildIcon } from './icons.js';
-import { PERFORMED_FOR } from '../content/index.js';
-import { mountForms } from './forms.js';
+import { formButton, formById } from './forms.js';
 import { buildPicture } from './picture.js';
+import { CTA, hrefFor } from './nav.js';
 
 /**
  * Every section is a self-contained PANEL, described by two attributes rather than a
- * place in a scroll choreography: `data-panel` names the LAYOUT (hero/story/feature/
- * grid), `data-surface` names the MATERIAL (solid/glass — whether the animated gradient
- * behind the page shows through). The hero carries no surface: the gradient itself is
- * the hero, so there is nothing to plate it against.
+ * place in a scroll choreography: `data-panel` names the LAYOUT, `data-surface` names the
+ * MATERIAL. There is one material now -- glass, which lets the gradient show through --
+ * and the panels that carry none sit on the gradient itself.
+ *
+ *   hero     the home page's first screen: the wordmark, the photograph, and the
+ *            performed-for marquee directly under both. No surface.
+ *   feature  the home page's events panel: the schedule beside a photograph. Glass.
+ *   header   a sub-page's opening: a label, a heading and a lead, centred. No surface.
+ *   plate    a sub-page's content at full width -- the board, the videos, the ways to
+ *            join. Glass.
  *
  * Every panel is still the same two boxes arranged differently:
  *
@@ -22,16 +27,8 @@ import { buildPicture } from './picture.js';
  *                                                    <div class="room-head"> ...text...
  *                                                    <div class="room-body"> ...everything else...
  *
- * The four patterns in src/styles/sections.css are nothing but four arrangements of that
- * pair, which is the whole reason the wrapper exists. The flat heading/paragraph/list
- * structure this replaces could not express any of them: a sticky text column standing
- * beside a scrolling column of cards needs the two to be SIBLINGS in a two-track grid,
- * and a composition pinned for the length of a multi-screen section needs one box to pin
- * rather than three that each stick at a separately guessed offset and drift apart as the
- * heading rewraps. `.room` is also the single reveal unit per section (src/ui/reveal.js).
- *
- * data-section, data-panel, data-surface, the id and the class all stay on the <section>
- * itself: the nav's hrefs (src/ui/nav.js) key off the same id they always did.
+ * The patterns in src/styles/sections.css are nothing but arrangements of that pair.
+ * `.room` is also the single reveal unit per section (src/ui/reveal.js).
  */
 function section(id, headingText, panel, surface, level = 'h2') {
   const el = document.createElement('section');
@@ -59,9 +56,10 @@ function section(id, headingText, panel, surface, level = 'h2') {
   return { el, room: inner, head, body };
 }
 
-function paragraph(text) {
+function paragraph(text, className) {
   const p = document.createElement('p');
   p.textContent = text;
+  if (className) p.className = className;
   return p;
 }
 
@@ -72,44 +70,158 @@ function figure(photo, sizes, loading) {
   return fig;
 }
 
+/** A link styled as the page's filled control, for a place that is not a form. */
+function buttonLink(href, label, { external = false } = {}) {
+  const a = document.createElement('a');
+  a.className = 'button';
+  a.href = href;
+  if (external) {
+    a.rel = 'noreferrer';
+    a.target = '_blank';
+  }
+  a.append(label);
+  return a;
+}
+
 /**
- * The club name and the year, as the last line INSIDE the last panel.
+ * A sub-page's opening, after the client's team-page reference: a small label, a
+ * statement heading, one line of lead, centred on the bare gradient.
  *
- * There is no standalone <footer> any more. It was a full-bleed strip after the contact
- * panel with one line in it, and between the panel's own bottom gap and the strip's
- * padding the page ended on a screenful of gradient -- "remove the whitespace from the
- * bottom entirely, treat Contact us as a footer". So the sign-off moved inside, the last
- * panel loses its trailing gap (sections.css), and the page now ends on the plate.
+ * The page's only h1. The label is optional -- Media has none, because it would repeat
+ * the heading word for word -- and so is the lead. The body box goes: a header has
+ * nothing but reading text, and an empty box is one more thing for a layout rule to
+ * size by accident.
+ */
+function pageHeader(id, { label, heading, lead }) {
+  const header = section(id, heading, 'header', undefined, 'h1');
+  if (label) header.head.prepend(paragraph(label, 'page-label'));
+  if (lead) header.head.append(paragraph(lead, 'page-lead'));
+  header.body.remove();
+  return header;
+}
+
+/**
+ * The practice schedule, as a list.
  *
- * Appended to `.room` rather than to head or body: it spans both of a grid panel's
- * columns, which neither of those can do from inside one of them.
+ * It was one sentence -- "Two practices a week: Sundays 3-5PM in Kimmel Center, Room 606,
+ * and Fridays 5-7PM outdoors at the Bust of Sylvette..." -- and the client asked for it
+ * as bullets with the dates and places standing out. The day and time are <strong>, the
+ * place is a <mark>: two different emphases because they answer two different questions
+ * (when, and where), and a visitor scanning for one should not have to read the other.
+ *
+ * Rendered from EVENTS on both pages that show it -- the home page's events panel and the
+ * Join us page -- so the two cannot drift.
+ */
+export function schedule() {
+  const wrap = document.createElement('div');
+  wrap.className = 'schedule';
+
+  const sessions = document.createElement('ul');
+  sessions.className = 'schedule-sessions';
+  for (const session of EVENTS.sessions) {
+    const li = document.createElement('li');
+    const when = document.createElement('strong');
+    when.textContent = `${session.day}, ${session.time}`;
+    const where = document.createElement('mark');
+    where.textContent = session.place;
+    li.append(when, ` ${session.at} `, where);
+    sessions.append(li);
+  }
+
+  const notes = document.createElement('ul');
+  notes.className = 'schedule-notes';
+  for (const note of EVENTS.notes) {
+    const li = document.createElement('li');
+    li.textContent = note;
+    notes.append(li);
+  }
+
+  wrap.append(paragraph(EVENTS.intro, 'schedule-intro'), sessions, notes);
+  return wrap;
+}
+
+/**
+ * The club name and the year: the last line of every page.
+ *
+ * Computed at render time, never hardcoded.
  */
 function signoff() {
   const line = document.createElement('p');
   line.className = 'footer-line';
-  // Computed at render time, never hardcoded.
   line.textContent = `${SITE.name} ${new Date().getFullYear()}`;
   return line;
 }
 
 /**
- * The media page's own body. Same nav, same gradient, same panel vocabulary — the videos
- * and the practice gallery simply have a page to themselves instead of a panel at the
- * bottom of the home page, at the client's request.
+ * The socials, as a labelled landmark of icon links.
  *
- * Not a second entry point: index.html and media.html both load src/main.js and differ
- * only by `data-page` on <body>. The boot sequence in main.js is load-bearing (content
- * before any graphics branch, the reduced-motion return, the no-IntersectionObserver
- * guard) and a second copy of it is a second thing to get wrong.
+ * The label is always in the DOM, never replaced by the mark: it is the link's accessible
+ * name. `.visually-hidden` takes it off the screen without taking it out of the
+ * accessibility tree, and it comes back as visible text if the icon is ever missing
+ * (buildIcon returns null), so a link can never end up with no name at all.
  */
-export function renderMediaPage(root) {
-  const media = section('media', SECTION_HEADINGS.media, 'page', 'solid');
-  media.head.append(paragraph(MEDIA_INTRO));
-  mountMedia(media.body);
-  mountGallery(media.body);
-  media.room.append(signoff());
+function socialLinks() {
+  const socials = document.createElement('nav');
+  socials.className = 'socials';
+  socials.setAttribute('aria-label', 'Social links');
+  for (const s of SOCIALS) {
+    const a = document.createElement('a');
+    a.href = s.href;
+    a.rel = 'noreferrer';
+    a.target = '_blank';
+    const mark = buildIcon(s.icon);
+    if (mark) a.append(mark);
+    const label = document.createElement('span');
+    label.className = mark ? 'visually-hidden' : '';
+    label.textContent = s.label;
+    a.append(label);
+    if (mark) a.title = s.label;
+    socials.append(a);
+  }
+  return socials;
+}
 
-  root.replaceChildren(media.el);
+/**
+ * The footer: what the Contact panel became, on every page.
+ *
+ * The client asked for Contact to be compacted into "more of a footer". It was a
+ * two-column panel -- a sentence and the socials on the left, a photograph on the right,
+ * and the sign-off under the LEFT column only, which is why its hairline stopped a third
+ * of the way across the page and its text centred on nothing in particular. Now it is one
+ * centred column at the full width of the page: the socials, the address and the
+ * Linktree, then the sign-off under a hairline that runs the whole way.
+ *
+ * A real <footer> OUTSIDE <main> (src/main.js mounts it), so it is the page's contentinfo
+ * landmark; inside <main> it would be an anonymous box. Glass, because the address and
+ * the Linktree are --accent links, and an accent link on the bare gradient measures
+ * 2.06:1 against the brightest pixel the shader can draw.
+ */
+export function buildFooter() {
+  const footer = document.createElement('footer');
+  footer.className = 'site-footer';
+  footer.dataset.surface = 'glass';
+
+  const mail = document.createElement('a');
+  mail.href = `mailto:${CONTACT.email}`;
+  mail.textContent = CONTACT.email;
+  const linktree = document.createElement('a');
+  linktree.href = CONTACT.linktree;
+  linktree.textContent = 'Linktree';
+  linktree.rel = 'noreferrer';
+  linktree.target = '_blank';
+
+  // A list, so the separator between the two is drawn by the stylesheet rather than
+  // spoken: a middle dot in the text is read out as "dot" by some screen readers.
+  const contact = document.createElement('ul');
+  contact.className = 'footer-contact';
+  for (const link of [mail, linktree]) {
+    const li = document.createElement('li');
+    li.append(link);
+    contact.append(li);
+  }
+
+  footer.append(socialLinks(), contact, signoff());
+  return footer;
 }
 
 /**
@@ -160,10 +272,8 @@ export function observeMarqueeSpeed(strip) {
 /**
  * One chip in the marquee: a mark if the organisation has given us one, its name if not.
  *
- * Exported for the tests, and that is the whole reason it is a named function. Every
- * entry in PERFORMED_FOR is name-only today, so the logo branch is unreachable from
- * renderSections — code that ships untested until the first logo lands, which is exactly
- * when nobody is looking. A test can call this directly with a synthetic entry.
+ * Exported for the tests, so both branches can be driven with a synthetic entry rather
+ * than depending on which organisations happen to have a mark today.
  */
 export function marqueeItem(org) {
   const li = document.createElement('li');
@@ -179,7 +289,7 @@ export function marqueeItem(org) {
   }
   // The name always renders, logo or not. A mark is an addition beside it, never a
   // replacement for it, so a chip nobody could find artwork for still reads — and the
-  // strip does not look half-finished because eight of eighteen came up empty.
+  // strip does not look half-finished because four of eighteen came up empty.
   const name = document.createElement('span');
   name.className = 'marquee-name';
   name.textContent = org.name;
@@ -195,14 +305,19 @@ export function marqueeItem(org) {
  * loop has no seam. That is why `aria-hidden` is on the copy and not on both: a screen
  * reader should hear the list once, and a keyboard user should never tab into a duplicate.
  *
- * It is a <ul>, so what is announced is a list of seven organisations rather than one
- * run-on line, and it stops on `prefers-reduced-motion` (src/styles/sections.css) — a
- * loop that cannot be paused is the accessibility complaint this pattern usually earns.
+ * It is a <ul>, so what is announced is a list of organisations rather than one run-on
+ * line, and it stops on `prefers-reduced-motion` (src/styles/sections.css) — a loop that
+ * cannot be paused is the accessibility complaint this pattern usually earns.
+ *
+ * Glass, a band of its own. It moved out of the About panel's tinted glass onto the
+ * hero, which is bare gradient -- where --ink-dim names and marks chosen against a dark
+ * panel would both be at the mercy of whichever ribbon passed behind them.
  */
 function marquee() {
   const strip = document.createElement('div');
   strip.className = 'marquee';
   strip.dataset.marquee = 'performed-for';
+  strip.dataset.surface = 'glass';
 
   const track = document.createElement('div');
   track.className = 'marquee-track';
@@ -223,78 +338,127 @@ function marquee() {
   return strip;
 }
 
+/**
+ * The home page: the first screen, then the practice schedule.
+ *
+ * The marquee is the last thing inside the hero rather than a panel of its own, which is
+ * what puts it on the first screen: the hero is a screen tall and ends on it, directly
+ * under the wordmark and the photograph, at the client's request ("immediately visible").
+ * A panel after the hero would start a screen down, wherever the hero happened to end.
+ */
 export function renderSections(root) {
   const hero = section('hero', SITE.name, 'hero', undefined, 'h1');
   hero.head.append(paragraph(SITE.tagline));
-  // 'eager', unlike every other photograph on the page: this one is above the fold, and
+  // 'eager', unlike every other photograph on the site: this one is above the fold, and
   // buildPicture defaults to lazy, which would leave the first screen half empty while
   // the browser decided it was needed after all.
   hero.body.append(figure(PHOTOS.hero, '(max-width: 767px) 92vw, 46vw', 'eager'));
+  hero.room.append(marquee());
 
-  const about = section('about', ABOUT.heading, 'story', 'glass');
-  about.head.append(paragraph(ABOUT.body));
-  about.body.append(figure(PHOTOS.group, '(max-width: 900px) 92vw, 46vw', 'lazy'));
-  about.room.append(marquee());
-
-  // The copy and both form buttons go in the HEAD, which is the left column; the body
-  // holds nothing but the photograph. Before this the head was the heading alone and
-  // everything else sat in the right column, leaving the bottom-left quadrant of a
-  // full-screen panel empty — the "unnecessary white space on the left side" the client
-  // photographed.
+  // Everything you read on the left, the photograph on the right. The forms that used to
+  // sit here moved to the Join us page; the button that replaces them goes there too, and
+  // is the nav's own call to action so the two cannot point different ways.
   const events = section('events', EVENTS.heading, 'feature', 'glass');
-  events.head.append(paragraph(EVENTS.body));
-  mountForms(events.head);
+  events.head.append(schedule(), buttonLink(hrefFor(CTA), CTA.label));
   events.body.append(figure(PHOTOS.events, '(max-width: 767px) 92vw, 34vw', 'lazy'));
 
-  const board = section('board', SECTION_HEADINGS.board, 'grid', 'solid');
-  mountBoard(board.body);
-
-  // Solid, not glass. Contact is the page's practical endpoint -- an address, the
-  // socials and a photograph -- and closing on a plate before the footer releases back to
-  // bare gradient is a firmer ending than fading out through a translucent panel. The
-  // surface map and the reasoning for each entry are at the top of src/styles/sections.css.
-  const contact = section('contact', SECTION_HEADINGS.contact, 'grid', 'solid');
-  const mail = document.createElement('a');
-  mail.href = `mailto:${CONTACT.email}`;
-  mail.textContent = CONTACT.email;
-  const linktree = document.createElement('a');
-  linktree.href = CONTACT.linktree;
-  linktree.textContent = 'Linktree';
-  linktree.rel = 'noreferrer';
-  linktree.target = '_blank';
-
-  const contactLine = document.createElement('p');
-  contactLine.append('Reach out to ', mail, ' — also see our ', linktree, '.');
-  contact.head.append(contactLine);
-
-  const socials = document.createElement('nav');
-  socials.className = 'socials';
-  socials.setAttribute('aria-label', 'Social links');
-  for (const s of SOCIALS) {
-    const a = document.createElement('a');
-    a.href = s.href;
-    a.rel = 'noreferrer';
-    a.target = '_blank';
-    const mark = buildIcon(s.icon);
-    if (mark) a.append(mark);
-    // The label is always in the DOM, never replaced by the mark: it is the link's
-    // accessible name. `.visually-hidden` takes it off the screen without taking it out
-    // of the accessibility tree, and it comes back as visible text if the icon is ever
-    // missing (buildIcon returns null), so a link can never end up with no name at all.
-    const label = document.createElement('span');
-    label.className = mark ? 'visually-hidden' : '';
-    label.textContent = s.label;
-    a.append(label);
-    if (mark) a.title = s.label;
-    socials.append(a);
-  }
-  // Socials belong with the sign-off in the text column, not out among the pictures:
-  // they are the same act (here is how to reach us), and split across two columns they
-  // read as an unrelated strip of links.
-  contact.head.append(socials);
-  contact.body.append(figure(PHOTOS.wide, '(max-width: 900px) 92vw, 46vw'));
-
-  contact.room.append(signoff());
-
-  root.replaceChildren(hero.el, about.el, events.el, board.el, contact.el);
+  root.replaceChildren(hero.el, events.el);
 }
+
+/**
+ * About us: the club's account of itself as the page lead, then the board.
+ *
+ * The board moved here from the home page at the client's request ("Board can be in
+ * about us page so it will not appear in the default page"), laid out after the team
+ * page they pointed at: four cards across, name, role and bio, and a dashed card at the
+ * end that is the way in (src/ui/board.js).
+ */
+export function renderAboutPage(root) {
+  const copy = PAGE_COPY.about;
+  const header = pageHeader('about', copy);
+  const board = section('board', copy.team, 'plate', 'glass');
+  mountBoard(board.body, { controls: board.head });
+  root.replaceChildren(header.el, board.el);
+}
+
+/**
+ * Media: the videos, and only the videos. The practice gallery that shared this page went
+ * at the client's request; the ten videos run in blocks of five that alternate which side
+ * their lead sits on (src/ui/media.js).
+ *
+ * The videos' h2 is for the outline and is not shown: without it the page would go h1,
+ * then straight to each video's h3, and the header above already says what the list is.
+ */
+export function renderMediaPage(root) {
+  const copy = PAGE_COPY.media;
+  const header = pageHeader('media', copy);
+  const videos = section('videos', null, 'plate', 'glass');
+  const heading = document.createElement('h2');
+  heading.className = 'visually-hidden';
+  heading.textContent = copy.videos;
+  videos.head.replaceWith(heading);
+  mountMedia(videos.body);
+  root.replaceChildren(header.el, videos.el);
+}
+
+/** A card on the Join us page: a heading and the one thing it lets you do. */
+function joinCard(title, action) {
+  const card = document.createElement('div');
+  card.className = 'join-card';
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  card.append(heading, action);
+  return card;
+}
+
+function formCard(form) {
+  const card = joinCard(form.title, formButton(form));
+  card.dataset.form = form.id;
+  return card;
+}
+
+function discordCard() {
+  const { title, action } = PAGE_COPY.join.discord;
+  const link = buttonLink(DISCORD, action, { external: true });
+  const mark = buildIcon('discord');
+  if (mark) link.prepend(mark);
+  const card = joinCard(title, link);
+  card.dataset.link = 'discord';
+  return card;
+}
+
+/**
+ * Join us: when and where practice is, and every way in.
+ *
+ * The two forms used to be buttons in the home page's events panel. They live here now,
+ * with the Discord the client asked to add, each in a card of its own: the interest form
+ * first, because that is what someone arriving from "Join us" came to do, and the
+ * performance request last, because it is for somebody else entirely -- a host booking
+ * the club.
+ */
+export function renderJoinPage(root) {
+  const copy = PAGE_COPY.join;
+  const header = pageHeader('join', copy);
+
+  const practices = section('practices', copy.practices, 'plate', 'glass');
+  practices.body.append(schedule());
+
+  const involved = section('get-involved', copy.involved, 'plate', 'glass');
+  const ways = document.createElement('div');
+  ways.className = 'join-ways';
+  ways.append(formCard(formById('interest')), discordCard(), formCard(formById('request')));
+  involved.body.append(ways);
+
+  root.replaceChildren(header.el, practices.el, involved.el);
+}
+
+/**
+ * Every page on the site, by the `data-page` its HTML file carries. One boot for all four
+ * (src/main.js): the page files differ by that attribute alone.
+ */
+export const RENDERERS = Object.freeze({
+  home: renderSections,
+  about: renderAboutPage,
+  media: renderMediaPage,
+  join: renderJoinPage,
+});

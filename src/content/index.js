@@ -4,13 +4,6 @@ export const SITE = {
 };
 
 /**
- * Cut roughly in half at the client's note that it ran too long — 100 words to 54. Every
- * fact survives: the founding, the award, the art form, the Hell's Kitchen credit and the
- * range of the work. What went was the restatement (three clauses all saying "we perform
- * a lot, in a lot of places") and the third-person voice, which read like a grant
- * application beside the rest of the page.
- */
-/**
  * The club's mark, for the nav bar.
  *
  * `alt: ''` on purpose. It sits inside the wordmark link, which already carries the text
@@ -22,38 +15,85 @@ export const LOGO = Object.freeze({
   base: 'logo', widths: [64, 128], width: 128, height: 149, alt: '',
 });
 
+/**
+ * The club's own account of itself, now the lead paragraph of the About page.
+ *
+ * Two sentences. The third — the Hell's Kitchen credit and "hundreds of galas, festivals,
+ * schools and fundraisers" — was removed at the client's request. The range of the work
+ * is carried by the performed-for marquee on the home page instead, which names eighteen
+ * of those places rather than gesturing at hundreds.
+ */
 export const ABOUT = {
-  heading: 'ABOUT US',
   body:
     'Founded in the Spring of 2019, Violet Diabolo is NYU’s award-winning Chinese Yo-Yo team. ' +
     'We take a traditional pastime, set it to contemporary music, and use it to promote AAPI ' +
-    'culture through performance. The club has appeared on Gordon Ramsey’s Hell’s Kitchen and at ' +
-    'hundreds of galas, festivals, schools and fundraisers across the tri-state area.',
-};
-
-export const EVENTS = {
-  heading: 'EVENTS',
-  body:
-    'Two practices a week: Sundays 3-5PM in Kimmel Center, Room 606, and Fridays 5-7PM ' +
-    'outdoors at the Bust of Sylvette. Come to either or both. ' +
-    'All equipment will be provided, and anyone is welcome, regardless of experience!',
-};
-
-// Headings for the sections that don't otherwise carry a `heading` field (MEDIA is an
-// array, BOARD is a semester map, CONTACT is just an email/linktree pair) - kept here so
-// ui/sections.js never hardcodes club-facing copy, matching ABOUT.heading/EVENTS.heading.
-/** One line under the MEDIA title on its own page, where a bare heading floats. */
-export const MEDIA_INTRO =
-  'Performances, competitions and a Friday on the lawn — the club’s own record of itself.';
-
-export const SECTION_HEADINGS = {
-  media: 'MEDIA',
-  board: 'BOARD',
-  contact: 'CONTACT US',
+    'culture through performance.',
 };
 
 /**
- * Organisations the club has performed for, for the marquee under the About panel.
+ * The practice schedule, as DATA rather than a sentence.
+ *
+ * It was one paragraph — "Two practices a week: Sundays 3-5PM in Kimmel Center, Room 606,
+ * and Fridays 5-7PM outdoors at the Bust of Sylvette..." — and the client asked for it as
+ * bullets with the dates and places standing out. A string can only be bolded by parsing
+ * it back apart, so the facts are kept as fields and the markup decides what is bold
+ * (schedule() in src/ui/sections.js). One source for both places it renders: the home
+ * page's events panel and the Join us page.
+ */
+export const EVENTS = Object.freeze({
+  heading: 'EVENTS',
+  intro: 'Two practices a week',
+  // `at` is the words between the time and the place, kept with the place because they
+  // are copy too: the client's own sentence said "in Kimmel Center" and "outdoors at the
+  // Bust of Sylvette", and "outdoors" is the one fact about Friday a visitor needs most.
+  sessions: Object.freeze([
+    Object.freeze({ day: 'Sundays', time: '3–5 PM', at: 'in', place: 'Kimmel Center, Room 606' }),
+    Object.freeze({ day: 'Fridays', time: '5–7 PM', at: 'outdoors at the', place: 'Bust of Sylvette' }),
+  ]),
+  notes: Object.freeze([
+    'Come to either or both.',
+    'All equipment is provided.',
+    'Anyone is welcome, regardless of experience!',
+  ]),
+});
+
+/**
+ * The header of each sub-page: a small label, a heading, a line of lead. Every page but
+ * the home page opens on one, centred, on the bare gradient.
+ *
+ * The About page mirrors the team page the client pointed at — a label, a statement
+ * heading, one paragraph, then the people. The Media lead is the client's own rewording
+ * ("Our performances and videos"), replacing a line that read like a caption.
+ */
+export const PAGE_COPY = Object.freeze({
+  about: Object.freeze({
+    label: 'About us',
+    heading: 'The people who make up Violet Diabolo',
+    lead: ABOUT.body,
+    team: 'BOARD',
+  }),
+  // No label: it would say "Media" directly above a heading that says "Media". The
+  // videos' own heading is for the document outline only (h1, then h2, then each video's
+  // h3) and is not shown -- the page header already says what the list is.
+  media: Object.freeze({
+    heading: 'Media',
+    lead: 'Our performances and videos',
+    videos: 'Videos',
+  }),
+  // The lead does not restate the practice notes ("Anyone is welcome...", "All equipment
+  // is provided") because the schedule directly under it lists them, word for word.
+  join: Object.freeze({
+    label: 'Join us',
+    heading: 'Join Violet Diabolo',
+    lead: 'Here’s how to get started.',
+    practices: 'PRACTICES',
+    involved: 'GET INVOLVED',
+    discord: Object.freeze({ title: 'Discord', action: 'Join our Discord' }),
+  }),
+});
+
+/**
+ * Organisations the club has performed for, for the marquee on the home page's first screen.
  *
  * PROVENANCE. Every entry was read out of violetdiabolo@gmail.com and is backed by one of
  * three things: the club confirming and then sending set music or logistics, the host
@@ -217,12 +257,19 @@ export const CONTACT = {
   linktree: 'https://linktr.ee/violetdiabolo',
 };
 
+/**
+ * `id` is how the Join us page places each form in its own card, in the order it wants
+ * them -- the interest form first, the booking request last -- without depending on the
+ * order of this array or on a title nobody would think to keep in sync.
+ */
 export const FORMS = [
   {
+    id: 'request',
     title: 'Performance / Teaching Request',
     url: 'https://docs.google.com/forms/d/e/1FAIpQLSdqk-vvGryB5SCO2AM-iL2FXDi_2MNJHLJxnyxeckUNRoRzgw/viewform?embedded=true',
   },
   {
+    id: 'interest',
     title: 'Interest Form',
     url: 'https://docs.google.com/forms/d/e/1FAIpQLSdGVUpii4Viiv3EPtoDtXCyk9l7dxhbi3pINhJiN_KLiIwT4g/viewform?embedded=true',
   },
@@ -240,52 +287,23 @@ export const SOCIALS = [
   { label: 'Instagram', href: 'https://instagram.com/violet_diabolo', icon: 'instagram' },
   { label: 'YouTube', href: 'https://www.youtube.com/@violetdiabolo2213', icon: 'youtube' },
   { label: 'NYU Engage', href: 'https://engage.nyu.edu/organization/violet-diabolo-all-university', icon: 'engage' },
+  { label: 'Discord', href: 'https://discord.gg/7Kn3udMrrf', icon: 'discord' },
 ];
 
-/**
- * The practice gallery, shot at one Friday session on the lawn by the Bust of Sylvette.
- *
- * `width`/`height` are the real pixel dimensions of the 1000px derivative, AFTER the
- * pipeline applies each file's EXIF orientation -- four of these six are portraits stored
- * sideways. They are here so the browser can reserve each cell's box before the bytes
- * arrive; the mixed 3:4 and 4:3 shapes are why the grid cannot simply declare one ratio
- * the way the about and contact photographs do.
- *
- * Alt text is deliberately generic about WHO. These are photographs of identifiable
- * students and nobody has told us which name belongs to which face; describing the action
- * is accurate, guessing at a name would not be.
- */
-export const PRACTICE_PHOTOS = Object.freeze({
-  heading: 'AT PRACTICE',
-  photos: Object.freeze([
-    { base: 'practice-throw', widths: [500, 1000], width: 1000, height: 1333,
-      alt: 'A club member sending a diabolo high into the air on the lawn' },
-    { base: 'practice-sylvette', widths: [500, 1000], width: 1000, height: 750,
-      alt: "A club member spinning a diabolo in front of Picasso's Bust of Sylvette" },
-    { base: 'practice-reach', widths: [500, 1000], width: 1000, height: 1333,
-      alt: 'A club member catching a diabolo with both arms spread wide' },
-    { base: 'practice-pair', widths: [500, 1000], width: 1000, height: 1333,
-      alt: 'A club member running two diabolos at once, one on each end of the string' },
-    { base: 'practice-back', widths: [500, 1000], width: 1000, height: 1333,
-      alt: 'A club member seen from behind, a diabolo running along the string' },
-    { base: 'practice-team', widths: [500, 1000], width: 1000, height: 750,
-      alt: 'Four club members posing together with their diabolos after practice' },
-  ]),
-});
+/** The Join us page's Discord step points here too: one URL, read from one place. */
+export const DISCORD = SOCIALS.find((s) => s.icon === 'discord').href;
 
 /**
- * The page's standalone photographs: two carried over from the previous site, two from
- * the 2026 practice shoot.
+ * The page's two standalone photographs: the team on the home page's first screen, and
+ * two members at practice in the events panel. Both carry a width/height pair so the
+ * <img>'s own attributes reserve the box before the bytes land (src/ui/picture.js).
  *
- * `hero` and `events` carry a width/height pair and the older two do not, which is not an
- * oversight: sections.css declares an aspect-ratio for the about and contact photographs
- * per section, and these two take theirs from the img's own attributes instead (see
- * src/ui/picture.js). Both reserve the box; only one of them needs a stylesheet to know
- * the shape.
+ * The two that came over from the previous site — the USADA group shot on the old About
+ * panel and the stage strip on the old Contact panel — went with the panels they sat in.
+ * The About page follows the client's team-page reference, which has no standalone photo,
+ * and Contact is a footer now. Both masters are recoverable from git history.
  */
 export const PHOTOS = {
-  group: { base: 'group-usadc', widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo performing together at the USADA National Diabolo Competition' },
-  wide:  { base: 'usadc-wide',  widths: [900, 1600, 2000], jpgWidths: [900, 1600], alt: 'Violet Diabolo on stage at the USADA National Diabolo Competition' },
   hero:  { base: 'hero-group', widths: [800, 1600], width: 1600, height: 1200, alt: 'Five Violet Diabolo members on the lawn after practice, diabolos spinning' },
   events: { base: 'events-practice', widths: [600, 1200], width: 1200, height: 1600, alt: 'Two club members practising together on the lawn, a diabolo on the string between them' },
 };
