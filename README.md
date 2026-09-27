@@ -1,6 +1,6 @@
 # Violet Diabolo
 
-Rebuilt website for Violet Diabolo, NYU's diabolo (Chinese yo-yo) performance team. A single page: an animated WebGL gradient — a near-black field with two or three bright violet ribbons drifting through it — fixed behind six content panels that scroll over it. Replaces the React site at github.com/violetdiabolo/violetdiabolo.github.io; deploys to GitHub Pages.
+Rebuilt website for Violet Diabolo, NYU's diabolo (Chinese yo-yo) performance team. Four pages — Home, About us, Media and Join us — over one animated WebGL gradient: a near-black field with two or three bright violet ribbons drifting through it, fixed behind glass panels that scroll over it. Replaces the React site at github.com/violetdiabolo/violetdiabolo.github.io; deploys to GitHub Pages.
 
 The branch that produced this shape (`build/gradient-panels`) replaced a Three.js diabolo scrubbed by an anime.js scroll timeline. Both libraries are gone, and so is every module that used them: the bundle went from **600,476 B to 38,565 B**, −93.6 %.
 
@@ -11,7 +11,7 @@ npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (runs `npm run assets` first)
 npm run preview      # Serve the built dist/ locally
-npm test             # 251 tests across 17 test files
+npm test             # 278 tests across 18 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -31,18 +31,19 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | Path | Purpose |
 |---|---|
 | `src/content/index.js` | Club identity, board members, events, videos, forms, socials, photos. No markup. Mutations here flow everywhere. |
-| `src/ui/` | DOM rendering: the fixed nav (`nav.js`), the six panels (`sections.js`), board cards (`board.js`), video facades (`media.js`), form facades (`forms.js`), responsive `<picture>` (`picture.js`), the practice gallery (`gallery.js`), scroll reveal (`reveal.js`). No WebGL. |
+| `src/ui/` | DOM rendering: the fixed nav and the four pages' addresses (`nav.js`), the four pages and the footer (`sections.js`), board cards (`board.js`), video facades in alternating blocks (`media.js`), form facades (`forms.js`), social icons (`icons.js`), responsive `<picture>` (`picture.js`), scroll reveal (`reveal.js`). No WebGL. |
 | `src/gradient/` | `palette.js` (three stops), `shader.js` (the GLSL), `gradient.js` (the WebGL state), `contrast.js` (contrast arithmetic — **test and probe only, never bundled**). |
 | `src/render/` | `lifecycle.js` (when the loop may run), `budget.js` (`TARGET_FPS`, `RENDER_SCALE`, the frame cap). |
 | `src/scroll/smooth.js` | Lenis inertia scrolling, and the source of the gradient's scroll boost. |
 | `src/fallback/detect.js` | Feature detection: `supportsWebGL()`, `prefersReducedMotion()`. |
-| `src/styles/` | `base.css` (tokens, reset, typography, nav, focus, scroll reveal), `sections.css` (the four panel patterns and the two surfaces). Two files, no third. |
-| `src/main.js` | `boot()`: render content, mount the nav, mount the reveal, then branch on WebGL and reduced motion. |
+| `src/styles/` | `base.css` (tokens, reset, typography, nav, focus, scroll reveal), `sections.css` (the four panel patterns, the glass surface, the footer). Two files, no third. |
+| `index.html`, `about.html`, `media.html`, `join.html` | The four page shells — identical but for the title, the description and `<body data-page>`, which is all `main.js` renders from. |
+| `src/main.js` | `boot()`: render the page `data-page` names, mount the nav and the footer, mount the reveal, then branch on WebGL and reduced motion. |
 | `scripts/build-assets.mjs` | Image pipeline (resize, AVIF/WebP/JPEG). |
 | `scripts/check-shader.html` | Dev-time shader bench: compile, frame cost with a zero-render control, luminance histogram. |
-| `scripts/check-contrast.html` | Dev-time contrast probe over the real page. Needs `npm run dev` — it imports `contrast.js`, which the build excludes. |
+| `scripts/check-contrast.html` | Dev-time contrast probe over a real page (`?page=index`, `about`, `media` or `join`). Needs `npm run dev` — it imports `contrast.js`, which the build excludes. |
 | `scripts/bench-verdict.mjs` | The pass/fail decision the shader bench calls, as a module so the suite can falsify it. |
-| `tests/` | 251 tests across 17 files — see **Testing**. |
+| `tests/` | 278 tests across 18 files — see **Testing**. |
 | `public/images/` | Generated derivatives (`npm run assets`). Masters live in `assets-src/`. |
 | `docs/VERIFICATION.md` | What was measured in a real browser, on a named GPU, and what could not be. |
 
@@ -52,13 +53,15 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 - `src/gradient/*` and `src/render/*` hold no club copy.
 
 **Boundaries actually enforced by tests:**
-- **`src/ui/*` never hardcodes club copy.** `tests/ui.dom.test.js` ("content boundary") greps every file in `src/ui/` for the site name, tagline, contact email, the first 60 characters of the About and Events body, and every media title, and fails if one is baked in rather than imported from `src/content/`. This is what guarantees content edits need no code changes.
+- **`src/ui/*` never hardcodes club copy.** `tests/ui.dom.test.js` ("content boundary") greps the code of every file in `src/ui/` — comments excluded, since they quote the client to explain a decision — for the site name, tagline, contact email, the About copy, the schedule's places and notes, the page headings and leads, and every media title, and fails if one is baked in rather than imported from `src/content/`. This is what guarantees content edits need no code changes.
 - **No animation engine, anywhere.** `tests/lifecycle.test.js` ("no animation engine") walks every file under `src/` and fails on any `animejs` import, with **no exception set** — there is no longer an owner to except. A second test fails if `package.json` declares `animejs` or `three` again.
 - **`contrast.js` never ships.** `tests/visual-language.test.js` asserts `src/main.js` does not import `gradient/contrast`.
 - **Nothing resolves to `position: sticky`.** See **The page** below.
-- **`backdrop-filter` appears on exactly one selector.** `tests/visual-language.test.js` fails any rule that blurs without being glass.
+- **`backdrop-filter` appears on exactly one selector.** `tests/visual-language.test.js` fails any rule that blurs without being glass (or the nav bar).
+- **The four pages agree with each other.** `tests/pages.test.js` holds the nav's `PAGES`, the build's inputs, the renderers and each file's `data-page` to one list, and the four `<head>`s to one copy.
+- **Nothing is built that no page shows.** `tests/assets.test.js` checks content against the pipeline in both directions, and fails on a master nothing reads or a derivative nothing builds.
 
-## The page: six panels over one gradient
+## The pages: four pages over one gradient
 
 Every section is a self-contained **panel**, described by two attributes rather than a place in a scroll choreography. `src/ui/sections.js` stamps both:
 
@@ -68,23 +71,25 @@ Every section is a self-contained **panel**, described by two attributes rather 
                                               <div class="room-body">  everything else
 ```
 
-`data-panel` is the **layout**; `data-surface` is the **material** — whether the gradient shows through. `src/styles/sections.css` holds the four arrangements:
+`data-panel` is the **layout**; `data-surface` is the **material**. `src/styles/sections.css` holds the four arrangements, and there is one material: glass, which lets the gradient through. Every page opens on a panel with no surface at all, on the gradient itself, and plates everything after it in glass (`tests/panels.dom.test.js`).
 
-| section | `data-panel` | `data-surface` | composition |
-|---|---|---|---|
-| `#hero` | `hero` | *(none)* | full-bleed. Head bottom-left, photograph bottom-right. The gradient itself is the hero, so there is nothing to plate it against. |
-| `#about` | `story` | `glass` | violet-tinted glass. Serif, the club's own account of itself, and a photo. |
-| `#events` | `feature` | `glass` | title across the top, practice details dropped bottom-right. |
-| `#media` | `grid` | `solid` | video facades beside a title column. |
-| `#board` | `grid` | `solid` | roster cards beside a title column. |
-| `#contact` | `grid` | `solid` | address, socials and a photograph. |
-| `footer` | *(none)* | *(none)* | one line, released back to bare gradient. |
+| page | section | `data-panel` | `data-surface` | what it holds |
+|---|---|---|---|---|
+| Home | `#hero` | `hero` | *(none)* | the wordmark bottom-left, a photograph bottom-right, and the performed-for marquee — its own glass band — across the foot of both, on the first screen |
+| | `#events` | `feature` | `glass` | the practice schedule as bullets (times bold, places highlighted), then a button to Join us; a photograph on the right |
+| About us | `#about` | `header` | *(none)* | label, heading and the club's own account of itself, centred |
+| | `#board` | `plate` | `glass` | the board, four across, with the semester select beside its heading and a dashed "+" card that links to Join us |
+| Media | `#media` | `header` | *(none)* | heading and lead, centred |
+| | `#videos` | `plate` | `glass` | the ten videos in two blocks of five: a large one and four small, the large one left in the first block and right in the second |
+| Join us | `#join` | `header` | *(none)* | label, heading and lead, centred |
+| | `#practices` | `plate` | `glass` | the same schedule the home page shows, from the same data |
+| | `#get-involved` | `plate` | `glass` | the Interest Form, the Discord and the Performance / Teaching Request, a card each |
 
-Three solid to two glass, deliberately — a page where most sections are translucent reads as one continuous wash rather than as panels. The reasoning per entry is at the top of `sections.css`.
+**The footer** is on every page: the socials (Instagram, YouTube, NYU Engage, Discord), the address and the Linktree, and the sign-off under a hairline that runs the full width. It is a real `<footer>`, mounted after `<main>` by `main.js`, so it is the page's `contentinfo` landmark — and glass, because its links are `--accent`, which measures 2.06:1 on the gradient's brightest pixel.
 
-Panels are full-bleed and separated by `--panel-gap` (`clamp(3rem, 9vh, 7rem)`), where nothing but the gradient shows. That alternation — plate, light, plate — is the file's only structural device. There is no grid overlay, no hairline rule, and no plate behind running text: the gradient's own luminance ceiling keeps `--ink` legible directly on it.
+Panels are full-bleed and separated by `--panel-gap` (`clamp(3.5rem, 11vh, 8rem)`), where nothing but the gradient shows. That alternation — plate, light, plate — is the file's only structural device, and on the sub-pages it is the layout. There is no grid overlay and no plate behind the text that opens a page: the gradient's own luminance ceiling keeps `--ink` legible directly on it.
 
-**Nothing on this page sticks to the viewport.** `tests/sections-layout.dom.test.js` renders the real page — every panel plus the real nav, as `main.js` assembles them — and resolves the winning `position` declaration with the real selector engine plus explicit specificity arithmetic, for every element, at phone width. A source grep could not answer this safely in either direction. Because that scan is purely negative, a second test asserts `.site-nav` still resolves to `position: fixed` through the same call: without it, a stylesheet rename or a nesting syntax the brace scanner mishandled would empty the candidate set and report green over a page full of sticky.
+**Nothing on any page sticks to the viewport.** `tests/sections-layout.dom.test.js` renders every page — its panels plus the real nav and footer, as `main.js` assembles them — and resolves the winning `position` declaration with the real selector engine plus explicit specificity arithmetic, for every element, at phone width. A source grep could not answer this safely in either direction. Because that scan is purely negative, a second test asserts `.site-nav` still resolves to `position: fixed` through the same call: without it, a stylesheet rename or a nesting syntax the brace scanner mishandled would empty the candidate set and report green over a page full of sticky.
 
 ## How the gradient works
 
@@ -119,7 +124,7 @@ The shader's warp coefficients (0.055, 0.031) are the **ratio** between its two 
 
 `src/main.js`'s `onFrame` is where the three meet, and the ordering is deliberate: **Lenis is stepped every frame, ahead of the cap**, because the cap throttles only the gradient's draw and stepping the scroller at 30 Hz would make the inertia stutter. `tests/main.dom.test.js` ("the animated onFrame composition") drives the real loop in jsdom and pins all three limbs — that draws happen, that the cap both delays and then releases them, that `render()` receives the accumulated elapsed rather than a single frame delta, and that Lenis is stepped on frames that draw nothing.
 
-Measured GPU cost of the shader's own draw, with a zero-render control: **0.01253 ms/frame** against a 4 ms budget. That figure is the shader in a bare canvas and is **not** the background's total per-frame cost — the two glass panels put a full-viewport `backdrop-filter` over a canvas that repaints every frame. `docs/VERIFICATION.md` §3.1 measures that separately.
+Measured GPU cost of the shader's own draw, with a zero-render control: **0.01253 ms/frame** against a 4 ms budget. That figure is the shader in a bare canvas and is **not** the background's total per-frame cost — every glass panel puts a `backdrop-filter` over a canvas that repaints every frame. `docs/VERIFICATION.md` §3.1 measures that separately.
 
 ## Fallback paths
 
@@ -128,9 +133,9 @@ Both are decided in `boot()` (`src/main.js`), and neither is a degraded version 
 - **`prefers-reduced-motion: reduce`** → one frame is rendered and **nothing is installed**: no lifecycle, no Lenis, no rAF, no scroll listeners, and `window.__vd` is never assigned. A resize re-fits *and* repaints, because `gradient.resize()` reassigns `canvas.width/height` and clears the drawing buffer — with no loop running, a bare re-fit would leave the canvas permanently transparent after the first orientation change.
 - **No WebGL** → `data-stage="unsupported"`, and a CSS `linear-gradient` of the same three stops is painted on `#gradient` instead. Every panel still renders.
 
-Content is never gated behind the graphics: `renderSections` and `buildNav` run *before* `supportsWebGL()` is called at all, and `tests/main.dom.test.js` asserts that ordering rather than just the outcome.
+Content is never gated behind the graphics: the page's renderer, `buildNav` and the footer run *before* `supportsWebGL()` is called at all, and `tests/main.dom.test.js` asserts that ordering rather than just the outcome.
 
-**The scroll reveal fails open.** `src/ui/reveal.js` fades each panel in once via `IntersectionObserver`. The class that hides it (`.reveal-pending`, `opacity: 0`, in `base.css`) is added *synchronously by JS*, and only an observer callback ever removes it — so where the constructor does not exist, the class would hide all six panels with nothing left to reveal them. `initReveal` therefore checks for `IntersectionObserver` **before** adding the class, and the guard is narrow enough that an injected observer still runs.
+**The scroll reveal fails open.** `src/ui/reveal.js` fades each panel in once via `IntersectionObserver`. The class that hides it (`.reveal-pending`, `opacity: 0`, in `base.css`) is added *synchronously by JS*, and only an observer callback ever removes it — so where the constructor does not exist, the class would hide every panel with nothing left to reveal them. `initReveal` therefore checks for `IntersectionObserver` **before** adding the class, and the guard is narrow enough that an injected observer still runs.
 
 ## Editing content
 
@@ -138,17 +143,18 @@ Everything lives in `src/content/index.js`:
 
 - **Add a board member:** append to `BOARD`, creating a semester entry if needed.
 - **Add a video:** append to `MEDIA` with a YouTube ID.
-- **Change practice times:** edit `EVENTS.body`.
-- **Add social links:** extend `SOCIALS`.
-- **Add a form:** extend `FORMS`.
+- **Change practice times:** edit `EVENTS.sessions` (day, time, the words before the place, the place) and `EVENTS.notes`. Both the home page and Join us read them.
+- **Change a page's heading or lead:** `PAGE_COPY`.
+- **Add social links:** extend `SOCIALS`; they appear in every page's footer.
+- **Add a form:** extend `FORMS` with an `id`, and give it a card in `renderJoinPage`.
 
 **⚠️ Apostrophe warning:** the copy is reproduced verbatim from the club's old site, including a deliberate mix of curly (`U+2019`) and ASCII (`U+0027`) apostrophes. `tests/content.test.js` pins this exact mix. "Fixing" the apostrophes will fail it. Do not normalize them.
 
 ## Images
 
-Masters live in `assets-src/`; derivatives (AVIF, WebP and — for the two large photos only — JPEG, at several widths) are generated into `public/images/` by `npm run assets`.
+Masters live in `assets-src/`; derivatives (AVIF and WebP, at two widths each) are generated into `public/images/` by `npm run assets`. Every target has to be one content asks for — `public/images/` ships to `dist/` whole, so a picture no page shows is weight every deploy carries.
 
-**No derivative may exceed 400 KB.** The pipeline exits non-zero if one does. The current worst is `group-usadc-2000.webp` at **307 KB**, from 24 generated files.
+**No derivative may exceed 400 KB.** The pipeline exits non-zero if one does. The current worst is `hero-group-1600.webp` at **276 KB**, from 88 generated files.
 
 Widths cap at 2000 px, not 2400. Measured on the 4032×3024 master: at 2400 the intended quality yields WebP 406 KB and JPEG 531 KB, both over budget, while 2000 yields AVIF 240 / WebP 307 / JPEG 387. Capping width preserves quality; dropping quality to fit 2400 would not.
 
@@ -158,26 +164,27 @@ Widths cap at 2000 px, not 2400. Measured on the 4032×3024 master: at 2400 the 
 npm test
 ```
 
-**251 tests across 17 files**, all passing, with no stderr noise.
+**278 tests across 18 files**, all passing, with no stderr noise.
 
 | file | tests | covers |
 |---|---|---|
-| `visual-language.test.js` | 57 | the deleted design elements' absence, the four panel patterns, glass and accent discipline, the focus ring on both grounds, the luminance ceiling, the shader's two fixed defects, the bench and probe wiring, the nav pill row and height, 200 % text zoom |
-| `ui.dom.test.js` | 35 | DOM structure for every panel, the hero and events photographs, media and form facades, board photographs and their stand-in tiles, the practice gallery and its reserved cells, the footer, and the content boundary |
+| `visual-language.test.js` | 56 | the deleted design elements' absence, the four panel patterns, glass and accent discipline, the focus ring on every ground, the luminance ceiling, the shader's two fixed defects, the bench and probe wiring, the nav pill row and height, 200 % text zoom |
+| `ui.dom.test.js` | 50 | each page's sections and h1, the footer, board cards and the join tile, the alternating video blocks, the form facades and the Join us cards, the practice schedule, the marquee's place on the first screen, the photographs, and the content boundary |
+| `main.dom.test.js` | 23 | boot ordering, which page boots, the footer's mount, both fallback paths, the gradient mount, and the animated `onFrame` composition |
 | `lifecycle.test.js` | 17 | pause/resume on visibility and intersection, delta clamping, teardown; the no-animation-engine and no-`animejs`-dependency guards |
+| `content.test.js` | 16 | apostrophe preservation, board structure, the practice schedule, the sub-page copy, media list, photograph alt text, contact details and socials |
 | `contrast.test.js` | 15 | `relativeLuminance`, `contrastRatio`, `worstCase` (including its non-finite guard), `TIME_STEPS` |
-| `smooth.dom.test.js` | 14 | Lenis construction, anchor interception, modifier-click opt-out, teardown, and installing nothing under reduced motion |
-| `main.dom.test.js` | 17 | boot ordering, both fallback paths, the gradient mount, and the animated `onFrame` composition |
 | `gradient.dom.test.js` | 15 | shader compile/link, uniform plumbing, scroll acceleration (rate, direction, cap, decay, monotonicity), failure cleanup, resize |
-| `nav.dom.test.js` | 12 | the links, the CTA, the markup, and `--nav-offset`'s `ResizeObserver` |
-| `content.test.js` | 16 | apostrophe preservation, board structure, the practice timetable, media list, photograph alt text, contact details |
+| `nav.dom.test.js` | 14 | the page buttons, the CTA, `aria-current`, every link resolving on every page, and `--nav-offset`'s `ResizeObserver` |
+| `smooth.dom.test.js` | 14 | Lenis construction, anchor interception, modifier-click opt-out, teardown, and installing nothing under reduced motion |
+| `assets.test.js` | 12 | the image pipeline in both directions against content, orphaned masters and derivatives, EXIF orientation, each derivative's width against its own srcset descriptor, and the 400 KB budget |
+| `sections-layout.dom.test.js` | 11 | the plate's title size, the hero wordmark's size cap and its container on a phone, that nothing on any page resolves to sticky, that the scan proving it is not blind, and that the contrast probe's block list covers every element that paints text on every page |
 | `budget.test.js` | 9 | the frame cap's accumulation and `renderSize`'s clamp |
 | `reveal.dom.test.js` | 9 | the reveal's pending/visible classes, one-shot unobserve, reduced motion, and the no-`IntersectionObserver` guard |
-| `assets.test.js` | 10 | the image pipeline's derivatives, EXIF orientation, each derivative's width against its own srcset descriptor, and the 400 KB budget |
 | `palette.test.js` | 5 | three stops, ordering, range, and that it is violet rather than blue |
-| `panels.dom.test.js` | 5 | `data-panel` / `data-surface` stamping |
-| `sections-layout.dom.test.js` | 10 | the grid panel's title size, the hero wordmark's size cap, that nothing resolves to sticky, that the scan proving it is not blind, and that the contrast probe's block list covers every element that paints text |
 | `detect.dom.test.js` | 4 | WebGL and reduced-motion detection |
+| `panels.dom.test.js` | 4 | `data-panel` / `data-surface` on every page: bare gradient first, glass after |
+| `pages.test.js` | 3 | the four page files, the nav, the renderers and the build inputs agreeing |
 | `smoke.test.js` | 1 | module load |
 
 ## Known limitations
@@ -190,7 +197,7 @@ From **§10 of [`docs/VERIFICATION.md`](docs/VERIFICATION.md)**, which lists ele
 
 3. **Nothing rests on a screenshot.** The host's screenshot pipeline returns stale frames, so every visual claim in `VERIFICATION.md` is established by `getComputedStyle`, `getBoundingClientRect`, `Range` and `gl.readPixels` instead.
 
-4. **`backdrop-filter`'s cost on a mid-range phone.** Two full-viewport blurred layers sit over a canvas that repaints every frame, so the blur cannot be cached. On the measured host the shipped configuration has **at least 33× headroom** and is indistinguishable from `backdrop-filter: none` — but both conditions are pinned at a 60 Hz vsync ceiling there, so the cost is bounded above rather than resolved, and the machine the concern is about was not measured.
+4. **`backdrop-filter`'s cost on a mid-range phone.** Glass panels — up to a screen of them at once on the sub-pages — sit over a canvas that repaints every frame, so the blur cannot be cached. On the measured host the shipped configuration has **at least 33× headroom** and is indistinguishable from `backdrop-filter: none` — but both conditions are pinned at a 60 Hz vsync ceiling there, so the cost is bounded above rather than resolved, and the machine the concern is about was not measured.
 
 5. **Real devices, other browsers, other GPUs.** Chromium on ANGLE / Metal / Apple M4 only. 320 / 375 / 768 were viewport emulation, not real touch devices. Glyph rendering and font fallback were not inspected.
 
