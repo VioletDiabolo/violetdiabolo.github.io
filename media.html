@@ -4,28 +4,28 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Media — Violet Diabolo</title>
-  <meta name="description" content="Performances, competitions and practice — Violet Diabolo’s own record of itself." />
+  <meta name="description" content="Violet Diabolo’s performances and videos." />
   <link rel="icon" href="./favicon.ico" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!--
-    Two families, and only two. Inter carries the page: 200 for the hero's hairline
-    headline, 300 for the section titles, 400/500/600 for body, cards and the filled
-    controls. Instrument Serif is loaded upright only (the italic axis went with the
-    editorial pass that used it) and has exactly one job: the story panel, the single
-    printed surface in the scroll.
+    One family. Inter carries every page: 400 for the hero wordmark, 700 for the headings,
+    300 to 600 for body, cards and the filled controls.
 
-    Space Mono was here too. It set the 3D object's part labels and nothing else; the
-    object was deleted earlier on this branch and the family has been requested for no
-    glyph on the page ever since, left in place pending "a styling call for a later
-    task". The design pass is that task, so the request goes, along with --font-mono and
-    the two --mono-* sizes in base.css.
+    Instrument Serif was here too, with exactly one job: the prose of the About panel,
+    the one printed surface on the old single-page site. That panel is gone -- About is a
+    page of its own now, set in the same Inter as everything else after the client's
+    team-page reference -- and a page does not ask for a webfont it has no glyph to set.
+
+    The four page files are identical but for the title, the description and body's
+    data-page, which is what src/main.js renders from. tests/pages.test.js holds them to
+    that, so a fix made to one head cannot quietly miss the other three.
   -->
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
-  <script type="module" crossorigin src="./assets/main-BPXxcC2w.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/main-Cc4CmPmz.css">
+  <script type="module" crossorigin src="./assets/main-6jg-DulD.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/main-Cw-r-VQI.css">
 </head>
 <body data-page="media">
   <canvas id="gradient" aria-hidden="true"></canvas>
