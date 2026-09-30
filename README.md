@@ -11,7 +11,7 @@ npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (runs `npm run assets` first)
 npm run preview      # Serve the built dist/ locally
-npm test             # 278 tests across 18 test files
+npm test             # 286 tests across 18 test files
 ```
 
 `npm run build` regenerates optimized images from masters via `npm run assets` before bundling.
@@ -43,7 +43,7 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 | `scripts/check-shader.html` | Dev-time shader bench: compile, frame cost with a zero-render control, luminance histogram. |
 | `scripts/check-contrast.html` | Dev-time contrast probe over a real page (`?page=index`, `about`, `media` or `join`). Needs `npm run dev` — it imports `contrast.js`, which the build excludes. |
 | `scripts/bench-verdict.mjs` | The pass/fail decision the shader bench calls, as a module so the suite can falsify it. |
-| `tests/` | 278 tests across 18 files — see **Testing**. |
+| `tests/` | 286 tests across 18 files — see **Testing**. |
 | `public/images/` | Generated derivatives (`npm run assets`). Masters live in `assets-src/`. |
 | `docs/VERIFICATION.md` | What was measured in a real browser, on a named GPU, and what could not be. |
 
@@ -53,7 +53,7 @@ Note that `dist/` is listed in `.gitignore`, so it is not committed on this bran
 - `src/gradient/*` and `src/render/*` hold no club copy.
 
 **Boundaries actually enforced by tests:**
-- **`src/ui/*` never hardcodes club copy.** `tests/ui.dom.test.js` ("content boundary") greps the code of every file in `src/ui/` — comments excluded, since they quote the client to explain a decision — for the site name, tagline, contact email, the About copy, the schedule's places and notes, the page headings and leads, and every media title, and fails if one is baked in rather than imported from `src/content/`. This is what guarantees content edits need no code changes.
+- **`src/ui/*` never hardcodes club copy.** `tests/ui.dom.test.js` ("content boundary") greps the code of every file in `src/ui/` — comments excluded, since they quote the client to explain a decision — for the site name, tagline, contact email, the About copy, the schedule's places and notes, the page headings and leads, the home previews' links, and every media title, and fails if one is baked in rather than imported from `src/content/`. This is what guarantees content edits need no code changes.
 - **No animation engine, anywhere.** `tests/lifecycle.test.js` ("no animation engine") walks every file under `src/` and fails on any `animejs` import, with **no exception set** — there is no longer an owner to except. A second test fails if `package.json` declares `animejs` or `three` again.
 - **`contrast.js` never ships.** `tests/visual-language.test.js` asserts `src/main.js` does not import `gradient/contrast`.
 - **Nothing resolves to `position: sticky`.** See **The page** below.
@@ -71,14 +71,16 @@ Every section is a self-contained **panel**, described by two attributes rather 
                                               <div class="room-body">  everything else
 ```
 
-`data-panel` is the **layout**; `data-surface` is the **material**. `src/styles/sections.css` holds the four arrangements, and there is one material: glass, which lets the gradient through. Every page opens on a panel with no surface at all, on the gradient itself, and plates everything after it in glass (`tests/panels.dom.test.js`).
+`data-panel` is the **layout**; `data-surface` is the **material**. `src/styles/sections.css` holds the five arrangements, and there is one material: glass, which lets the gradient through. Every page opens on a panel with no surface at all, on the gradient itself, and plates everything after it in glass (`tests/panels.dom.test.js`).
 
 | page | section | `data-panel` | `data-surface` | what it holds |
 |---|---|---|---|---|
 | Home | `#hero` | `hero` | *(none)* | the wordmark bottom-left, a photograph bottom-right, and the performed-for marquee — its own glass band — across the foot of both, on the first screen |
-| | `#events` | `feature` | `glass` | the practice schedule as bullets (times bold, places highlighted), then a button to Join us; a photograph on the right |
+| | `#about` | `teaser` | `glass` | a simplified About us: the club's story, and "Meet the board →" |
+| | `#media` | `teaser` | `glass` | a simplified Media: the three newest videos, one large and two beside it, and "See all videos →" |
+| | `#join` | `feature` | `glass` | a simplified Join us: the practice schedule as bullets (times bold, places highlighted) and a "How to join" button; a photograph on the right |
 | About us | `#about` | `header` | *(none)* | label, heading and the club's own account of itself, centred |
-| | `#board` | `plate` | `glass` | the board, four across, with the semester select beside its heading and a dashed "+" card that links to Join us |
+| | `#board` | `plate` | `glass` | the board, four across — photograph, name and position, no bios — with the semester select beside its heading and a dashed "+" card that links to Join us |
 | Media | `#media` | `header` | *(none)* | heading and lead, centred |
 | | `#videos` | `plate` | `glass` | the ten videos in two blocks of five: a large one and four small, the large one left in the first block and right in the second |
 | Join us | `#join` | `header` | *(none)* | label, heading and lead, centred |
@@ -141,9 +143,10 @@ Content is never gated behind the graphics: the page's renderer, `buildNav` and 
 
 Everything lives in `src/content/index.js`:
 
-- **Add a board member:** append to `BOARD`, creating a semester entry if needed.
+- **Add a board member:** append to `BOARD` (a name, a position, and an image base name or `null`), creating a semester entry if needed. There are no bios for now; the card has no line for one.
+- **Change the home page's previews:** `HOME_SECTIONS` (each heading and its link's label). The About preview reads `ABOUT.body`; the Media preview shows the first `MEDIA_PREVIEW` videos (`src/ui/media.js`).
 - **Add a video:** append to `MEDIA` with a YouTube ID.
-- **Change practice times:** edit `EVENTS.sessions` (day, time, the words before the place, the place) and `EVENTS.notes`. Both the home page and Join us read them.
+- **Change practice times:** edit `EVENTS.sessions` (day, time, the words before the place, the place) and `EVENTS.notes`. Both the home page's Join us section and the Join us page read them.
 - **Change a page's heading or lead:** `PAGE_COPY`.
 - **Add social links:** extend `SOCIALS`; they appear in every page's footer.
 - **Add a form:** extend `FORMS` with an `id`, and give it a card in `renderJoinPage`.
@@ -164,15 +167,15 @@ Widths cap at 2000 px, not 2400. Measured on the 4032×3024 master: at 2400 the 
 npm test
 ```
 
-**278 tests across 18 files**, all passing, with no stderr noise.
+**286 tests across 18 files**, all passing, with no stderr noise.
 
 | file | tests | covers |
 |---|---|---|
-| `visual-language.test.js` | 56 | the deleted design elements' absence, the four panel patterns, glass and accent discipline, the focus ring on every ground, the luminance ceiling, the shader's two fixed defects, the bench and probe wiring, the nav pill row and height, 200 % text zoom |
-| `ui.dom.test.js` | 50 | each page's sections and h1, the footer, board cards and the join tile, the alternating video blocks, the form facades and the Join us cards, the practice schedule, the marquee's place on the first screen, the photographs, and the content boundary |
+| `visual-language.test.js` | 57 | the deleted design elements' absence, the five panel patterns, glass and accent discipline, the focus ring on every ground, the luminance ceiling, the shader's two fixed defects, the bench and probe wiring, the nav pill row and height, 200 % text zoom |
+| `ui.dom.test.js` | 55 | each page's sections and h1, the home page's previews and their order, the footer, board cards (name and position only) and the join tile, the alternating video blocks, the form facades and the Join us cards, the practice schedule, the marquee's place on the first screen, the photographs, and the content boundary |
 | `main.dom.test.js` | 23 | boot ordering, which page boots, the footer's mount, both fallback paths, the gradient mount, and the animated `onFrame` composition |
 | `lifecycle.test.js` | 17 | pause/resume on visibility and intersection, delta clamping, teardown; the no-animation-engine and no-`animejs`-dependency guards |
-| `content.test.js` | 16 | apostrophe preservation, board structure, the practice schedule, the sub-page copy, media list, photograph alt text, contact details and socials |
+| `content.test.js` | 18 | apostrophe preservation, board structure and the absence of bios, the home previews, the practice schedule, the sub-page copy, media list, photograph alt text, contact details and socials |
 | `contrast.test.js` | 15 | `relativeLuminance`, `contrastRatio`, `worstCase` (including its non-finite guard), `TIME_STEPS` |
 | `gradient.dom.test.js` | 15 | shader compile/link, uniform plumbing, scroll acceleration (rate, direction, cap, decay, monotonicity), failure cleanup, resize |
 | `nav.dom.test.js` | 14 | the page buttons, the CTA, `aria-current`, every link resolving on every page, and `--nav-offset`'s `ResizeObserver` |
