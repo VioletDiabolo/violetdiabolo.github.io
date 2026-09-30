@@ -1593,3 +1593,84 @@ Drive originals are untouched. `dist/images` is 2.7 MB.
   and that panel is gone.
 - **The two form buttons** moved from the home page to Join us, and the events panel links
   there instead.
+
+## 21. The board without bios, and a home page that previews every page
+
+The client's brief:
+- "remove the bio from all board members. We will just have position and name for now";
+- "For the main page, lets add a simplified version of all sections."
+
+### 21.1 The board
+
+- **Every card on every board is a photograph (or an initials tile), a name and a
+  position.** `tests/ui.dom.test.js` walks all six semesters and requires exactly
+  `H3:name, P:position` on every card.
+- **Content carries no `description` at all.** `tests/content.test.js` fails on one coming
+  back. That took the Fall 2026 lorem filler and the two real bios carried over from the
+  old site, Aaron's and Jonathan's. Both are in git history.
+- **Measured at 1440 on About us:** six cards, zero bio paragraphs, and one card height
+  (419px) across the whole board.
+
+### 21.2 The home page
+
+In the nav's order, each preview with its way on:
+
+| section | pattern | holds | link |
+|---|---|---|---|
+| `#hero` | hero | unchanged: wordmark, photograph, marquee | — |
+| `#about` | teaser | the club's story (`ABOUT.body`) | Meet the board → `about.html` |
+| `#media` | teaser | the three newest videos | See all videos → `media.html` |
+| `#join` | feature | the practice schedule and the photograph | How to join → `join.html` |
+
+- **The board stays off the home page**, as the client asked earlier. "Meet the board" is
+  the way to it.
+- **The video preview** is the Media page's layout cut down to three. Measured:
+  - at 1440 the lead is 843×533 with the other two (421×237) stacked beside it;
+  - at 1024 the lead is 597 wide, with 299 beside it;
+  - at 768 the lead spans the row, with the two below side by side at 336;
+  - at 375 it is one column.
+
+  The cards are the Media page's own, so they click to play the same way.
+- **The marquee is still on the first screen**, unmoved: 786–864 of 900 at 1440, 690–749
+  of 768 at 1024, 935–996 of 1024 at 768, and 746–800 of 812 at 375. A first reading at
+  1440 said 798–876. That was the hero mid-reveal, still carrying 11.3px of the slide-in
+  `translateY`, which this pane's hidden-document throttling holds partway.
+
+### 21.3 Contrast and overflow
+
+The probe, all four pages at 1440×900, 12 time steps:
+
+| page | blocks |
+|---|---|
+| index | 20/20 |
+| about | 16/16 |
+| media | 10/10 |
+| join | 17/17 |
+
+The new blocks: the "more" links 6.16:1 (accent on glass), the preview headings and the
+story 15.71:1. The tightest block is still --ink on bare gradient, 5.25:1.
+
+The first overflow run failed on index at 280 with a 32px root. The About preview's story
+is set at a 1.15rem floor, 36.8px there, in a 200px column. Its longest word ran to
+x 282.5 in a 280px viewport: the rem-floor trap the headings hit first.
+
+- **Fix:** `overflow-wrap: anywhere` on `.teaser-story`, and on `.page-lead`, which sets the
+  same sentence on the About page and had been clearing by about 5px.
+- **Re-run:** 375 and 280 pass on every page.
+- **Guard:** a source guard pins both declarations, and deleting one fails it.
+
+### 21.4 Falsification
+
+12 of 12 mutations caught:
+- the previews out of the nav's order, in the markup and in the content;
+- the board mounted on the home page;
+- the preview skipping the newest video;
+- a preview link's arrow read aloud;
+- a bio line coming back in the card, and a bio coming back in content;
+- a pixel floor on the preview grid;
+- a teaser going solid;
+- the probe forgetting the new links;
+- the Join us section linking elsewhere;
+- the story losing its `overflow-wrap`.
+
+The tree was byte-identical after every run.

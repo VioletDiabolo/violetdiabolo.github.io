@@ -1,7 +1,7 @@
 // tests/content.test.js
 import { describe, it, expect } from 'vitest';
 import {
-  SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, PAGE_COPY, PHOTOS,
+  SITE, ABOUT, EVENTS, MEDIA, BOARD, CONTACT, FORMS, SOCIALS, PAGE_COPY, HOME_SECTIONS, PHOTOS,
   PERFORMED_FOR, DISCORD,
 } from '../src/content/index.js';
 
@@ -190,22 +190,34 @@ describe('content', () => {
   });
 
   it("preserves the source apostrophes exactly, curly and ASCII alike", () => {
-    const aaron = BOARD['Fall 2025'].find((m) => m.name === 'Aaron Hui');
-    const aaronSecretary = BOARD['Spring 2024'].find((m) => m.name === 'Aaron Hui');
-    const jon = BOARD['Fall 2025'].find((m) => m.name === 'Jonathan Sun');
-
+    // Most of what this pinned went with the board's bios. What is left from the old
+    // site still carries both kinds, and both are still worth pinning.
     // U+2019 curly
     expect(ABOUT.body).toContain("NYU’s award-winning");
-    expect(jon.description).toContain("I’m all about carefully crafting ");
-
     // U+0027 ASCII
-    expect(aaron.description).toContain("Heyo, I'm Aaron");
-    expect(aaron.description).toContain("I'm the current president");
-    expect(aaron.description).toContain("I'm currently working on 3D");
-    expect(aaron.description).toContain("Sometimes you'll catch me");
-    expect(aaronSecretary.description).toContain("can't really write");
-    expect(jon.description).toContain("I'm currently working on getting DNA");
-    expect(jon.description).toContain("I'm not spinning");
+    expect(MEDIA.map((m) => m.name)).toContain("Violet Diabolo - Asian Heritage Month's Fall Fest 2019");
+  });
+
+  it('keeps no bio on any board member, on any board', () => {
+    // The client: "remove the bio from all board members. We will just have position
+    // and name for now." A `description` coming back in content would be copy nothing
+    // renders -- the card has no line for it (src/ui/board.js).
+    const withBio = Object.entries(BOARD).flatMap(([semester, roster]) => roster
+      .filter((m) => 'description' in m).map((m) => `${semester}: ${m.name}`));
+    expect(withBio, 'these board members carry a bio again').toEqual([]);
+    for (const member of Object.values(BOARD).flat()) {
+      expect(member.name.length).toBeGreaterThan(0);
+      expect(member.position.length, `${member.name} has no position`).toBeGreaterThan(0);
+    }
+  });
+
+  it('gives the home page a preview of every page in the nav, and not the board', () => {
+    // "a simplified version of all sections", in the nav's own order.
+    expect(Object.keys(HOME_SECTIONS)).toEqual(['about', 'media', 'join']);
+    for (const [key, copy] of Object.entries(HOME_SECTIONS)) {
+      expect(copy.heading.length, `${key} has no heading`).toBeGreaterThan(0);
+      expect(copy.more.length, `${key} has no way on to its page`).toBeGreaterThan(0);
+    }
   });
 
   it('gives every sub-page a heading, and the copy the client asked for', () => {

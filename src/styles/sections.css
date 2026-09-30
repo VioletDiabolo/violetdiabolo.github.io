@@ -8,12 +8,14 @@
  *                                                    <div class="room-head">  reading text
  *                                                    <div class="room-body">  everything else
  *
- * `data-panel` is the LAYOUT, one of the four patterns below. `data-surface` is the
+ * `data-panel` is the LAYOUT, one of the five patterns below. `data-surface` is the
  * MATERIAL.
  *
  *   hero     the home page's first screen. Wordmark bottom-left, photograph bottom-right,
  *            and the performed-for marquee across the foot of both. No surface.
- *   feature  the home page's events panel: the schedule left, a photograph right. Glass.
+ *   teaser   a home-page preview of another page: its heading and a link to the rest of
+ *            it on one line, then a taste of the page at full width. Glass.
+ *   feature  the home page's Join us section: the schedule left, a photograph right. Glass.
  *   header   a sub-page's opening: a label, a heading and a lead, centred. No surface.
  *   plate    a sub-page's content -- the board, the videos, the ways to join. Glass.
  *
@@ -292,8 +294,64 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Feature: the home page's events panel. Everything you read on the left -- the schedule
- * and the button to Join us -- and the photograph on the right.
+ * Teaser: a home-page preview of one of the other pages, at the client's request for "a
+ * simplified version of all sections" on the main page. The heading and the way on share
+ * a line -- ABOUT US ... Meet the board -- and the taste of the page sits under them.
+ * ------------------------------------------------------------------------- */
+
+[data-panel='teaser'] .room {
+  padding-block: clamp(3rem, 9vh, 5.5rem);
+}
+
+/* baseline, so the small link sits on the heading's own line rather than floating at its
+   middle; wrap, so on a phone the link drops under the heading instead of crowding it. */
+[data-panel='teaser'] .room-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+  margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
+}
+
+/*
+ * The way on to the page a teaser previews. A text link, not a filled .button: the
+ * accent's fill is spent on the things that ask a visitor to commit (a form, the Discord,
+ * joining), and going to look at a page commits to nothing. The arrow is inline-block so
+ * the link's underline stops at the label; it is aria-hidden in the markup.
+ */
+.more-link {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.more-link span {
+  display: inline-block;
+  margin-left: 0.4em;
+}
+
+/*
+ * The club's story, set as the About preview's statement rather than as body copy, since
+ * it is the whole of it. --ink on glass.
+ *
+ * overflow-wrap: anywhere, for the rem-floor trap the headings fell into first (base.css,
+ * `h1, h2, h3`): at a 32px root the 1.15rem floor is 36.8px while the column is 200px,
+ * and the longest words in the club's sentence are wider than that. Measured at 280x812,
+ * 32px root: the ink ran to x 282.5 against a 280px viewport. `anywhere` breaks a word
+ * only when it cannot fit its line at all, which at every width this file has verified
+ * it can.
+ */
+.teaser-story {
+  font-size: clamp(1.15rem, 1.9vw, 1.65rem);
+  line-height: 1.5;
+  max-width: 44ch;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+ * Feature: the home page's Join us section. Everything you read on the left -- the
+ * schedule and the button on to the Join us page -- and the photograph on the right.
  *
  * 0.78fr on the right, and a max-width on the figure: the events photograph is a
  * PORTRAIT, so an equal column would make it the tallest thing on the page.
@@ -321,17 +379,20 @@ body { overflow-x: hidden; }
   width: 100%;
 }
 
-[data-panel='feature'] h2 {
+/* The home page's section titles, one size for all three: the two teasers and Join us. */
+[data-panel='feature'] h2,
+[data-panel='teaser'] h2 {
   font-size: var(--type-title);
 }
 
 /* 24rem keeps a 3:4 portrait under about 32rem tall, which is what stops it setting the
-   height of the whole panel. */
-[data-section='events'] .section-photo { max-width: min(100%, 24rem); margin-left: auto; }
+   height of the whole panel. Keyed on the pattern, not the section's id: the id is `join`
+   now, and join.html has a `join` section of its own. */
+[data-panel='feature'] .section-photo { max-width: min(100%, 24rem); margin-left: auto; }
 
 /* ---------------------------------------------------------------------------
- * The practice schedule (schedule() in src/ui/sections.js), on the events panel and on
- * the Join us page.
+ * The practice schedule (schedule() in src/ui/sections.js), on the home page's Join us
+ * section and on the Join us page.
  *
  * It was a sentence; the client asked for bullets with the dates and places standing out.
  * WHEN is bold and WHERE is marked, because they answer different questions and someone
@@ -442,12 +503,15 @@ body { overflow-x: hidden; }
   text-wrap: balance;
 }
 
+/* overflow-wrap for the reason .teaser-story gives: on the About page this is the same
+   sentence, and at 280px with a 32px root it cleared the viewport by only about 5px. */
 .page-lead {
   font-size: var(--type-lead);
   line-height: 1.55;
   color: var(--ink);
   max-width: 46ch;
   text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
 
 /* ---------------------------------------------------------------------------
@@ -483,7 +547,7 @@ body { overflow-x: hidden; }
 }
 
 /* ---------------------------------------------------------------------------
- * Section photographs: the hero's and the events panel's. Both carry a width/height
+ * Section photographs: the hero's and the Join us section's. Both carry a width/height
  * pair in content (PHOTOS), so the <img>'s own attributes reserve the box before the
  * bytes land and no aspect-ratio has to be declared here.
  * ------------------------------------------------------------------------- */
@@ -502,7 +566,8 @@ body { overflow-x: hidden; }
 
 /* ---------------------------------------------------------------------------
  * The board, on the About page: four across, after the client's team-page reference --
- * a rounded photograph, the name, the role in the accent, the bio dim.
+ * a rounded photograph, the name, and the role in the accent. No bio, at the client's
+ * request ("We will just have position and name for now").
  * ------------------------------------------------------------------------- */
 
 .board-list {
@@ -570,14 +635,6 @@ body { overflow-x: hidden; }
   font-size: 0.95rem;
   font-weight: 500;
   color: var(--accent);
-  max-width: none;
-}
-
-.board-card p:not(.board-position) {
-  margin-top: 0.45rem;
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: var(--ink-dim);
   max-width: none;
 }
 
@@ -732,6 +789,46 @@ body { overflow-x: hidden; }
   .media-block[data-lead='right'] > .media-card:last-child h3 {
     font-size: 1.15rem;
   }
+}
+
+/*
+ * The home page's preview (mountMediaPreview, src/ui/media.js): the three newest videos,
+ * one large and two beside it -- the blocks above, cut down to three. One column on a
+ * phone; from 560 two across with the lead spanning both; from 900 the lead takes two
+ * thirds of the width and both rows, the other two stacked beside it. Fixed column
+ * counts of minmax(0, n fr), so there is no pixel floor that could outgrow the grid.
+ */
+.media-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1.25rem, 2.5vw, 2rem);
+  width: 100%;
+}
+
+@media (min-width: 560px) {
+  .media-preview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .media-preview > .media-card:first-child { grid-column: 1 / -1; }
+}
+
+@media (min-width: 900px) {
+  .media-preview { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+
+  /* Row AND column, for the reason the blocks above give: the two small cards then
+     auto-place into the cells beside it. */
+  .media-preview > .media-card:first-child {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .media-preview > .media-card:first-child .media-facade,
+  .media-preview > .media-card:first-child iframe {
+    flex: 1;
+    min-height: 0;
+    aspect-ratio: auto;
+  }
+
+  .media-preview > .media-card:first-child h3 { font-size: 1.15rem; }
 }
 
 .media-card {

@@ -1,12 +1,12 @@
 import {
-  SITE, EVENTS, CONTACT, SOCIALS, PHOTOS, PAGE_COPY, PERFORMED_FOR, DISCORD,
+  SITE, ABOUT, EVENTS, CONTACT, SOCIALS, PHOTOS, PAGE_COPY, HOME_SECTIONS, PERFORMED_FOR, DISCORD,
 } from '../content/index.js';
 import { mountBoard } from './board.js';
-import { mountMedia } from './media.js';
+import { mountMedia, mountMediaPreview } from './media.js';
 import { buildIcon } from './icons.js';
 import { formButton, formById } from './forms.js';
 import { buildPicture } from './picture.js';
-import { CTA, hrefFor } from './nav.js';
+import { PAGES } from './nav.js';
 
 /**
  * Every section is a self-contained PANEL, described by two attributes rather than a
@@ -16,7 +16,9 @@ import { CTA, hrefFor } from './nav.js';
  *
  *   hero     the home page's first screen: the wordmark, the photograph, and the
  *            performed-for marquee directly under both. No surface.
- *   feature  the home page's events panel: the schedule beside a photograph. Glass.
+ *   teaser   a home-page preview of another page: its heading and a link to the rest of
+ *            it on one line, then a taste of what is there. Glass.
+ *   feature  the home page's Join us section: the schedule beside a photograph. Glass.
  *   header   a sub-page's opening: a label, a heading and a lead, centred. No surface.
  *   plate    a sub-page's content at full width -- the board, the videos, the ways to
  *            join. Glass.
@@ -80,6 +82,23 @@ function buttonLink(href, label, { external = false } = {}) {
     a.target = '_blank';
   }
   a.append(label);
+  return a;
+}
+
+/**
+ * The link from a home-page preview to the page it previews.
+ *
+ * The arrow is decoration, so it is hidden from assistive tech: the link's name is the
+ * label alone ("See all videos"), not "See all videos right arrow".
+ */
+function moreLink(href, label) {
+  const a = document.createElement('a');
+  a.className = 'more-link';
+  a.href = href;
+  const arrow = document.createElement('span');
+  arrow.setAttribute('aria-hidden', 'true');
+  arrow.textContent = '→';
+  a.append(label, arrow);
   return a;
 }
 
@@ -339,7 +358,12 @@ function marquee() {
 }
 
 /**
- * The home page: the first screen, then the practice schedule.
+ * The home page: the first screen, then a simplified version of every other page, in the
+ * nav's order -- About us, Media, Join us -- at the client's request ("For the main page,
+ * lets add a simplified version of all sections"). Each is a taste and a way on: the
+ * club's story and "Meet the board", the three newest videos and "See all videos", the
+ * practice times and "How to join". Ending on Join us puts the call to action last,
+ * directly above the footer.
  *
  * The marquee is the last thing inside the hero rather than a panel of its own, which is
  * what puts it on the first screen: the hero is a screen tall and ends on it, directly
@@ -355,14 +379,24 @@ export function renderSections(root) {
   hero.body.append(figure(PHOTOS.hero, '(max-width: 767px) 92vw, 46vw', 'eager'));
   hero.room.append(marquee());
 
-  // Everything you read on the left, the photograph on the right. The forms that used to
-  // sit here moved to the Join us page; the button that replaces them goes there too, and
-  // is the nav's own call to action so the two cannot point different ways.
-  const events = section('events', EVENTS.heading, 'feature', 'glass');
-  events.head.append(schedule(), buttonLink(hrefFor(CTA), CTA.label));
-  events.body.append(figure(PHOTOS.events, '(max-width: 767px) 92vw, 34vw', 'lazy'));
+  // About us, simplified: the club's own account of itself, which is also the About
+  // page's lead. The board stays on its page -- "Meet the board" is the way to it.
+  const about = section('about', HOME_SECTIONS.about.heading, 'teaser', 'glass');
+  about.head.append(moreLink(PAGES.about, HOME_SECTIONS.about.more));
+  about.body.append(paragraph(ABOUT.body, 'teaser-story'));
 
-  root.replaceChildren(hero.el, events.el);
+  // Media, simplified: the newest videos, laid out as the Media page lays out its own.
+  const media = section('media', HOME_SECTIONS.media.heading, 'teaser', 'glass');
+  media.head.append(moreLink(PAGES.media, HOME_SECTIONS.media.more));
+  mountMediaPreview(media.body);
+
+  // Join us, simplified: the practice times on the left, the photograph on the right,
+  // and the way on to the page with the forms and the Discord.
+  const join = section('join', HOME_SECTIONS.join.heading, 'feature', 'glass');
+  join.head.append(schedule(), buttonLink(PAGES.join, HOME_SECTIONS.join.more));
+  join.body.append(figure(PHOTOS.events, '(max-width: 767px) 92vw, 34vw', 'lazy'));
+
+  root.replaceChildren(hero.el, about.el, media.el, join.el);
 }
 
 /**

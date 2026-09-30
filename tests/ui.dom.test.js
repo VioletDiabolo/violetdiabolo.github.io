@@ -8,11 +8,12 @@ import {
   schedule, marqueeItem, observeMarqueeSpeed, MARQUEE_SPEED,
 } from '../src/ui/sections.js';
 import { mountBoard } from '../src/ui/board.js';
-import { mountMedia, MEDIA_BLOCK } from '../src/ui/media.js';
+import { mountMedia, MEDIA_BLOCK, MEDIA_PREVIEW } from '../src/ui/media.js';
 import { formButton, formById } from '../src/ui/forms.js';
-import { PAGES, CTA } from '../src/ui/nav.js';
+import { PAGES, CTA, NAV_LINKS } from '../src/ui/nav.js';
 import {
-  BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS, PERFORMED_FOR, PAGE_COPY, DISCORD, SOCIALS,
+  BOARD, MEDIA, SITE, CONTACT, ABOUT, EVENTS, FORMS, PERFORMED_FOR, PAGE_COPY, HOME_SECTIONS,
+  DISCORD, SOCIALS,
 } from '../src/content/index.js';
 
 beforeEach(() => { document.body.innerHTML = '<main id="content"></main>'; });
@@ -22,10 +23,53 @@ const rendered = (render) => { const root = document.createElement('main'); rend
 const sectionIds = (root) => [...root.querySelectorAll('[data-section]')].map((e) => e.dataset.section);
 
 describe('pages', () => {
-  it('renders the home page as the first screen and the schedule, and nothing else', () => {
-    // About, Board, Contact and Media all left the home page: the board to About us at
-    // the client's request, Contact to the footer on every page, Media to its own page.
-    expect(sectionIds(rendered(renderSections))).toEqual(['hero', 'events']);
+  it('renders the home page as the first screen, then a preview of every other page', () => {
+    // "For the main page, lets add a simplified version of all sections."
+    expect(sectionIds(rendered(renderSections))).toEqual(['hero', 'about', 'media', 'join']);
+  });
+
+  it("previews the pages in the nav's own order, each with its way on", () => {
+    // The previews follow the bar: About us, Media, then Join us -- the call to action
+    // last, directly above the footer. Each one links to the page it previews.
+    const order = [...NAV_LINKS.map((l) => l.page), CTA.page];
+    const home = rendered(renderSections);
+    const previews = sectionIds(home).slice(1);
+    expect(previews).toEqual(order);
+    for (const page of order) {
+      const section = home.querySelector(`#${page}`);
+      expect(section.querySelector('h2').textContent).toBe(HOME_SECTIONS[page].heading);
+      const onward = section.querySelector(`a[href="${PAGES[page]}"]`);
+      expect(onward, `the ${page} preview has no link to ${PAGES[page]}`).not.toBeNull();
+      expect(onward.textContent.replace('→', '').trim()).toBe(HOME_SECTIONS[page].more);
+    }
+  });
+
+  it('previews About us with the club\'s own story, and not the board', () => {
+    const about = rendered(renderSections).querySelector('#about');
+    expect(about.querySelector('.teaser-story').textContent).toBe(ABOUT.body);
+    expect(about.querySelector('.board-list, [data-member]')).toBeNull();
+  });
+
+  it('previews Media with its newest videos, the same click-to-play cards as the page', () => {
+    const media = rendered(renderSections).querySelector('#media');
+    const cards = [...media.querySelectorAll('[data-video]')];
+    expect(cards.map((c) => c.dataset.video))
+      .toEqual(MEDIA.slice(0, MEDIA_PREVIEW).map((m) => m.youtubeId));
+    expect(media.querySelectorAll('iframe'), 'a preview loads an embed up front').toHaveLength(0);
+    cards[0].querySelector('button').click();
+    expect(media.querySelector('iframe').src).toContain('youtube-nocookie.com');
+  });
+
+  it('keeps each preview link\'s arrow out of its accessible name', () => {
+    // The arrow is decoration. Unhidden, "See all videos" would be announced as "See all
+    // videos right arrow" -- and the label alone already says where the link goes.
+    const links = [...rendered(renderSections).querySelectorAll('.more-link')];
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      const arrow = link.querySelector('span');
+      expect(arrow.textContent).toBe('→');
+      expect(arrow.getAttribute('aria-hidden')).toBe('true');
+    }
   });
 
   it('keeps the board off the home page', () => {
@@ -263,8 +307,8 @@ describe('board', () => {
   it('renders a seated member whose photograph has not arrived, without an img', () => {
     // A distinct case from the open slot above, and new with the Fall 2026 board: a real
     // person holding a real role whose photo is not in public/images yet. The card must
-    // still render -- name, role and bio -- rather than being skipped or given a broken
-    // <img>, and it must NOT be marked as a placeholder seat.
+    // still render -- name and role -- rather than being skipped or given a broken <img>,
+    // and it must NOT be marked as a placeholder seat.
     const el = document.getElementById('content');
     mountBoard(el);
     const semester = Object.keys(BOARD)
@@ -280,7 +324,24 @@ describe('board', () => {
     expect(card.querySelector('img')).toBeNull();
     expect(card.dataset.placeholder).toBeUndefined();
     expect(card.textContent).toContain(member.position);
-    expect(card.textContent).toContain(member.description);
+  });
+
+  it('shows a name and a position on every card, on every board, and nothing under them', () => {
+    // "remove the bio from all board members. We will just have position and name for
+    // now." Checked on every semester, because the old boards carried the only real bios
+    // there were, and a card is the same card whichever board it is on.
+    const el = document.getElementById('content');
+    mountBoard(el);
+    const select = el.querySelector('select');
+    for (const semester of Object.keys(BOARD)) {
+      select.value = semester;
+      select.dispatchEvent(new Event('change'));
+      for (const member of BOARD[semester]) {
+        const card = el.querySelector(`[data-member="${member.name}"]`);
+        const text = [...card.querySelectorAll('h3, p')].map((n) => `${n.tagName}:${n.textContent}`);
+        expect(text, `${semester}: ${member.name}`).toEqual([`H3:${member.name}`, `P:${member.position}`]);
+      }
+    }
   });
 });
 
@@ -406,7 +467,7 @@ describe('the practice schedule', () => {
   it('states each practice once per page, on both pages that show it', () => {
     // One source (EVENTS) rendered on two pages, and once on each: two copies of the
     // times on one page is how they drifted apart in the first place.
-    for (const [render, where] of [[renderSections, '#events'], [renderJoinPage, '#practices']]) {
+    for (const [render, where] of [[renderSections, '#join'], [renderJoinPage, '#practices']]) {
       const root = rendered(render);
       for (const fact of ['Kimmel', 'Sylvette', '3–5 PM', '5–7 PM']) {
         const holders = [...root.querySelectorAll('*')].filter((el) =>
@@ -418,10 +479,10 @@ describe('the practice schedule', () => {
   });
 
   it('sends the home page on to Join us, where the forms went', () => {
-    const link = rendered(renderSections).querySelector('#events a.button');
-    expect(link, 'the events panel has no way on to Join us').not.toBeNull();
+    const link = rendered(renderSections).querySelector('#join a.button');
+    expect(link, "the home page's Join us section has no way on to the page").not.toBeNull();
     expect(link.getAttribute('href')).toBe(PAGES.join);
-    expect(link.textContent).toBe(CTA.label);
+    expect(link.textContent).toBe(HOME_SECTIONS.join.more);
     expect(rendered(renderSections).querySelector('[data-form], iframe'), 'a form is back on the home page')
       .toBeNull();
   });
@@ -503,7 +564,7 @@ describe('the performed-for marquee', () => {
   });
 });
 
-describe('the hero and events photographs', () => {
+describe('the hero and Join us photographs', () => {
   const render = () => { const root = document.createElement('main'); renderSections(root); return root; };
 
   it('opens on a photograph, loaded eagerly because it is above the fold', () => {
@@ -516,15 +577,15 @@ describe('the hero and events photographs', () => {
     expect(img.alt.length).toBeGreaterThan(0);
   });
 
-  it('gives the events panel a photograph, lazily', () => {
-    const img = render().querySelector('#events .section-photo img');
-    expect(img, 'the events panel has no photograph').not.toBeNull();
+  it("gives the home page's Join us section a photograph, lazily", () => {
+    const img = render().querySelector('#join .section-photo img');
+    expect(img, "the home page's Join us section has no photograph").not.toBeNull();
     expect(img.getAttribute('loading')).toBe('lazy');
   });
 
   it('renders both as real <picture> elements, with AVIF and WebP sources and alt text', () => {
     const root = render();
-    for (const id of ['hero', 'events']) {
+    for (const id of ['hero', 'join']) {
       const picture = root.querySelector(`#${id} picture`);
       expect(picture, `#${id} has no <picture>`).not.toBeNull();
       expect(picture.querySelectorAll('source[type="image/avif"]').length).toBeGreaterThan(0);
@@ -546,6 +607,7 @@ describe('content boundary', () => {
       ...EVENTS.sessions.map((s) => s.place), ...EVENTS.notes,
       PAGE_COPY.about.heading, PAGE_COPY.media.lead, PAGE_COPY.join.heading, PAGE_COPY.join.lead,
       PAGE_COPY.join.discord.action,
+      ...Object.values(HOME_SECTIONS).map((copy) => copy.more),
       ...MEDIA.map((m) => m.name),
     ];
     for (const file of readdirSync(dir)) {

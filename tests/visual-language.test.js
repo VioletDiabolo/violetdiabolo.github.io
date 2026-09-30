@@ -234,10 +234,10 @@ describe('the light spill is gone', () => {
 
 describe('the four panel patterns', () => {
   it('styles every panel pattern', () => {
-    // hero and feature on the home page, header and plate on the three sub-pages. story
-    // and grid went with the single-page layout they were drawn for.
+    // hero, teaser and feature on the home page, header and plate on the three sub-pages.
+    // story and grid went with the single-page layout they were drawn for.
     const css = read('../src/styles/sections.css');
-    for (const panel of ['hero', 'feature', 'header', 'plate']) {
+    for (const panel of ['hero', 'teaser', 'feature', 'header', 'plate']) {
       expect(css, `${panel} has no styling`).toMatch(new RegExp(`\\[data-panel=["']?${panel}["']?\\]`));
     }
   });
@@ -1036,6 +1036,19 @@ describe('the horizontal overflow at 200% text zoom', () => {
     expect(rule[1], 'a button can outgrow its own column again').toMatch(/max-width:\s*100%/);
   });
 
+  it("lets the club's story break a word that has run out of column, on both pages it is set on", () => {
+    // The home page's About preview sets the story at a 1.15rem floor: 36.8px at a 32px
+    // root, in a 200px column at 280. Measured: the ink ran to x 282.5 in a 280px
+    // viewport. The About page's lead is the same sentence at 1.05rem and cleared by 5px.
+    const css = read('../src/styles/sections.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const selector of ['teaser-story', 'page-lead']) {
+      const rule = new RegExp(`(?:^|\\})\\s*\\.${selector}\\s*\\{([^}]*)\\}`).exec(css);
+      expect(rule, `.${selector} has no rule of its own any more`).not.toBeNull();
+      expect(rule[1], `.${selector} can paint a long word past a narrow column again`)
+        .toMatch(/overflow-wrap:\s*anywhere/);
+    }
+  });
+
   it("does not let a card grid's automatic minimum size push its own ancestor wider than the viewport", () => {
     // A grid or flex item's default automatic minimum size is its own min-content, the
     // same mechanism .site-nav-links overrides. Measured on the old grid panel: .room, a
@@ -1074,19 +1087,26 @@ describe('the horizontal overflow at 200% text zoom', () => {
       expect(rule[1], `.${name}'s column floor can push its grid past the viewport again`)
         .toMatch(new RegExp(`minmax\\(\\s*min\\(\\s*${floor}\\s*,\\s*100%\\s*\\)`));
     }
-    // The media blocks have no floor to guard, and that is the claim: their column counts
-    // are fixed per width, and minmax(0, 1fr) cannot outgrow the grid it is in. A pixel
+    // The media grids have no floor to guard, and that is the claim: their column counts
+    // are fixed per width, and minmax(0, n fr) cannot outgrow the grid it is in. A pixel
     // floor coming back is how the other two needed their min() in the first place.
-    const blockColumns = leafRules(css)
-      .filter(({ selector }) => selector.trim() === '.media-block')
-      .map(({ body }) => /grid-template-columns:([^;]*)/.exec(body)?.[1])
-      .filter(Boolean);
-    // The base rule and the two widths above it; fewer means a breakpoint went unread.
-    expect(blockColumns.length, 'no .media-block column rule found -- this check is reading nothing')
-      .toBeGreaterThanOrEqual(3);
-    for (const columns of blockColumns) {
-      expect(columns, '.media-block has a column floor that can outgrow its grid')
-        .toMatch(/^\s*(repeat\(\s*\d+\s*,\s*)?minmax\(\s*0\s*,\s*1fr\s*\)\)?\s*$/);
+    // Every track, not just the first: the home page's preview is 2fr beside 1fr.
+    const track = /minmax\(\s*0\s*,\s*[\d.]+fr\s*\)/;
+    for (const grid of ['.media-block', '.media-preview']) {
+      const columns = leafRules(css)
+        .filter(({ selector }) => selector.trim() === grid)
+        .map(({ body }) => /grid-template-columns:([^;]*)/.exec(body)?.[1])
+        .filter(Boolean);
+      // The base rule and the two widths above it; fewer means a breakpoint went unread.
+      expect(columns.length, `no ${grid} column rule found -- this check is reading nothing`)
+        .toBeGreaterThanOrEqual(3);
+      for (const value of columns) {
+        const tracks = value.replace(/repeat\(\s*\d+\s*,\s*(.*)\)\s*$/, '$1').trim().split(/\s+(?=minmax)/);
+        for (const one of tracks) {
+          expect(one, `${grid} has a column floor that can outgrow its grid: "${value.trim()}"`)
+            .toMatch(new RegExp(`^${track.source}$`));
+        }
+      }
     }
   });
 

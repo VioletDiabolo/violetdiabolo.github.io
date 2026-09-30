@@ -38,10 +38,9 @@ export const ABOUT = {
  * bullets with the dates and places standing out. A string can only be bolded by parsing
  * it back apart, so the facts are kept as fields and the markup decides what is bold
  * (schedule() in src/ui/sections.js). One source for both places it renders: the home
- * page's events panel and the Join us page.
+ * page's Join us section and the Join us page.
  */
 export const EVENTS = Object.freeze({
-  heading: 'EVENTS',
   intro: 'Two practices a week',
   // `at` is the words between the time and the place, kept with the place because they
   // are copy too: the client's own sentence said "in Kimmel Center" and "outdoors at the
@@ -90,6 +89,20 @@ export const PAGE_COPY = Object.freeze({
     involved: 'GET INVOLVED',
     discord: Object.freeze({ title: 'Discord', action: 'Join our Discord' }),
   }),
+});
+
+/**
+ * The home page's previews of the other three pages, in the nav's own order: a heading,
+ * a taste of the page, and a link to the rest of it. The client asked for "a simplified
+ * version of all sections" on the main page, and these are the sections the nav names.
+ *
+ * The board is not previewed, deliberately. The client moved it to About us so that it
+ * "will not appear in the default page", and "Meet the board" is the way to it instead.
+ */
+export const HOME_SECTIONS = Object.freeze({
+  about: Object.freeze({ heading: 'ABOUT US', more: 'Meet the board' }),
+  media: Object.freeze({ heading: 'MEDIA', more: 'See all videos' }),
+  join: Object.freeze({ heading: 'JOIN US', more: 'How to join' }),
 });
 
 /**
@@ -164,37 +177,21 @@ export const MEDIA = [
   { name: 'Violet Diabolo Promo', youtubeId: 'u-ECtolBckU' },
 ];
 
-const AARON = {
-  name: 'Aaron Hui',
-  position: 'President',
-  image: 'aaron',
-  description:
-    "Heyo, I'm Aaron and I'm the current president of Violet Diabolo! I am a vertax one-trick (which " +
-    "means that you should be very careful near me when I'm yoyoing), but I'm currently working on 3D " +
-    'and trying to learn more integrals! In my free time I like to play Tetris (modern, not NES) and ' +
-    "spin other non yoyo props like poi, whip, staff, or ropedart. Sometimes you'll catch me playing " +
-    'with fire :)',
-};
+/**
+ * The board: a name and a position, and a photograph where there is one.
+ *
+ * No bios, at the client's request: "We will just have position and name for now". That
+ * took the Fall 2026 board's lorem-ipsum filler with it, and the two real bios carried
+ * over from the previous site -- Aaron's and Jonathan's, on the older boards. Both are in
+ * git history for when bios come back. The card (src/ui/board.js) has no bio line to fill
+ * any more, so bringing them back is a change there and here together.
+ */
+const AARON = { name: 'Aaron Hui', position: 'President', image: 'aaron' };
 
-const AARON_SECRETARY = {
-  ...AARON,
-  position: 'Secretary',
-  description:
-    "This website was created a year after this time period, so I guess I can't really write that I'm " +
-    'the current president, but presumably I was sending a lot of practice emails and grinding vertax ' +
-    'and 2D around this time haha. Probably destroying my ribs with body hit gens or failing to learn heli...',
-};
+// Spring 2024: the same person in a different seat.
+const AARON_SECRETARY = { ...AARON, position: 'Secretary' };
 
-const JON = {
-  name: 'Jonathan Sun',
-  position: 'Artistic Director',
-  image: 'jon',
-  description:
-    "Yo. I'm JonaSun. Resident transplant from UMich Revolution. I’m all about carefully crafting " +
-    'combos for creative, yet chaotic, choreography. Proud proponent of plasma torch for cutting yo-yo ' +
-    "string. I'm currently working on getting DNA into flare (a.k.a. cancer) consistently. When I'm not " +
-    'spinning, I am mad scientist. It is so cool!',
-};
+const JON = { name: 'Jonathan Sun', position: 'Artistic Director', image: 'jon' };
 
 // The source site filled this slot with a member literally named "N/A" whose photo
 // hotlinked Google's image CDN. Rendered as an honest open-slot card instead.
@@ -203,44 +200,24 @@ const OPEN_SLOT = {
   position: 'Open slot',
   image: null,
   placeholder: true,
-  description: 'More board members coming soon — photos and blurbs are still trickling in.',
 };
 
 /**
- * Placeholder bios for the Fall 2026 board, at the client's instruction: "you can put
- * gibberish as filler for their descriptions".
- *
- * Lorem ipsum rather than plausible prose, deliberately. These are real, named students.
- * Filler that READS like a bio is one forgotten deploy away from putting invented words
- * in someone's mouth, and nobody skimming the page would spot it — every card would look
- * finished. Nonsense cannot be mistaken for the real thing, and it says at a glance which
- * cards are still waiting on copy. Replace each one as its owner sends theirs in.
- */
-const LOREM = (
-  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
-  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
-  'exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute ' +
-  'irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla.'
-).split(' ');
-
-const filler = (words) => `Bio coming soon — ${LOREM.slice(0, words).join(' ')}…`;
-
-/**
- * Fall 2026. No `image` on anyone but Aaron: the club's photographs for this board have
- * not been selected yet, and buildPicture is only given a base name once the derivatives
- * exist (scripts/build-assets.mjs). These are NOT `placeholder: true` — that flag means
- * an unfilled seat on the board, and every seat here is filled.
+ * Fall 2026. Three photographs from the club's Drive folder and Aaron's from the previous
+ * site; Emily and Megan are waiting on theirs (`image: null`, for which src/ui/board.js
+ * stands in an initials tile). None is `placeholder: true` -- that flag means an unfilled
+ * seat on the board, and every seat here is filled.
  */
 const FALL_2026 = [
-  { name: 'Barry Chen', position: 'Co-President', image: 'board-barry', description: filler(26) },
-  { name: 'Evan Yu', position: 'Co-President', image: 'board-evan', description: filler(22) },
-  { name: 'Hannah Chen', position: 'Logistics', image: 'board-hannah', description: filler(30) },
-  { name: 'Emily Chen', position: 'Media', image: null, description: filler(24) },
-  { name: 'Megan Kim', position: 'Media', image: null, description: filler(28) },
+  { name: 'Barry Chen', position: 'Co-President', image: 'board-barry' },
+  { name: 'Evan Yu', position: 'Co-President', image: 'board-evan' },
+  { name: 'Hannah Chen', position: 'Logistics', image: 'board-hannah' },
+  { name: 'Emily Chen', position: 'Media', image: null },
+  { name: 'Megan Kim', position: 'Media', image: null },
   // Aaron's photograph is the one from the previous site -- a different shoot from the
   // three above it, and the client's call to keep it rather than stand a tile in its
   // place. AARON.image rather than the literal, so the two never drift.
-  { name: 'Aaron Hui', position: 'Treasurer', image: AARON.image, description: filler(20) },
+  { name: 'Aaron Hui', position: 'Treasurer', image: AARON.image },
 ];
 
 export const BOARD = {
