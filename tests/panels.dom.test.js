@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { RENDERERS } from '../src/ui/sections.js';
 
-const PANELS = ['hero', 'feature', 'header', 'plate'];
+const PANELS = ['hero', 'teaser', 'feature', 'header', 'plate'];
 
 /** The two patterns that OPEN a page, on the bare gradient. Every other one is glass. */
 const BARE = ['hero', 'header'];

@@ -33,6 +33,22 @@ export function mountMedia(el) {
   el.append(list);
 }
 
+/** How many videos the home page previews. */
+export const MEDIA_PREVIEW = 3;
+
+/**
+ * The home page's taste of the Media page: its first MEDIA_PREVIEW videos, the newest,
+ * one large and the rest beside it -- the Media page's own lead-and-small layout, cut down
+ * (src/styles/sections.css). Same cards and the same click-to-play as the full page, so a
+ * video started from the home page behaves exactly as it does there.
+ */
+export function mountMediaPreview(el) {
+  const list = document.createElement('div');
+  list.className = 'media-preview';
+  for (const item of MEDIA.slice(0, MEDIA_PREVIEW)) list.append(card(item));
+  el.append(list);
+}
+
 /** One video facade: a thumbnail button that swaps itself for the embed on click. */
 function card(item) {
   const el = document.createElement('article');

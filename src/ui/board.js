@@ -39,15 +39,15 @@ function card(member) {
     article.append(pending);
   }
 
+  // A name and a position, and nothing under them: no bios, at the client's request
+  // (src/content/index.js, above BOARD).
   const name = document.createElement('h3');
   name.textContent = member.name;
   const position = document.createElement('p');
   position.className = 'board-position';
   position.textContent = member.position;
-  const bio = document.createElement('p');
-  bio.textContent = member.description;
 
-  article.append(name, position, bio);
+  article.append(name, position);
   return article;
 }
 

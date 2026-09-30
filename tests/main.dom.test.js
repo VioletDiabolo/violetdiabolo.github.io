@@ -89,10 +89,10 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   };
 }
 
-// The home page's two: About, Board and Media are pages of their own now and Contact is
-// the footer. boot() picks its renderer off document.body.dataset.page, and these specs
-// run against the default (home) unless they set one.
-const SECTION_IDS = ['hero', 'events'];
+// The home page's four: the first screen, then a preview of each other page in the nav's
+// order. boot() picks its renderer off document.body.dataset.page, and these specs run
+// against the default (home) unless they set one.
+const SECTION_IDS = ['hero', 'about', 'media', 'join'];
 
 /** The current test's hand-driven rAF. Reassigned by the file-level beforeEach. */
 let frames;
